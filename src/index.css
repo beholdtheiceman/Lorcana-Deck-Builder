@@ -1,0 +1,10 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #111827; /* Tailwind’s gray-900 */
+  color: #fff;
+}
+
+button {
+  cursor: pointer;
+}
