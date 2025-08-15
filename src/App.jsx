@@ -453,6 +453,17 @@ export default function LorcanaDeckBuilderApp(){
   const [publishedImageUrl, setPublishedImageUrl] = useState(null);
   const [publishErr, setPublishErr] = useState(null);
 
+  // Safely close publish modal and release preview URL
+  const closePublishModal = () => {
+    if (publishedImageUrl) {
+      try { URL.revokeObjectURL(publishedImageUrl); } catch {}
+    }
+    setPublishedImageUrl(null);
+    setPublishedLink(null);
+    setPublishErr(null);
+    setPublishOpen(false);
+  };
+
   // load sets
   useEffect(()=>{ (async()=>{ try{ setLoadingSets(true); const s=await fetchSets(); setSets(s); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingSets(false); } })(); },[]);
 
@@ -799,7 +810,7 @@ export default function LorcanaDeckBuilderApp(){
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-semibold">Publish Deck</div>
-              <button type="button" className="text-xs underline text-white/70" onClick={()=> setPublishOpen(false)}>Close</button>
+              <button type="button" className="text-xs underline text-white/70" onClick={closePublishModal}>Close</button>
             </div>
             <div className="space-y-3">
               <div>
@@ -831,31 +842,67 @@ export default function LorcanaDeckBuilderApp(){
               {publishErr && <div className="p-2 rounded bg-red-500/10 border border-red-500/30 text-xs">{publishErr}</div>}
 
               <div className="flex items-center gap-2">
+                {/* PUBLISH: generate poster + show preview/link (no auto-download or navigation) */}
                 <button
                   className={`px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm ${publishing?'opacity-60 cursor-wait':''}`}
                   disabled={publishing}
                   onClick={async()=>{
-                    setPublishing(true); setPublishErr(null); setPublishedLink(null); setPublishedImageUrl(null);
+                    setPublishing(true);
+                    setPublishErr(null);
+                    setPublishedLink(null);
+
+                    // revoke previous preview if any
+                    if (publishedImageUrl) {
+                      try { URL.revokeObjectURL(publishedImageUrl); } catch {}
+                      setPublishedImageUrl(null);
+                    }
+
                     try {
-                      // UNIQUE poster (one tile per card + bubble)
-                      const blob = await exportDeckPoster(deck, deckName || 'Untitled Deck', deckNotes, { unique: true });
+                      const blob = await exportDeckPoster(
+                        deck,
+                        deckName || 'Untitled Deck',
+                        deckNotes,
+                        { unique: true }
+                      );
                       const url = URL.createObjectURL(blob);
-                      setPublishedImageUrl(url);
+                      setPublishedImageUrl(url); // preview stays in modal
 
-                      // share link (deck encoded in hash)
-                      const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(deck)))))}&title=${encodeURIComponent(deckName)}`;
+                      const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(
+                        btoa(unescape(encodeURIComponent(JSON.stringify(deck))))
+                      )}&title=${encodeURIComponent(deckName)}`;
                       setPublishedLink(share);
-
-                      // auto-download the poster
-                      const a = document.createElement('a');
-                      a.href = url; a.download = 'deck_poster.png';
-                      document.body.appendChild(a); a.click(); a.remove();
-                    } catch(e){ setPublishErr(e?.message || String(e)); }
-                    finally { setPublishing(false); }
-                  }}>
+                    } catch(e) {
+                      setPublishErr(e?.message || String(e));
+                    } finally {
+                      setPublishing(false);
+                    }
+                  }}
+                >
                   {publishing? 'Publishing…':'Publish'}
                 </button>
-                <button className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setPublishOpen(false)}>Close</button>
+
+                {/* DOWNLOAD POSTER (explicit) */}
+                {publishedImageUrl && (
+                  <button
+                    className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
+                    onClick={() => {
+                      const a = document.createElement('a');
+                      a.href = publishedImageUrl;
+                      a.download = (deckName || 'deck') + '_poster.png';
+                      a.rel = 'noopener';
+                      a.target = '_blank'; // avoids same-tab navigation quirks
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                    }}
+                  >
+                    Download poster
+                  </button>
+                )}
+
+                <button className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={closePublishModal}>
+                  Close
+                </button>
               </div>
             </div>
           </div>
