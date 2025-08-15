@@ -4,7 +4,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pi
 /** =========================
  *  Config / Data helpers
  * ========================= */
-const BASE = "https://api.lorcana-api.com";
+const BASE = import.meta.env.VITE_LORCANA_BASE || "https://api.lorcana-api.com";
 
 function buildSearch({ q, colors, types, cost, set, rarity, text }) {
   const parts = [];
@@ -38,7 +38,8 @@ function cacheKeyFor(query) {
 function getCached(query) {
   const k = cacheKeyFor(query);
   if (cache.has(k)) return cache.get(k);
-  const s = sessionStorage.getItem(`lorcana.cache.${k}`);
+  let s = null;
+  try { s = sessionStorage.getItem(`lorcana.cache.${k}`); } catch {}
   if (s) {
     try {
       const parsed = JSON.parse(s);
@@ -72,10 +73,8 @@ async function fetchCards({
   const search = buildSearch({ q, colors, types, cost, set, rarity, text });
   const query = { search, page, pagesize, orderby, sortdirection };
   if (!search) delete query.search;
-
   const cached = getCached(query);
   if (cached) return cached;
-
   const data = await fetchCardsRaw(query);
   setCached(query, data);
   return data;
@@ -178,7 +177,8 @@ function useUrlSync(filters, setters) {
   const { q, textSearch, colors, types, cost, rarity, setName, pagesize, orderby, sortdirection } = filters;
   // Load from URL once
   useEffect(() => {
-    const sp = new URLSearchParams(location.search);
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
     if (sp.has("q")) setters.setQ(sp.get("q") || "");
     if (sp.has("text")) setters.setTextSearch(sp.get("text") || "");
     if (sp.has("colors")) setters.setColors((sp.get("colors") || "").split(",").filter(Boolean));
@@ -194,6 +194,7 @@ function useUrlSync(filters, setters) {
 
   // Persist to URL
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
     if (textSearch) sp.set("text", textSearch);
@@ -206,7 +207,7 @@ function useUrlSync(filters, setters) {
     if (orderby !== "Color,Set_Num,Name") sp.set("orderby", orderby);
     if (sortdirection !== "ASC") sp.set("dir", sortdirection);
     const qs = sp.toString();
-    const url = qs ? `?${qs}` : location.pathname;
+    const url = qs ? `?${qs}` : window.location.pathname;
     window.history.replaceState({}, "", url);
   }, [q, textSearch, colors, types, cost, rarity, setName, pagesize, orderby, sortdirection]);
 }
@@ -245,7 +246,7 @@ export default function App() {
   const canvasRef = useRef(null);
   const exportBusyRef = useRef(false);
 
-  // Intersection observer for infinite scroll
+  // Infinite scroll sentinel
   const sentinelRef = useRef(null);
 
   // Debounce timer
@@ -267,6 +268,19 @@ export default function App() {
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved.deck) setDeck(saved.deck);
+      if (saved.filters) {
+        const f = saved.filters;
+        setQ(f.q || "");
+        setTextSearch(f.textSearch || "");
+        setColors(f.colors || []);
+        setTypes(f.types || []);
+        setCost(f.cost || "Any");
+        setRarity(f.rarity || "");
+        setSetName(f.setName || "");
+        setPagesize(f.pagesize || 24);
+        setOrderby(f.orderby || "Color,Set_Num,Name");
+        setSortdirection(f.sortdirection || "ASC");
+      }
     } catch {}
   }, []);
   useEffect(() => {
@@ -308,7 +322,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [lastAddedKey, push]);
 
-  // Fetch (initial & whenever filters change) — reset page + infinite list
+  // Fetch (initial & whenever filters change)
   useEffect(() => {
     clearTimeout(debounceRef.current);
     setLoading(true);
@@ -563,10 +577,15 @@ export default function App() {
     if (!lines.length) return;
     const parsed = [];
     for (const line of lines) {
-      let m = line.match(/^(\d+)[xX]?\s+(.+)$/) || line.match(/^(.+?)\s+[xX](\d+)$/);
-      if (m) {
-        const count = Number(m[1] || m[2] || 1);
-        const name = (m[2] || m[1] || "").replace(/^[xX]\d+/, "").trim();
+      let m1 = line.match(/^(\d+)[xX]?\s+(.+)$/);
+      let m2 = line.match(/^(.+?)\s+[xX](\d+)$/);
+      if (m1) {
+        const count = Number(m1[1] || 1);
+        const name = (m1[2] || "").trim();
+        if (name) parsed.push({ name, count: isNaN(count) ? 1 : count });
+      } else if (m2) {
+        const count = Number(m2[2] || 1);
+        const name = (m2[1] || "").trim();
         if (name) parsed.push({ name, count: isNaN(count) ? 1 : count });
       } else {
         parsed.push({ name: line, count: 1 });
@@ -589,7 +608,7 @@ export default function App() {
         if (key && copy[key]) {
           copy[key].__count = (copy[key].__count || 0) + count;
         } else {
-          // can't resolve card object without search, create a placeholder entry
+          // placeholder if not found
           copy[`name-only|${name}`] = { Name: name, __count: count, Color: "—", Cost: "—", Type: "—", Rarity: "—", Set: "—", Set_Num: "—", Image: "" };
         }
       }
@@ -615,7 +634,6 @@ export default function App() {
           const name = (r[iName] || "").trim();
           if (!name) continue;
           const count = Number((iCount !== -1 ? r[iCount] : "1") || "1") || 1;
-          // same merging by printed name as above
           const nm = name.toLowerCase();
           const existingKey = Object.keys(copy).find((k) => (copy[k].Name || "").trim().toLowerCase() === nm);
           if (existingKey) copy[existingKey].__count = (copy[existingKey].__count || 0) + count;
@@ -657,7 +675,7 @@ export default function App() {
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center gap-3">
         <h1 className="text-xl font-semibold">Lorcana Deck Builder</h1>
-        <div className="text-xs text-white/60 ml-auto">Data: api.lorcana-api.com</div>
+        <div className="text-xs text-white/60 ml-auto">Data: {BASE.replace(/^https?:\/\//, "")}</div>
       </div>
 
       <div className="p-4 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
@@ -800,7 +818,7 @@ export default function App() {
                     if (ia !== ib) return ia.localeCompare(ib);
                     const ca = Number(a.Cost ?? 0); const cb = Number(b.Cost ?? 0);
                     if (ca !== cb) return ca - cb;
-                    return String(a.Name || "").localeCompare(String(b.Name || "");
+                    return String(a.Name || "").localeCompare(String(b.Name || ""));
                   })}
                   .map((d) => (
                     <li key={cardKey(d)} className="flex items-center gap-2 p-2 rounded-lg bg-black/10 border border-white/10">
@@ -810,9 +828,25 @@ export default function App() {
                         <div className="text-xs text-white/50">{d.Color ?? "—"} · Cost {d.Cost ?? "—"} · {d.Rarity ?? "—"}</div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button className="px-2 py-1 text-sm rounded-md bg-white/10 hover:bg-white/20" onClick={() => addToDeck(d, -1)} title="Remove one">−</button>
-                        <input className="w-14 px-2 py-1 text-sm rounded-md bg-[#0a0f1d] border border-white/10 text-center" value={d.__count} onChange={(e) => setCount(d, e.target.value)} />
-                        <button className="px-2 py-1 text-sm rounded-md bg-white/10 hover:bg-white/20" onClick={() => addToDeck(d, +1)} title="Add one">+</button>
+                        <button
+                          className="px-2 py-1 text-sm rounded-md bg-white/10 hover:bg-white/20"
+                          onClick={() => addToDeck(d, -1)}
+                          title="Remove one"
+                        >
+                          −
+                        </button>
+                        <input
+                          className="w-14 px-2 py-1 text-sm rounded-md bg-[#0a0f1d] border border-white/10 text-center"
+                          value={d.__count}
+                          onChange={(e) => setCount(d, e.target.value)}
+                        />
+                        <button
+                          className="px-2 py-1 text-sm rounded-md bg-white/10 hover:bg-white/20"
+                          onClick={() => addToDeck(d, +1)}
+                          title="Add one"
+                        >
+                          +
+                        </button>
                       </div>
                     </li>
                   ))}
@@ -964,7 +998,7 @@ export default function App() {
               <div>
                 <div className="text-sm text-white/70 mb-2">Cost</div>
                 <div className="flex flex-wrap gap-2">
-                  {["Any", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9+"].map((c) => (
+                  {COSTS.map((c) => (
                     <button
                       key={c}
                       className={`px-3 py-1.5 rounded-full border text-sm ${cost === c ? "bg-white/20 border-white/40" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
