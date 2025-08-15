@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer,
@@ -12,222 +13,47 @@ import {
 } from "recharts";
 
 /** =========================
- *  Provider selector
- *  (Default to LORCAST per your request)
+ *  Data fetcher (matches MAIN provider: lorcana-api.com)
  * ========================= */
-const DATA_PROVIDER = (import.meta.env.VITE_DATA_PROVIDER || "lorcast").toLowerCase();
+const API_BASE = "https://lorcana-api.com";
 
-/** =========================
- *  Lorcast Provider
- * ========================= */
-const LORCAST_BASE = import.meta.env.VITE_LORCAST_BASE || "";
-
-function buildLorcastQuery({
+/**
+ * Build query for lorcana-api.com/cards
+ * (We keep it minimal to mirror your main branch;
+ * keywords/archetype/format are applied client-side.)
+ */
+function buildCardsQuery({
   q,
-  colors,
-  types,
+  color,
+  type,
   cost,
-  set,
-  rarity,
-  text,
-  keywords = [],
-  archetype = "",
   page = 1,
   pagesize = 24,
   orderby = "Color,Set_Num,Name",
   sortdirection = "ASC",
 }) {
-  // We don't know Lorcast's exact grammar, so we send common-sense params.
-  // Adjust keys here to match your Lorcast server once known.
   const params = new URLSearchParams();
-
   if (q) params.set("name", q);
-  if (text) params.set("text", text);
-  if (keywords.length) params.set("keywords", keywords.join(","));
-  if (archetype) params.set("archetype", archetype);
-
-  if (colors?.length) params.set("color", colors.join(",")); // e.g., Amber,Emerald
-  if (types?.length) params.set("type", types.join(","));    // e.g., Character,Song
-
+  if (color) params.set("ink", color);
+  if (type) params.set("type", type);
   if (cost && cost !== "Any") {
-    if (cost === "9+") {
-      params.set("minCost", "9");
-    } else {
-      params.set("cost", String(cost));
-    }
+    params.set("cost", cost === "9+" ? "9+" : String(cost));
   }
-
-  if (set) params.set("set", set);
-  if (rarity) params.set("rarity", rarity);
-
   params.set("page", String(page));
-  params.set("pageSize", String(pagesize)); // common naming; server can alias
-
-  // Sort mapping best-effort
-  // Map known fields to lowercase plausible server keys.
-  const mappedSort = orderby
-    .split(",")
-    .map((k) => k.trim().toLowerCase().replace("set_num", "setnumber"))
-    .join(",");
-  params.set("sort", mappedSort);
-  params.set("dir", (sortdirection || "ASC").toUpperCase());
-
+  params.set("pagesize", String(pagesize));
+  params.set("orderby", orderby);
+  params.set("sortdirection", sortdirection);
   return params;
 }
 
-function normalizeLorcastCard(x) {
-  // Normalize various possible field names coming from Lorcast
-  const Name = x.Name ?? x.name ?? x.cardName ?? x.title ?? "";
-  const Color = x.Color ?? x.color ?? x.ink ?? x.inkColor ?? "";
-  const Cost = x.Cost ?? x.cost ?? x.inkCost ?? x.playCost ?? "";
-  const Type = x.Type ?? x.type ?? x.cardType ?? "";
-  const Rarity = x.Rarity ?? x.rarity ?? "";
-  const Set = x.Set ?? x.setName ?? x.set ?? "";
-  const Set_Num = x.Set_Num ?? x.setNumber ?? x.number ?? x.collectorNumber ?? "";
-  const Image =
-    x.Image ??
-    x.image ??
-    x.imageUrl ??
-    (x.images && (x.images.large || x.images.normal || x.images.small)) ??
-    "";
-  const Rules = x.Rules ?? x.text ?? x.oracleText ?? x.rules ?? "";
-
-  return {
-    ...x,
-    Name,
-    Color,
-    Cost,
-    Type,
-    Rarity,
-    Set,
-    Set_Num,
-    Image,
-    Rules,
-  };
-}
-
-async function fetchFromLorcast(query) {
-  if (!LORCAST_BASE) {
-    throw new Error(
-      "VITE_LORCAST_BASE is not set. Please add it in your env (Preview/Production)."
-    );
-  }
-  // Try a couple of common endpoints: /cards, /api/cards, /cards/search
-  const endpoints = ["/cards", "/api/cards", "/cards/search"];
-  let lastErr;
-  for (const path of endpoints) {
-    const url = `${LORCAST_BASE.replace(/\/+$/, "")}${path}?${query.toString()}`;
-    try {
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) {
-        lastErr = new Error(`Lorcast ${res.status} on ${path}`);
-        continue;
-      }
-      const data = await res.json();
-      // Accept either an array or {results:[], total: n}
-      const list = Array.isArray(data) ? data : data.results || [];
-      return list.map(normalizeLorcastCard);
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr || new Error("Lorcast request failed");
-}
-
-const lorcastProvider = {
-  async fetchCards(filters) {
-    const qs = buildLorcastQuery(filters);
-    return fetchFromLorcast(qs);
-  },
-  label: LORCAST_BASE ? new URL(LORCAST_BASE).host : "Lorcast",
-};
-
-/** =========================
- *  (Optional) Lorcana-API Provider (kept as fallback)
- * ========================= */
-const LORCANA_BASE =
-  import.meta.env.VITE_LORCANA_BASE || "https://api.lorcana-api.com";
-
-function buildLorcanaSearch({
-  q,
-  colors,
-  types,
-  cost,
-  set,
-  rarity,
-  text,
-  keywords,
-  archetype,
-}) {
-  const parts = [];
-  if (q) parts.push(`name~${encodeURIComponent(q)}`);
-  if (text) parts.push(`rules~${encodeURIComponent(text)}`);
-  if (keywords?.length) {
-    parts.push(keywords.map((k) => `rules~${encodeURIComponent(k)}`).join(";"));
-  }
-  if (archetype) parts.push(`rules~${encodeURIComponent(archetype)}`);
-  if (colors?.length)
-    parts.push(colors.map((c) => `color=${encodeURIComponent(c)}`).join(";"));
-  if (types?.length) {
-    const normalized = types.map((t) => (t === "Song" ? "Song" : t));
-    parts.push(
-      normalized.map((t) => `type~${encodeURIComponent(t)}`).join(";")
-    );
-  }
-  if (set) parts.push(`set=${encodeURIComponent(set)}`);
-  if (rarity) parts.push(`rarity=${encodeURIComponent(rarity)}`);
-  if (cost && cost !== "Any") {
-    if (cost === "9+") parts.push("cost>=9");
-    else parts.push(`cost=${cost}`);
-  }
-  return parts.length ? parts.join(";") : "";
-}
-
-async function fetchFromLorcanaApi(paramsObj) {
-  const params = new URLSearchParams(paramsObj);
-  const url = `${LORCANA_BASE}/cards/fetch?${params.toString()}`;
+async function fetchCardsRaw(filters) {
+  const params = buildCardsQuery(filters);
+  const url = `${API_BASE.replace(/\/+$/, "")}/cards?${params.toString()}`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`lorcana-api ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
-
-const lorcanaProvider = {
-  async fetchCards(filters) {
-    const {
-      q,
-      colors,
-      types,
-      cost = "Any",
-      set,
-      rarity,
-      text,
-      keywords = [],
-      archetype = "",
-      page = 1,
-      pagesize = 24,
-      orderby = "Color,Set_Num,Name",
-      sortdirection = "ASC",
-    } = filters;
-    const search = buildLorcanaSearch({
-      q,
-      colors,
-      types,
-      cost,
-      set,
-      rarity,
-      text,
-      keywords,
-      archetype,
-    });
-    const query = { page, pagesize, orderby, sortdirection };
-    if (search) query.search = search;
-    return fetchFromLorcanaApi(query);
-  },
-  label: "api.lorcana-api.com",
-};
-
-const provider = DATA_PROVIDER === "lorcana-api" ? lorcanaProvider : lorcastProvider;
 
 /** =========================
  *  Shared helpers
@@ -260,9 +86,7 @@ function proxyImageUrl(src) {
     const u = new URL(src);
     if (u.hostname.includes("weserv.nl")) return src;
   } catch {}
-  return `https://images.weserv.nl/?url=${encodeURIComponent(
-    src
-  )}&output=jpg&il`;
+  return `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg&il`;
 }
 
 /** =========================
@@ -459,8 +283,8 @@ export default function App() {
   // Filters / search
   const [q, setQ] = useState("");
   const [textSearch, setTextSearch] = useState("");
-  const [keywords, setKeywords] = useState([]);
-  const [archetype, setArchetype] = useState("");
+  const [keywords, setKeywords] = useState([]); // client-side filter
+  const [archetype, setArchetype] = useState(""); // client-side filter
   const [colors, setColors] = useState([]);
   const [types, setTypes] = useState([]);
   const [cost, setCost] = useState("Any");
@@ -632,24 +456,33 @@ export default function App() {
    *  Fetch
    * ========================= */
   async function fetchCards(filters) {
-    const key = { provider: provider.label, ...filters };
+    const key = { provider: "lorcana-api.com", ...filters };
     const cached = getCached(key);
     if (cached) return cached;
-    const data = await provider.fetchCards(filters);
+    const data = await fetchCardsRaw({
+      q: filters.q,
+      color: filters.colors?.[0] || "", // API supports single ink param; we send first if multi-selected
+      type: filters.types?.[0] || "",
+      cost: filters.cost,
+      page: filters.page,
+      pagesize: filters.pagesize,
+      orderby: filters.orderby,
+      sortdirection: filters.sortdirection,
+    });
     setCached(key, data);
     return data;
   }
 
-  // Apply Format (client-side): Standard Core excludes Sets 1–4
+  // Format filter (client-side): Standard Core excludes Sets 1–4
   function passesFormat(c) {
     if (format === "Infinity") return true;
-    const setName = String(c.Set || "");
-    const found = SETS.find((s) => s.name === setName);
+    const setNameLocal = String(c.Set || "");
+    const found = SETS.find((s) => s.name === setNameLocal);
     const setId = found?.id ?? Number(c.Set_Num ?? 0);
-    return setId >= 5; // Standard Core ⇒ sets 5+
+    return setId >= 5; // Standard Core: sets 5+
   }
 
-  // Extra client-side filters (keywords/archetype if backend didn't)
+  // Extra client-side filters
   function passesClientFilters(c) {
     const textBlob = [c.Rules, c.Traits, c.Subtypes, c.Type, c.Name]
       .map((x) => String(x || "").toLowerCase())
@@ -660,6 +493,10 @@ export default function App() {
     )
       return false;
     if (archetype && !textBlob.includes(String(archetype).toLowerCase()))
+      return false;
+    if (rarity && String(c.Rarity || "").toLowerCase() !== rarity.toLowerCase())
+      return false;
+    if (setName && String(c.Set || "").toLowerCase() !== setName.toLowerCase())
       return false;
     return true;
   }
@@ -676,11 +513,6 @@ export default function App() {
           colors,
           types,
           cost,
-          set: setName || undefined,
-          rarity: rarity || undefined,
-          text: textSearch || undefined,
-          keywords,
-          archetype,
           page: 1,
           pagesize,
           orderby,
@@ -703,7 +535,7 @@ export default function App() {
     // eslint-disable-next-line
   }, [
     q,
-    textSearch,
+    textSearch, // currently client-side only
     keywords.join("|"),
     archetype,
     colors.join("|"),
@@ -715,7 +547,6 @@ export default function App() {
     pagesize,
     orderby,
     sortdirection,
-    DATA_PROVIDER,
   ]);
 
   // Infinite scroll
@@ -734,11 +565,6 @@ export default function App() {
             colors,
             types,
             cost,
-            set: setName || undefined,
-            rarity: rarity || undefined,
-            text: textSearch || undefined,
-            keywords,
-            archetype,
             page: next,
             pagesize,
             orderby,
@@ -1027,8 +853,9 @@ export default function App() {
         <h1 className="text-xl font-semibold">Lorcana Deck Builder</h1>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden sm:inline text-xs text-white/60">
-            Data: {provider.label}
+            Data: lorcana-api.com
           </span>
+          {/* Mobile deck toggle */}
           <button
             className="sm:hidden px-3 py-2 rounded-md border border-white/10 bg-white/5"
             onClick={() => setDeckOpen(true)}
@@ -1041,6 +868,7 @@ export default function App() {
       <div className="p-4 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
         {/* Left: Search & Results */}
         <div>
+          {/* Search row (mobile-friendly) */}
           <div className="flex flex-wrap gap-2 items-center mb-3">
             <input
               className="flex-1 min-w-[180px] px-3 py-2 rounded-md bg-[#0f1324] border border-white/10 outline-none"
@@ -1053,7 +881,7 @@ export default function App() {
             />
             <input
               className="flex-1 min-w-[180px] px-3 py-2 rounded-md bg-[#0f1324] border border-white/10 outline-none"
-              placeholder="Text in rules…"
+              placeholder="Text in rules… (client filter)"
               value={textSearch}
               onChange={(e) => {
                 setPage(1);
@@ -1103,6 +931,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Results grid */}
           {err && (
             <div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">
               {err}
@@ -1175,7 +1004,10 @@ export default function App() {
         <div className="hidden lg:block bg-[#0f1324] rounded-xl border border-white/10 p-3 h-fit sticky top-4">
           <DeckPanel
             deck={deck}
-            totalDeckCards={totalDeckCards}
+            totalDeckCards={Object.values(deck).reduce(
+              (s, d) => s + (d.__count || 0),
+              0
+            )}
             addToDeck={addToDeck}
             setCount={setCount}
             clearDeck={clearDeck}
@@ -1200,10 +1032,15 @@ export default function App() {
           <div className="absolute inset-x-0 bottom-0 max-h-[85%] bg-[#0b1120] border-t border-white/10 rounded-t-2xl p-3 overflow-auto">
             <div className="flex items-center mb-2">
               <h2 className="text-lg font-semibold">
-                Your Deck ({totalDeckCards})
+                Your Deck (
+                {Object.values(deck).reduce(
+                  (s, d) => s + (d.__count || 0),
+                  0
+                )}
+                )
               </h2>
               <button
-                className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg.white/5 hover:bg-white/10"
                 onClick={() => setDeckOpen(false)}
               >
                 Close
@@ -1211,7 +1048,10 @@ export default function App() {
             </div>
             <DeckPanel
               deck={deck}
-              totalDeckCards={totalDeckCards}
+              totalDeckCards={Object.values(deck).reduce(
+                (s, d) => s + (d.__count || 0),
+                0
+              )}
               addToDeck={addToDeck}
               setCount={setCount}
               clearDeck={clearDeck}
@@ -1228,7 +1068,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Filters Drawer */}
+      {/* Filters Drawer (with Keywords/Archetype/Format) */}
       {filtersOpen && (
         <div className="fixed inset-0 z-40">
           <div
@@ -1252,7 +1092,7 @@ export default function App() {
             <div className="space-y-5">
               {/* Format */}
               <div>
-                <div className="text-sm text-white/70 mb-2">Format</div>
+                <div className="text-sm text.white/70 mb-2">Format</div>
                 <div className="flex flex-wrap gap-2">
                   {["Infinity", "Standard Core"].map((f) => (
                     <button
@@ -1474,7 +1314,7 @@ export default function App() {
                   <div className="flex items-start gap-2">
                     <h4 className="text-lg font-semibold">{modalCard.Name}</h4>
                     <button
-                      className="ml-auto px-2 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                      className="ml-auto px-2 py-1 rounded-md bg-white/10 hover:bg.white/20"
                       onClick={() => setModalCard(null)}
                     >
                       ✕
