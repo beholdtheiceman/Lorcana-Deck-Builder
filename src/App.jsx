@@ -1,4 +1,3 @@
-\
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
@@ -96,7 +95,7 @@ function buildQuery(f){
   if (typeof f.costMax === 'number') parts.push(`c<=${f.costMax}`);
   if (f.inkwell === 'inkable') parts.push('iw');
   if (f.inkwell === 'non-inkable') parts.push('-iw');
-  if (f.keywords?.length) parts.push(`(${f.keywords.map(k=>`keyword:${k.toLowerCase().replace(/\\s+/g,'_')}`).join(" or ")})`);
+  if (f.keywords?.length) parts.push(`(${f.keywords.map(k=>`keyword:${k.toLowerCase().replace(/\s+/g,'_')}`).join(" or ")})`);
   if (f.archetypes?.length) parts.push(`(${f.archetypes.map(a=>`t:${a.toLowerCase()}`).join(" or ")})`);
   if (f.format === 'core') parts.push('format:core');
   if (f.format === 'infinity') parts.push('format:infinity');
@@ -150,7 +149,7 @@ async function generateDeckListImage(entries, title, notes){
   if(notes){ const boxY=H-footerH-70; ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(pad,boxY,W-pad*2,60); ctx.fillStyle='#fff'; ctx.font='bold 13px ui-sans-serif, system-ui'; ctx.fillText('Notes', pad+10, boxY+20); ctx.font='12px ui-sans-serif, system-ui'; wrapText(ctx, notes, pad+10, boxY+40, W-pad*2-20, 16); }
   ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px ui-sans-serif, system-ui'; ctx.fillText('Generated with Lorcast data · deckbuilder', pad, H-8);
   return new Promise(resolve=> canvas.toBlob(b=>resolve(b), 'image/png', 0.92));
-  function wrapText(c,t,ox,oy,maxW,lh){ const words=(t||'').split(/\\s+/); let line='', y=oy; for(const w of words){ const test=line?line+' '+w:w; if(c.measureText(test).width>maxW){ c.fillText(line,ox,y); line=w; y+=lh; } else line=test; } if(line) c.fillText(line,ox,y); }
+  function wrapText(c,t,ox,oy,maxW,lh){ const words=(t||'').split(/\s+/); let line='', y=oy; for(const w of words){ const test=line?line+' '+w:w; if(c.measureText(test).width>maxW){ c.fillText(line,ox,y); line=w; y+=lh; } else line=test; } if(line) c.fillText(line,ox,y); }
 }
 
 // ───────────────────────────── UI atoms ─────────────────────────────
@@ -263,7 +262,7 @@ export default function LorcanaDeckBuilderApp(){
   }, [filters]);
 
   // Search (guard empty)
-  useEffect(()=>{ (async()=>{ try{ setErr(null); if(!query || !query.trim()){ setCards([]); return; } setLoadingCards(true); const res=await searchCards(query, uniqueMode); setCards(res); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingCards(false); } })(); }, [query, uniqueMode]);
+  useEffect(()=>{ (async()=>{ try{ setErr(null); if(!query || !query.trim()){ setCards([]); return; } setLoadingCards=true; const res=await searchCards(query, uniqueMode); setCards(res); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingCards(false); } })(); }, [query, uniqueMode]);
 
   // Persist deck
   useEffect(()=>{ try{ localStorage.setItem('lorcana_deck_mvp', JSON.stringify(deck)); }catch{} }, [deck]);
@@ -482,7 +481,7 @@ export default function LorcanaDeckBuilderApp(){
       {/* Manual copy modal */}
       {copyModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-width-2xl rounded-2xl border border-white/10 bg-slate-950 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-950 p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-semibold">Manual Copy</div>
               <button type="button" className="text-xs underline text-white/70" onClick={()=> setCopyModal({ open:false, text:"" })}>Close</button>
