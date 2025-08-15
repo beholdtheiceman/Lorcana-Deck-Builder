@@ -127,9 +127,8 @@ function drawCountBubble(ctx, x, y, n) {
   ctx.restore();
 }
 
-// UNIQUE tile grid (one tile per full name) or per-copy grid (old mode)
+// UNIQUE tile grid (one tile per full name) or per-copy grid
 async function exportDeckAsPng(deck, { unique = false } = {}) {
-  // Build entries
   const entries = Object.values(deck)
     .filter(e => e.count > 0)
     .sort((a, b) =>
@@ -137,7 +136,6 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
       (a.card.name > b.card.name ? 1 : -1)
     );
 
-  // Totals per full name + representative print
   const totalByFullName = {};
   const repByFullName = {};
   const prints = [];
@@ -154,7 +152,6 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
     for (const key of Object.keys(repByFullName)) prints.push(repByFullName[key]);
   }
 
-  // Layout
   const cols = unique ? 8 : 10;
   const cellW = unique ? 180 : 134;
   const cellH = unique ? 255 : 187;
@@ -178,11 +175,9 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
     const x = pad + col * (cellW + pad);
     const y = pad + row * (cellH + pad);
 
-    // frame
     ctx.fillStyle = "#171b2b"; ctx.fillRect(x, y, cellW, cellH);
     ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.strokeRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
 
-    // image
     const rawImg =
       card.image_uris?.digital?.large ||
       card.image_uris?.digital?.normal ||
@@ -198,7 +193,6 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
       } catch { /* keep placeholder */ }
     }
 
-    // count bubble
     const key = fullNameKey(card);
     const totalForThis = totalByFullName[key] || 0;
     if (unique) {
@@ -209,16 +203,14 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
     }
   }
 
-  // footer
   ctx.fillStyle = "#fff"; ctx.font = "10px ui-sans-serif, system-ui";
   ctx.fillText(`Exported ${new Date().toLocaleString()} — Powered by Lorcast`, pad, H - 6);
 
   return new Promise(res => canvas.toBlob(b => res(b), "image/png"));
 }
 
-/* Poster export for Publish: grid (left) + decklist/notes (right) */
+/* Poster export for Publish */
 async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
-  // grid image
   const gridBlob = await exportDeckAsPng(deck, { unique });
   if (!gridBlob) throw new Error("Failed to build grid image");
   const gridUrl = URL.createObjectURL(gridBlob);
@@ -230,7 +222,6 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
     img.src = gridUrl;
   });
 
-  // decklist for right column
   const entries = Object.values(deck)
     .sort((a, b) => (a.card.cost ?? 0) - (b.card.cost ?? 0) || (a.card.name > b.card.name ? 1 : -1))
     .map((e) => ({
@@ -242,7 +233,6 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
       ink: e.card.ink,
     }));
 
-  // layout
   const pad = 24;
   const rightW = 460;
   const lineH = 20;
@@ -262,19 +252,16 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
   ctx.fillStyle = "#0b0f1a";
   ctx.fillRect(0, 0, W, H);
 
-  // grid
   const gridX = pad;
   const gridY = pad;
   ctx.drawImage(gridImg, gridX, gridY);
 
-  // right column bg
   const rightX = gridX + gridImg.width + pad;
   ctx.fillStyle = "#0a0e19";
   ctx.fillRect(rightX, pad, rightW, H - pad * 2);
   ctx.strokeStyle = "rgba(255,255,255,0.08)";
   ctx.strokeRect(rightX + 0.5, pad + 0.5, rightW - 1, H - pad * 2 - 1);
 
-  // header
   ctx.fillStyle = "#fff";
   ctx.font = "bold 20px ui-sans-serif, system-ui";
   ctx.fillText(title || "Untitled Deck", rightX + 14, pad + 26);
@@ -282,7 +269,6 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.fillText(new Date().toLocaleString(), rightX + 14, pad + 44);
 
-  // decklist
   ctx.fillStyle = "#fff";
   ctx.font = "13px ui-sans-serif, system-ui";
   let y = pad + headerH;
@@ -294,7 +280,6 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
     y += lineH;
   }
 
-  // notes
   if (notes) {
     const boxY = Math.min(y + 12, H - footerH - 78);
     ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -306,14 +291,9 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
     wrap(ctx, notes, rightX + 18, boxY + 36, rightW - 36, 16);
   }
 
-  // footer
   ctx.font = "11px ui-sans-serif, system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillText(
-    "Generated with Lorcast data · deckbuilder",
-    rightX + 14,
-    H - 10
-  );
+  ctx.fillText("Generated with Lorcast data · deckbuilder", rightX + 14, H - 10);
 
   URL.revokeObjectURL(gridUrl);
 
@@ -521,8 +501,7 @@ export default function LorcanaDeckBuilderApp(){
   async function doExport(){
     setExportErr(null); setExporting(true);
     try{
-      // unique tiles with count bubbles
-      const blob=await exportDeckAsPng(deck, { unique: true });
+      const blob=await exportDeckAsPng(deck, { unique: true }); // unique tiles
       if(!blob) throw new Error('Failed to build image blob');
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a'); a.href=url; a.download='lorcana-deck.png'; a.rel='noopener';
@@ -725,4 +704,166 @@ export default function LorcanaDeckBuilderApp(){
                 <div className="text-sm font-semibold">Unsaved deck</div>
                 <div className="text-xs text-white/60">
                   {total} cards · Inks: {inksInDeck.join(', ') || '—'} {total < 60 && <span className="ml-1 text-amber-300">(needs ≥ 60)</span>}
-               
+                </div>
+              </div>
+              <div className="text-right text-xs">
+                <div>Inkable: <span className="text-emerald-300">{inkableStats.inkable}</span></div>
+                <div>Uninkable: <span className="text-rose-300">{inkableStats.uninkable}</span></div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex gap-2 flex-wrap">
+              <button type="button" onClick={copyTextExport}
+                className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">Copy Text</button>
+              <button type="button" disabled={exporting} onClick={doExport}
+                className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">
+                {exporting? 'Exporting…' : 'Export PNG'}
+              </button>
+              <button type="button" onClick={()=> setPublishOpen(true)}
+                className="px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm">
+                Publish
+              </button>
+              <button type="button" onClick={clearDeck}
+                className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">Clear</button>
+            </div>
+
+            <div className="mt-3">
+              {Object.values(deck).length === 0 ? (
+                <div className="text-sm text-white/60">Add cards from the grid →</div>
+              ) : (
+                Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).map(e=> (
+                  <DeckRow key={e.card.id} entry={e}
+                    onInc={()=> addToDeck(e.card,1)}
+                    onDec={()=> decEntry(e.card.id)}
+                    onRemove={()=> removeEntry(e.card.id)}
+                  />
+                ))
+              )}
+            </div>
+
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-2">Curve</div>
+              <div className="h-36">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={curveData}>
+                    <XAxis dataKey="cost" stroke="#aaa" />
+                    <YAxis stroke="#aaa" allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="count" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-xs text-white/50 mt-1">Rules: ≥60 min, ≤4 per full name, ≤2 inks.</div>
+              {exportErr && <div className="mt-2 text-xs text-rose-300">{exportErr}</div>}
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      {/* Copy modal */}
+      {copyModal.open && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={()=> setCopyModal({open:false, text:''})} />
+          <div className="relative bg-[#0b0f1a] border border-white/10 rounded-xl w-[min(90vw,680px)] p-4">
+            <div className="text-sm font-semibold mb-2">Copy deck text</div>
+            <textarea ref={copyAreaRef} rows={10} className="w-full bg-black/30 border border-white/10 rounded p-2 font-mono text-xs"
+              value={copyModal.text} onChange={()=>{}} />
+            <div className="mt-3 flex justify-end">
+              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
+                onClick={()=> setCopyModal({open:false, text:''})}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish modal */}
+      {publishOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={closePublishModal} />
+          <div className="relative bg-[#0b0f1a] border border-white/10 rounded-xl w-[min(96vw,900px)] max-h-[90vh] overflow-auto p-4">
+            <div className="text-sm font-semibold mb-3">Publish deck poster</div>
+
+            <div className="grid gap-4 md:grid-cols-[1fr,320px]">
+              <div className="bg-black/20 border border-white/10 rounded-lg min-h-[280px] flex items-center justify-center">
+                {publishedImageUrl
+                  ? <img src={publishedImageUrl} alt="Poster preview" className="max-w-full max-h-[60vh] object-contain" />
+                  : <div className="text-white/50 text-sm">No poster yet. Click “Publish” to generate.</div>}
+              </div>
+
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Deck name</label>
+                <input value={deckName} onChange={e=> setDeckName(e.target.value)}
+                  className="w-full mb-3 px-3 py-2 rounded bg-black/30 border border-white/10" />
+
+                <label className="block text-xs text-white/60 mb-1">Notes (optional)</label>
+                <textarea rows={6} value={deckNotes} onChange={e=> setDeckNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded bg-black/30 border border-white/10" />
+
+                {publishedLink && (
+                  <div className="mt-3 text-xs">
+                    <div className="text-white/60 mb-1">Share link:</div>
+                    <div className="p-2 rounded bg-black/30 border border-white/10 break-all">{publishedLink}</div>
+                  </div>
+                )}
+
+                {publishErr && <div className="mt-2 text-xs text-rose-300">{publishErr}</div>}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2 justify-end">
+              <button
+                className={`px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm ${publishing?'opacity-60 cursor-wait':''}`}
+                disabled={publishing}
+                onClick={async()=>{
+                  setPublishing(true);
+                  setPublishErr(null);
+                  setPublishedLink(null);
+                  if (publishedImageUrl) { try{ URL.revokeObjectURL(publishedImageUrl); }catch{} setPublishedImageUrl(null); }
+                  try {
+                    const blob = await exportDeckPoster(deck, deckName || 'Untitled Deck', deckNotes, { unique: true });
+                    const url = URL.createObjectURL(blob);
+                    setPublishedImageUrl(url);
+                    const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(
+                      btoa(unescape(encodeURIComponent(JSON.stringify(deck))))
+                    )}&title=${encodeURIComponent(deckName)}`;
+                    setPublishedLink(share);
+                  } catch(e) {
+                    setPublishErr(e?.message || String(e));
+                  } finally {
+                    setPublishing(false);
+                  }
+                }}
+              >
+                {publishing ? 'Publishing…' : 'Publish'}
+              </button>
+
+              {publishedImageUrl && (
+                <button
+                  className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = publishedImageUrl;
+                    a.download = (deckName || 'deck') + '_poster.png';
+                    a.rel = 'noopener';
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                  }}
+                >
+                  Download poster
+                </button>
+              )}
+
+              <button className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={closePublishModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {filtersOpen && <FiltersSheet/>}
+    </div>
+  );
+}
