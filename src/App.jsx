@@ -3,18 +3,15 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recha
 
 /**
  * Lorcana Deck Builder – Dreamborn-style two-pane
- *
- * - Tailwind ready
- * - Clipboard-safe (user-initiated actions)
- * - Optional Supabase publish (dynamic import; env read is safe)
- * - Filters: inks/types/rarities/sets/cost chips/inkwell/keywords/archetypes/format
- * - Sorting: by set then collector number
- * - Export PNG (grid of cards) + Copy Text export
+ * - Filters (inks/types/rarities/sets/cost chips/inkwell/keywords/archetypes/format)
+ * - Sorting by set then collector number
+ * - Deck: ≥60 min, ≤4 per full name, ≤2 inks
+ * - Export PNG (grid of prints) with CORS-safe image proxy
+ * - Copy Text export w/ clipboard fallback
+ * - Optional publish modal (no backend calls unless configured in env)
  */
 
-// ────────────────────────────── Types via JSDoc ─────────────────────────────
 /** @typedef {"Amber"|"Amethyst"|"Emerald"|"Ruby"|"Sapphire"|"Steel"} Ink */
-
 /** @typedef {{
  *  id: string,
  *  name: string,
@@ -31,7 +28,6 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recha
  *  collector_number?: string
  * }} Card */
 
-// ─────────────────────────────── Constants/Data ─────────────────────────────
 const API_ROOT = "https://api.lorcast.com/v0";
 const ALL_INKS = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
 const ALL_TYPES = ["Character","Action","Song","Item","Location"];
@@ -49,8 +45,6 @@ const ALL_ARCHETYPES = [
 ];
 const COST_CHOICES = [1,2,3,4,5,6,7,8,9]; // 9 -> 9+
 
-// ─────────────────────────────── Helper functions ───────────────────────────
-/** @param {Card} card */
 function fullNameKey(card){ return `${card.name} — ${card.version ?? ""}`.trim(); }
 
 async function fetchSets(){
@@ -60,11 +54,6 @@ async function fetchSets(){
   return (j.results ?? []);
 }
 
-/**
- * @param {string} query
- * @param {"cards"|"prints"} unique
- * @returns {Promise<Card[]>}
- */
 async function searchCards(query, unique = "cards"){
   const url = new URL(`${API_ROOT}/cards/search`);
   url.searchParams.set("q", query);
@@ -119,24 +108,106 @@ async function copyToClipboardRobust(text){
   return 'manual';
 }
 
-async function fetchImageBlob(url){ const r=await fetch(url); if(!r.ok) throw new Error('Image fetch failed'); return await r.blob(); }
-function drawCountBubble(ctx,x,y,n){ const radius=16; ctx.save(); ctx.beginPath(); ctx.arc(x,y,radius,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 16px ui-sans-serif, system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(n),x,y+1); ctx.restore(); }
-async function exportDeckAsPng(deck){
-  const entries=Object.values(deck).filter(e=>e.count>0).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1));
-  const prints=[]; entries.forEach(({card,count})=>{ for(let i=0;i<count;i++) prints.push(card); });
-  const cols=10, cellW=134, cellH=187, pad=10; const rows=Math.ceil(Math.max(1,prints.length)/cols); const W=pad+cols*(cellW+pad), H=pad+rows*(cellH+pad);
-  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H; const ctx=canvas.getContext('2d'); if(!ctx) throw new Error('No canvas context');
-  ctx.fillStyle='#0b0f1a'; ctx.fillRect(0,0,W,H);
-  for(let idx=0; idx<prints.length; idx++){
-    const card=prints[idx]; const imgUrl=card.image_uris?.digital?.large||card.image_uris?.digital?.normal||card.image_uris?.digital?.small; if(!imgUrl) continue;
-    const col=idx%cols, row=Math.floor(idx/cols); const x=pad+col*(cellW+pad), y=pad+row*(cellH+pad);
-    try{ const blob=await fetchImageBlob(imgUrl); const img=await createImageBitmap(blob); const scale=Math.min(cellW/img.width, cellH/img.height); const w=img.width*scale, h=img.height*scale; const cx=x+(cellW-w)/2, cy=y+(cellH-h)/2; ctx.drawImage(img,cx,cy,w,h); }
-    catch{ ctx.fillStyle='#222'; ctx.fillRect(x,y,cellW,cellH); ctx.fillStyle='#999'; ctx.font='12px ui-sans-serif, system-ui'; ctx.fillText(card.name,x+6,y+20); }
-  }
-  let cursor=0; entries.forEach(({count})=>{ for(let i=0;i<count;i++){ const col=cursor%cols, row=Math.floor(cursor/cols); const x=pad+col*(cellW+pad)+cellW-18, y=pad+row*(cellH+pad)+18; drawCountBubble(ctx,x,y,i===0?count:0); cursor++; } });
-  ctx.fillStyle='#fff'; ctx.font='12px ui-sans-serif, system-ui'; ctx.fillText(`Exported ${new Date().toLocaleString()} — Powered by Lorcast`, pad, H-6);
-  return new Promise(res=>canvas.toBlob(b=>res(b), 'image/png'));
+/* -------------------- EXPORT HELPERS (CORS-safe) -------------------- */
+
+function proxyImageUrl(rawUrl) {
+  if (!rawUrl) return null;
+  const noProto = rawUrl.replace(/^https?:\/\//, "");
+  return `https://images.weserv.nl/?url=${encodeURIComponent(noProto)}&w=600&h=800&fit=inside`;
 }
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function drawCountBubble(ctx, x, y, n) {
+  if (!n || n <= 1) return;
+  const r = 16;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 14px ui-sans-serif, system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(n), x, y + 0.5);
+  ctx.restore();
+}
+
+async function exportDeckAsPng(deck) {
+  const entries = Object.values(deck)
+    .filter((e) => e.count > 0)
+    .sort((a, b) => (a.card.cost ?? 0) - (b.card.cost ?? 0) || (a.card.name > b.card.name ? 1 : -1));
+
+  const prints = [];
+  for (const { card, count } of entries) for (let i = 0; i < count; i++) prints.push(card);
+
+  const cols = 10, cellW = 134, cellH = 187, pad = 10;
+  const rows = Math.max(1, Math.ceil(prints.length / cols));
+  const W = pad + cols * (cellW + pad);
+  const H = pad + rows * (cellH + pad);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No canvas context");
+
+  ctx.fillStyle = "#0b0f1a"; ctx.fillRect(0, 0, W, H);
+
+  const totalById = {};
+  entries.forEach(({ card, count }) => (totalById[card.id] = count));
+
+  for (let idx = 0; idx < prints.length; idx++) {
+    const card = prints[idx];
+    const col = idx % cols, row = Math.floor(idx / cols);
+    const x = pad + col * (cellW + pad), y = pad + row * (cellH + pad);
+
+    // placeholder + border
+    ctx.fillStyle = "#171b2b"; ctx.fillRect(x, y, cellW, cellH);
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.strokeRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
+
+    // small name always
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "10px ui-sans-serif, system-ui";
+    const nm = `${card.name}${card.version ? ` — ${card.version}` : ""}`;
+    ctx.fillText(nm, x + 6, y + 14);
+
+    const rawImg =
+      card.image_uris?.digital?.large ||
+      card.image_uris?.digital?.normal ||
+      card.image_uris?.digital?.small;
+
+    const proxied = proxyImageUrl(rawImg);
+    if (proxied) {
+      try {
+        const img = await loadImage(proxied);
+        const scale = Math.min(cellW / img.width, cellH / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        const cx = x + (cellW - w) / 2, cy = y + (cellH - h) / 2;
+        ctx.drawImage(img, cx, cy, w, h);
+      } catch {
+        // leave placeholder
+      }
+    }
+
+    const firstIdx = prints.findIndex((p) => p.id === card.id);
+    if (firstIdx === idx) drawCountBubble(ctx, x + cellW - 18, y + 18, totalById[card.id] || 0);
+  }
+
+  ctx.fillStyle = "#fff"; ctx.font = "10px ui-sans-serif, system-ui";
+  ctx.fillText(`Exported ${new Date().toLocaleString()} — Powered by Lorcast`, pad, H - 6);
+
+  return new Promise((res) => canvas.toBlob((b) => res(b), "image/png"));
+}
+
+/* -------------------- Decklist image (for Publish preview) -------------------- */
 
 async function generateDeckListImage(entries, title, notes){
   const pad=24, lineH=22, headerH=70, footerH=28, colGap=40; const maxPerCol=30; const cols=Math.ceil(entries.length/maxPerCol)||1; const colW=420; const W=pad*2+cols*colW+(cols-1)*colGap; const rows=Math.ceil(entries.length/cols); const bodyH=rows*lineH; const H=pad+headerH+bodyH+footerH+(notes?80:0);
@@ -152,7 +223,8 @@ async function generateDeckListImage(entries, title, notes){
   function wrapText(c,t,ox,oy,maxW,lh){ const words=(t||'').split(/\s+/); let line='', y=oy; for(const w of words){ const test=line?line+' '+w:w; if(c.measureText(test).width>maxW){ c.fillText(line,ox,y); line=w; y+=lh; } else line=test; } if(line) c.fillText(line,ox,y); }
 }
 
-// ───────────────────────────── UI atoms ─────────────────────────────
+/* ----------------------------- UI atoms ----------------------------- */
+
 function Chip({ active, label, onClick, title }){
   return (
     <button type="button" title={title} onClick={onClick} className={`px-3 py-1 rounded-full border text-sm mr-2 mb-2 transition ${active ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}>
@@ -212,7 +284,8 @@ function DeckRow({ entry, onInc, onDec, onRemove }){
   );
 }
 
-// ───────────────────────────── Main Component ─────────────────────────────
+/* --------------------------- Main Component --------------------------- */
+
 export default function LorcanaDeckBuilderApp(){
   // Sets
   const [sets, setSets] = useState([]);
@@ -241,7 +314,7 @@ export default function LorcanaDeckBuilderApp(){
   const [copyModal, setCopyModal] = useState({ open:false, text:"" });
   const copyAreaRef = useRef(null);
 
-  // Publish (optional)
+  // Publish (UI only; no backend without env config)
   const [publishOpen, setPublishOpen] = useState(false);
   const [deckName, setDeckName] = useState("My Lorcana Deck");
   const [deckNotes, setDeckNotes] = useState("");
@@ -278,7 +351,7 @@ export default function LorcanaDeckBuilderApp(){
   async function copyTextExport(){ const text=buildDeckText(); const method=await copyToClipboardRobust(text); if(method==='api'||method==='exec'){ alert('Deck copied to clipboard as text.'); return; } setCopyModal({open:true, text}); setTimeout(()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); },0); }
   async function doExport(){ setExportErr(null); setExporting(true); try{ const blob=await exportDeckAsPng(deck); if(!blob) throw new Error('Failed to build image blob'); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='lorcana-deck.png'; a.rel='noopener'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=> URL.revokeObjectURL(url), 1500); } catch(e){ setExportErr(e?.message||String(e)); } finally{ setExporting(false); } }
 
-  // Sorting & pagination for results
+  // Sorting & pagination
   const [page, setPage] = useState(1);
   const pageSize = 24;
   const setOrder = useMemo(()=>{ const m={}; sets.forEach((s,i)=> m[s.code]=i); return m; }, [sets]);
@@ -382,7 +455,6 @@ export default function LorcanaDeckBuilderApp(){
         </div>
       </header>
 
-      {/* Two columns: left grid + right deck */}
       <main className="max-w-7xl mx-auto px-4 py-6 grid gap-6 md:grid-cols-[minmax(0,1fr),400px]">
         {/* LEFT COLUMN */}
         <section>
@@ -419,7 +491,7 @@ export default function LorcanaDeckBuilderApp(){
           {err && (<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm">{err}</div>)}
         </section>
 
-        {/* RIGHT COLUMN: Deck panel */}
+        {/* RIGHT COLUMN */}
         <aside className="md:sticky md:top-16 h-fit">
           <div className="rounded-xl bg-[#0a0e19] border border-white/10 p-3">
             <div className="flex items-center justify-between">
@@ -495,7 +567,7 @@ export default function LorcanaDeckBuilderApp(){
         </div>
       )}
 
-      {/* Publish modal (Supabase optional) */}
+      {/* Publish modal (UI only unless env configured) */}
       {publishOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-4">
@@ -531,43 +603,10 @@ export default function LorcanaDeckBuilderApp(){
                   try {
                     const entries = Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).map((e)=> ({ name: `${e.card.name}${e.card.version ? ` — ${e.card.version}` : ''}`, set: e.card.set?.code, num: e.card.collector_number, cost: e.card.cost, ink: e.card.ink, count: e.count }));
                     const blob = await generateDeckListImage(entries, deckName || 'Untitled Deck', deckNotes);
-
-                    let supaUrl = undefined, supaKey = undefined;
-                    try { supaUrl = import.meta?.env?.VITE_SUPABASE_URL; supaKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY; } catch {}
-                    if (!supaUrl && typeof window !== 'undefined') {
-                      supaUrl = window.VITE_SUPABASE_URL;
-                      supaKey = window.VITE_SUPABASE_ANON_KEY;
-                    }
-
-                    let createClient = null;
-                    if (supaUrl && supaKey) {
-                      try {
-                        const dynamicImport = new Function('s', 'return import(s)');
-                        const mod = await dynamicImport('@supabase/supabase-js');
-                        createClient = mod?.createClient;
-                      } catch {}
-                    }
-
-                    if (supaUrl && supaKey && createClient) {
-                      const supabase = createClient(supaUrl, supaKey);
-                      const payload = deck; const total_cards = Object.values(deck).reduce((n,e)=> n + e.count, 0);
-                      const inksArr = Array.from(new Set(Object.values(deck).map((e)=> e.card.ink).filter(Boolean)));
-                      const name = deckName || 'Untitled Deck';
-                      const { data: ins, error } = await supabase.from('decks').insert({ name, payload, total_cards, inks: inksArr, notes: deckNotes }).select('id, slug, share_token').single();
-                      if (error) throw error;
-                      const path = `${ins.id}.png`;
-                      const { error: upErr } = await supabase.storage.from('deck-images').upload(path, blob, { upsert: true, contentType: 'image/png' });
-                      if (upErr) throw upErr;
-                      const { data: pub } = supabase.storage.from('deck-images').getPublicUrl(path);
-                      await supabase.from('decks').update({ image_url: pub.publicUrl }).eq('id', ins.id);
-                      const link = `/deck/${ins.slug}?token=${encodeURIComponent(ins.share_token)}`;
-                      setPublishedImageUrl(pub.publicUrl); setPublishedLink(link);
-                    } else {
-                      const url = URL.createObjectURL(blob); setPublishedImageUrl(url);
-                      const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(deck)))))}&title=${encodeURIComponent(deckName)}`;
-                      setPublishedLink(share);
-                      const a = document.createElement('a'); a.href = url; a.download = 'decklist.png'; document.body.appendChild(a); a.click(); a.remove();
-                    }
+                    const url = URL.createObjectURL(blob); setPublishedImageUrl(url);
+                    const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(deck)))))}&title=${encodeURIComponent(deckName)}`;
+                    setPublishedLink(share);
+                    const a = document.createElement('a'); a.href = url; a.download = 'decklist.png'; document.body.appendChild(a); a.click(); a.remove();
                   } catch(e){ setPublishErr(e?.message || String(e)); } finally { setPublishing(false); }
                 }}>{publishing? 'Publishing…':'Publish'}</button>
                 <button className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setPublishOpen(false)}>Close</button>
