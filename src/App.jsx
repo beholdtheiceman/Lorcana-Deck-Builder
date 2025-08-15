@@ -1,13 +1,18 @@
+// src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
 /* =========================
-   Constants / simple lists
+   API base (lorcana-api)
    ========================= */
-const API_ROOT = "https://api.lorcast.com/v0";
+const API_ROOT = "https://api.lorcana-api.com";
 
+/* =========================
+   Constants / lists
+   ========================= */
 const ALL_INKS = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
 const ALL_TYPES = ["Character","Action","Song","Item","Location"];
+const TYPE_ORDER = { Character:0, Action:1, Song:2, Item:3, Location:4 };
 const ALL_RARITIES = ["Common","Uncommon","Rare","Super_rare","Legendary","Enchanted","Promo"];
 const ALL_KEYWORDS = [
   "Shift","Resist","Ward","Reckless","Challenger","Evasive","Rush","Support","Bodyguard","Singer","Guard","Hardy",
@@ -23,52 +28,108 @@ const ALL_ARCHETYPES = [
 const COST_CHOICES = [1,2,3,4,5,6,7,8,9]; // 9 => 9+
 
 /* =========================
-   API helpers
+   Utilities / normalization
    ========================= */
+function cap(s){ return typeof s === "string" ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
+function firstNonNull(...vals){ return vals.find(v => v !== undefined && v !== null) ?? null; }
 function fullNameKey(card){ return `${card.name} — ${card.version ?? ""}`.trim(); }
 
-async function fetchSets(){
-  const r = await fetch(`${API_ROOT}/sets`);
-  if (!r.ok) throw new Error("Failed to load sets");
-  const j = await r.json();
-  return j.results ?? [];
+// Normalize lorcana-api card JSON into the shape the UI expects
+function normalizeCard(raw){
+  const img =
+    firstNonNull(
+      raw?.image_uris?.digital?.normal,
+      raw?.image_uris?.normal,
+      raw?.image?.normal,
+      raw?.imageUrl,
+      raw?.image_url,
+      raw?.image_front,
+      raw?.image,
+      raw?.images?.normal,
+      Array.isArray(raw?.images) ? raw.images[0] : null
+    );
+
+  const setCode = firstNonNull(raw?.set?.code, raw?.set_code, raw?.setCode, raw?.set, raw?.set_id);
+  const setName = firstNonNull(raw?.set?.name, raw?.setName, raw?.set_name);
+  const releaseDate = firstNonNull(raw?.set?.releaseDate, raw?.set?.release_date, raw?.releaseDate, raw?.release_date);
+
+  const collector = firstNonNull(raw?.collector_number, raw?.number, raw?.card_number, raw?.collectorNumber);
+  const cost = firstNonNull(raw?.cost, raw?.ink_cost, raw?.inkCost);
+  const ink = firstNonNull(raw?.ink, raw?.color, raw?.colour);
+  const inkwell = firstNonNull(raw?.inkwell, raw?.inkable, raw?.is_inkable);
+  const version = firstNonNull(raw?.version, raw?.subtitle, raw?.title2, raw?.variation);
+  const id = firstNonNull(raw?.id, raw?.uuid, raw?._id, `${setCode ?? "x"}-${collector ?? raw?.name}`);
+
+  return {
+    id,
+    name: raw?.name || "Unknown",
+    version: version || null,
+    cost: typeof cost === "number" ? cost : (Number(cost) || null),
+    inkwell: typeof inkwell === "boolean" ? inkwell : null,
+    ink: ink ? cap(ink) : null,
+    type: Array.isArray(raw?.types) ? raw.types[0] : (raw?.type || raw?.card_type || null),
+    text: firstNonNull(raw?.text, raw?.rules_text, raw?.rules) || "",
+    set: setCode ? { code: String(setCode).toUpperCase(), name: setName || String(setCode).toUpperCase(), releaseDate: releaseDate || null } : null,
+    collector_number: collector ? String(collector) : null,
+    rarity: firstNonNull(raw?.rarity, raw?.rarity_code, raw?.rarity_name),
+    image_uris: img ? { digital: { normal: String(img) } } : null,
+    _raw: raw,
+  };
 }
 
-async function searchCards(query, unique = "cards"){
-  const url = new URL(`${API_ROOT}/cards/search`);
-  url.searchParams.set("q", query);
-  url.searchParams.set("unique", unique);
-  const r = await fetch(url.toString());
-  if (!r.ok) throw new Error("Search failed");
-  const j = await r.json();
-  return j.results ?? [];
-}
-
-function buildQuery(f){
+/* =========================
+   Build lorcana-api search clause from filters
+   AND = ';'   OR = ';|'
+   ========================= */
+function buildSearchClause(f){
   const parts = [];
-  const raw = (f.text || "").trim();
-  if (raw) {
-    if (raw.startsWith("n:")) parts.push(`name:${JSON.stringify(raw.slice(2).trim())}`);
-    else if (raw.startsWith("e:")) parts.push(`text:${JSON.stringify(raw.slice(2).trim())}`);
-    else parts.push(JSON.stringify(raw));
+  const rawText = (f.text || "").trim();
+  if (rawText) {
+    if (rawText.startsWith("n:")) parts.push(`name~${encodeURIComponent(rawText.slice(2).trim())}`);
+    else if (rawText.startsWith("e:")) parts.push(`text~${encodeURIComponent(rawText.slice(2).trim())}`);
+    else parts.push(`name~${encodeURIComponent(rawText)}`);
   }
-  if (f.inks?.length) parts.push(`(${f.inks.map(i=>`i:${i.toLowerCase()}`).join(" or ")})`);
-  if (f.types?.length) parts.push(`(${f.types.map(t=>`t:${t.toLowerCase()}`).join(" or ")})`);
-  if (f.rarities?.length) parts.push(`(${f.rarities.map(r=>`r:${r.toLowerCase()}`).join(" or ")})`);
-  if (f.sets?.length) parts.push(`(${f.sets.map(s=>`s:${s}`).join(" or ")})`);
+  if (f.inks?.length) parts.push(f.inks.map(v => `color=${encodeURIComponent(v.toLowerCase())}`).join(";|"));
+  if (f.types?.length) parts.push(f.types.map(v => `type=${encodeURIComponent(v.toLowerCase())}`).join(";|"));
+  if (f.rarities?.length) parts.push(f.rarities.map(v => `rarity=${encodeURIComponent(v.toLowerCase())}`).join(";|"));
+  if (f.sets?.length) parts.push(f.sets.map(v => `set=${encodeURIComponent(String(v).toLowerCase())}`).join(";|"));
   if (f.costs?.length) {
-    const cs = f.costs.map(n=> n>=9? "c>=9" : `c=${n}`);
-    parts.push(`(${cs.join(" or ")})`);
+    const chunks = f.costs.map(n => (n >= 9 ? "cost>=9" : `cost=${n}`));
+    parts.push(chunks.join(";|"));
   }
-  if (typeof f.costMin === 'number') parts.push(`c>=${f.costMin}`);
-  if (typeof f.costMax === 'number') parts.push(`c<=${f.costMax}`);
-  if (f.inkwell === 'inkable') parts.push('iw');
-  if (f.inkwell === 'non-inkable') parts.push('-iw');
-  if (f.keywords?.length) parts.push(`(${f.keywords.map(k=>`keyword:${k.toLowerCase().replace(/\s+/g,'_')}`).join(" or ")})`);
-  if (f.archetypes?.length) parts.push(`(${f.archetypes.map(a=>`t:${a.toLowerCase()}`).join(" or ")})`);
-  if (f.format === 'core') parts.push('format:core');
-  if (f.format === 'infinity') parts.push('format:infinity');
-  return parts.join(" ").trim();
+  if (f.inkwell === "inkable") parts.push("inkwell=true");
+  if (f.inkwell === "non-inkable") parts.push("inkwell=false");
+  if (f.keywords?.length) parts.push(f.keywords.map(v => `keyword=${encodeURIComponent(v.toLowerCase().replace(/\s+/g, "_"))}`).join(";|"));
+  if (f.archetypes?.length) parts.push(f.archetypes.map(v => `class=${encodeURIComponent(v.toLowerCase().replace(/\s+/g, "_"))}`).join(";|"));
+  if (f.format === "core") parts.push("format=core");
+  if (f.format === "infinity") parts.push("format=infinity");
+  return parts.filter(Boolean).join(";");
+}
+
+/* =========================
+   API calls (lorcana-api)
+   ========================= */
+async function fetchSets(){
+  const r = await fetch(`${API_ROOT}/sets/all`);
+  if (!r.ok) throw new Error("Failed to load sets");
+  const data = await r.json();
+  return (Array.isArray(data) ? data : []).map(s => ({
+    code: String(firstNonNull(s?.code, s?.set_code, s?.id, s?.abbr, s?.slug, s?.shortname, s?.short))?.toUpperCase(),
+    name: String(firstNonNull(s?.name, s?.longname, s?.title, s?.display_name, s?.full_name, s?.code)) || "Unknown Set",
+    releaseDate: firstNonNull(s?.releaseDate, s?.release_date, s?.released_on) || null,
+    _raw: s,
+  })).filter(s => !!s.code);
+}
+async function searchCards(filters, { page = 1, pagesize = 100 } = {}){
+  const clause = buildSearchClause(filters) || "name~a";
+  const url = new URL(`${API_ROOT}/cards/fetch`);
+  url.searchParams.set("search", clause);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("pagesize", String(pagesize));
+  const r = await fetch(url.toString());
+  if (!r.ok) throw new Error(`Search failed (${r.status})`);
+  const arr = await r.json();
+  return (Array.isArray(arr) ? arr : []).map(normalizeCard);
 }
 
 /* =========================
@@ -91,15 +152,13 @@ async function copyToClipboardRobust(text){
 }
 
 /* =========================
-   EXPORT HELPERS (images)
+   EXPORT HELPERS (images + list)
    ========================= */
-
 function proxyImageUrl(rawUrl) {
   if (!rawUrl) return null;
-  const noProto = rawUrl.replace(/^https?:\/\//, "");
+  const noProto = String(rawUrl).replace(/^https?:\/\//, "");
   return `https://images.weserv.nl/?url=${encodeURIComponent(noProto)}&w=600&h=800&fit=inside`;
 }
-
 function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -109,7 +168,6 @@ function loadImage(url) {
     img.src = url;
   });
 }
-
 function drawCountBubble(ctx, x, y, n) {
   if (!n || n <= 1) return;
   const r = 16;
@@ -125,15 +183,8 @@ function drawCountBubble(ctx, x, y, n) {
   ctx.fillText(String(n), x, y + 0.5);
   ctx.restore();
 }
-
 async function exportDeckAsPng(deck, { unique = false } = {}) {
-  const entries = Object.values(deck)
-    .filter(e => e.count > 0)
-    .sort((a, b) =>
-      (a.card.cost ?? 0) - (b.card.cost ?? 0) ||
-      (a.card.name > b.card.name ? 1 : -1)
-    );
-
+  const entries = sortEntriesForList(deckEntries(deck));
   const totalByFullName = {};
   const repByFullName = {};
   const prints = [];
@@ -142,13 +193,9 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
     const key = fullNameKey(card);
     totalByFullName[key] = (totalByFullName[key] || 0) + count;
     if (!repByFullName[key]) repByFullName[key] = card;
-    if (!unique) {
-      for (let i = 0; i < count; i++) prints.push(card);
-    }
+    if (!unique) for (let i = 0; i < count; i++) prints.push(card);
   }
-  if (unique) {
-    for (const key of Object.keys(repByFullName)) prints.push(repByFullName[key]);
-  }
+  if (unique) for (const key of Object.keys(repByFullName)) prints.push(repByFullName[key]);
 
   const cols = unique ? 8 : 10;
   const cellW = unique ? 180 : 134;
@@ -188,133 +235,141 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
         const w = img.width * scale, h = img.height * scale;
         const cx = x + (cellW - w) / 2, cy = y + (cellH - h) / 2;
         ctx.drawImage(img, cx, cy, w, h);
-      } catch { /* placeholder if fails */ }
+      } catch {}
     }
 
     const key = fullNameKey(card);
     const totalForThis = totalByFullName[key] || 0;
-    if (unique) {
-      drawCountBubble(ctx, x + cellW - 18, y + 18, totalForThis);
-    } else {
+    if (unique) drawCountBubble(ctx, x + cellW - 18, y + 18, totalForThis);
+    else {
       const firstIdx = prints.findIndex(p => fullNameKey(p) === key);
       if (firstIdx === idx) drawCountBubble(ctx, x + cellW - 18, y + 18, totalForThis);
     }
   }
 
   ctx.fillStyle = "#fff"; ctx.font = "10px ui-sans-serif, system-ui";
-  ctx.fillText(`Exported ${new Date().toLocaleString()} — Powered by Lorcast`, pad, H - 6);
+  ctx.fillText(`Exported ${new Date().toLocaleString()} — lorcana-api`, pad, H - 6);
 
   return new Promise(res => canvas.toBlob(b => res(b), "image/png"));
 }
 
-/* Poster export for Publish */
-async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
-  const gridBlob = await exportDeckAsPng(deck, { unique });
-  if (!gridBlob) throw new Error("Failed to build grid image");
-  const gridUrl = URL.createObjectURL(gridBlob);
+function deckEntries(deck){ return Object.values(deck).map(e => ({ card: e.card, count: e.count })); }
 
-  const gridImg = await new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = gridUrl;
+function sortEntriesForList(entries){
+  return [...entries].sort((a,b)=>{
+    // group by TYPE order
+    const ta = TYPE_ORDER[a.card.type] ?? 999;
+    const tb = TYPE_ORDER[b.card.type] ?? 999;
+    if (ta !== tb) return ta - tb;
+    // then cost asc
+    const ca = a.card.cost ?? 999;
+    const cb = b.card.cost ?? 999;
+    if (ca !== cb) return ca - cb;
+    // then ink
+    const ia = ALL_INKS.indexOf(a.card.ink ?? "zz");
+    const ib = ALL_INKS.indexOf(b.card.ink ?? "zz");
+    if (ia !== ib) return ia - ib;
+    // then set (newest first) — setRankForCode is injected from component state
+    // we fall back to name if ranks are same
+    return (a.card.name > b.card.name) ? 1 : -1;
   });
+}
 
-  const entries = Object.values(deck)
-    .sort((a, b) => (a.card.cost ?? 0) - (b.card.cost ?? 0) || (a.card.name > b.card.name ? 1 : -1))
-    .map((e) => ({
-      count: e.count,
-      name: `${e.card.name}${e.card.version ? ` — ${e.card.version}` : ""}`,
-      set: e.card.set?.code,
-      num: e.card.collector_number,
-      cost: e.card.cost,
-      ink: e.card.ink,
-    }));
-
-  const pad = 24;
-  const rightW = 460;
-  const lineH = 20;
-  const headerH = 64;
-  const footerH = 28;
-
-  const H = Math.max(
-    gridImg.height + pad * 2,
-    pad + headerH + entries.length * lineH + footerH + (notes ? 90 : 0)
-  );
-  const W = gridImg.width + pad + rightW + pad * 2;
+async function exportDeckListPng(deck, title, setRankForCode){
+  const entries = deckEntries(deck).sort((a,b)=>{
+    const ta = TYPE_ORDER[a.card.type] ?? 999;
+    const tb = TYPE_ORDER[b.card.type] ?? 999;
+    if (ta !== tb) return ta - tb;
+    const ca = a.card.cost ?? 999, cb = b.card.cost ?? 999;
+    if (ca !== cb) return ca - cb;
+    const ia = ALL_INKS.indexOf(a.card.ink ?? "zz"), ib = ALL_INKS.indexOf(b.card.ink ?? "zz");
+    if (ia !== ib) return ia - ib;
+    const ra = setRankForCode(a.card.set?.code), rb = setRankForCode(b.card.set?.code);
+    if (ra !== rb) return rb - ra;
+    const na = parseInt(a.card.collector_number||"0",10)||0, nb = parseInt(b.card.collector_number||"0",10)||0;
+    if (na !== nb) return na - nb;
+    return a.card.name.localeCompare(b.card.name);
+  });
+  const groups = {};
+  for (const e of entries){
+    const k = ALL_TYPES.includes(e.card.type) ? e.card.type : "Other";
+    (groups[k] ||= []).push(e);
+  }
+  const pad = 24, colW = 620, headerH = 54, lineH = 20, gap = 8;
+  let lines = 0; Object.keys(groups).forEach(g=> { lines += 1 + groups[g].length; });
+  const H = pad*2 + headerH + lines*lineH + gap*(Object.keys(groups).length+2) + 30;
+  const W = pad*2 + colW;
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#0b0f1a";
-  ctx.fillRect(0, 0, W, H);
-
-  const gridX = pad;
-  const gridY = pad;
-  ctx.drawImage(gridImg, gridX, gridY);
-
-  const rightX = gridX + gridImg.width + pad;
-  ctx.fillStyle = "#0a0e19";
-  ctx.fillRect(rightX, pad, rightW, H - pad * 2);
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.strokeRect(rightX + 0.5, pad + 0.5, rightW - 1, H - pad * 2 - 1);
-
+  ctx.fillStyle = "#0b0f1a"; ctx.fillRect(0,0,W,H);
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 20px ui-sans-serif, system-ui";
-  ctx.fillText(title || "Untitled Deck", rightX + 14, pad + 26);
+  ctx.font = "bold 22px ui-sans-serif, system-ui";
+  ctx.fillText(title || "Decklist", pad, pad + 24);
   ctx.font = "12px ui-sans-serif, system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText(new Date().toLocaleString(), rightX + 14, pad + 44);
+  ctx.fillText(new Date().toLocaleString(), pad, pad + 44);
 
-  ctx.fillStyle = "#fff";
-  ctx.font = "13px ui-sans-serif, system-ui";
   let y = pad + headerH;
-  for (const e of entries) {
-    const line = `${e.count}x  ${e.name}${
-      e.set && e.num ? ` [${e.set}#${e.num}]` : ""
-    }  · ${e.ink || "—"} · ${typeof e.cost === "number" ? e.cost : "—"}`;
-    ctx.fillText(line, rightX + 14, y);
+  for (const type of Object.keys(TYPE_ORDER)){
+    if (!groups[type]) continue;
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = "bold 14px ui-sans-serif, system-ui";
+    ctx.fillText(type, pad, y);
     y += lineH;
-  }
-
-  if (notes) {
-    const boxY = Math.min(y + 12, H - footerH - 78);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.fillRect(rightX + 10, boxY, rightW - 20, 60);
+    ctx.font = "13px ui-sans-serif, system-ui";
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 12px ui-sans-serif, system-ui";
-    ctx.fillText("Notes", rightX + 18, boxY + 18);
-    ctx.font = "12px ui-sans-serif, system-ui";
-    wrap(ctx, notes, rightX + 18, boxY + 36, rightW - 36, 16);
+    for (const e of groups[type]){
+      const line = `${e.count}x  ${e.card.name}${e.card.version ? ` — ${e.card.version}` : ""}  · ${e.card.ink || "—"} · ${typeof e.card.cost === "number" ? e.card.cost : "—"}${e.card.set?.code && e.card.collector_number ? `  [${e.card.set.code}#${e.card.collector_number}]` : ""}`;
+      ctx.fillText(line, pad, y);
+      y += lineH;
+    }
+    y += gap;
   }
-
   ctx.font = "11px ui-sans-serif, system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillText("Generated with Lorcast data · deckbuilder", rightX + 14, H - 10);
+  ctx.fillText("Generated by deckbuilder", pad, H - 10);
+  return new Promise((resolve)=> canvas.toBlob(b=> resolve(b), "image/png", 0.92));
+}
 
-  URL.revokeObjectURL(gridUrl);
+/* =========================
+   Import (Dreamborn-style) parser
+   ========================= */
+function parseDeckText(text){
+  const entries = [];
+  const lines = (text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-  return new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(b), "image/png", 0.92)
-  );
+  for (const line of lines){
+    let s = line.replace(/^[-*\d.)\s]+/, "").trim();
+    let count = 1;
 
-  function wrap(c, text, x, oy, maxW, lh) {
-    const words = (text || "").split(/\s+/);
-    let line = "";
-    let y2 = oy;
-    for (const w of words) {
-      const test = line ? line + " " + w : w;
-      if (c.measureText(test).width > maxW) {
-        c.fillText(line, x, y2);
-        line = w;
-        y2 += lh;
-      } else {
-        line = test;
+    const mStart = s.match(/^(\d+)x\s+/i);
+    if (mStart){ count = parseInt(mStart[1],10); s = s.replace(/^(\d+)x\s+/i, ""); }
+    const mEnd = s.match(/\sx(\d+)$/i);
+    if (mEnd){ count = parseInt(mEnd[1],10); s = s.replace(/\sx\d+$/i, ""); }
+
+    let setCode = null, number = null;
+    const bracket = s.match(/\[([^\]]+)\]$/);
+    if (bracket){
+      const inside = bracket[1];
+      const parts = inside.split("#");
+      if (parts.length === 2){
+        setCode = parts[0].trim().toUpperCase();
+        number = parts[1].trim();
+        s = s.replace(/\[[^\]]+\]$/, "").trim();
       }
     }
-    if (line) c.fillText(line, x, y2);
+
+    const parts = s.split(/\s+—\s+|\s+-\s+/);
+    const name = parts[0]?.trim();
+    const version = parts[1] ? parts[1].trim() : null;
+    if (!name) continue;
+
+    entries.push({ name, version, count, setCode, number });
   }
+  return { entries };
 }
 
 /* =========================
@@ -323,14 +378,11 @@ async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
 function Chip({ active, label, onClick, title }){
   return (
     <button type="button" title={title} onClick={onClick}
-      className={`px-3 py-1 rounded-full border text-sm mr-2 mb-2 transition ${
-        active ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'
-      }`}>
+      className={`px-3 py-1 rounded-full border text-sm mr-2 mb-2 transition ${active ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}>
       {label}
     </button>
   );
 }
-
 function Section({ title, children }){
   return (
     <div className="mb-4">
@@ -339,7 +391,6 @@ function Section({ title, children }){
     </div>
   );
 }
-
 function CardTile({ card, onAdd }){
   const img = card.image_uris?.digital?.normal || card.image_uris?.digital?.small;
   const name = `${card.name}${card.version ? ` — ${card.version}` : ''}`;
@@ -362,7 +413,6 @@ function CardTile({ card, onAdd }){
     </div>
   );
 }
-
 function DeckRow({ entry, onInc, onDec, onRemove }){
   const { card, count } = entry;
   const name = `${card.name}${card.version ? ` — ${card.version}` : ''}`;
@@ -373,7 +423,7 @@ function DeckRow({ entry, onInc, onDec, onRemove }){
       </div>
       <div className="flex-1 min-w-0">
         <div className="truncate font-medium text-sm">{name}</div>
-        <div className="text-xs text-white/60 flex gap-2">{card.ink ?? '—'} {typeof card.cost === 'number' ? `· ${card.cost}` : ''}</div>
+        <div className="text-xs text-white/60 flex gap-2">{card.type ?? '—'} · {card.ink ?? '—'} {typeof card.cost === 'number' ? `· ${card.cost}` : ''}</div>
       </div>
       <div className="flex items-center gap-2">
         <button type="button" onClick={onDec} className="px-2 py-1 rounded border border-white/20">-</button>
@@ -388,7 +438,7 @@ function DeckRow({ entry, onInc, onDec, onRemove }){
 /* =========================
    Main component
    ========================= */
-export default function LorcanaDeckBuilderApp(){
+export default function App(){
   // sets
   const [sets, setSets] = useState([]);
   const [loadingSets, setLoadingSets] = useState(true);
@@ -396,15 +446,31 @@ export default function LorcanaDeckBuilderApp(){
   // filters & results
   const [filters, setFilters] = useState({
     text:"", inks:[], types:[], rarities:[], sets:[],
-    costMin:undefined, costMax:undefined, costs:[],
-    inkwell:"any", keywords:[], archetypes:[], format:"any"
+    costs:[], inkwell:"any", keywords:[], archetypes:[], format:"any"
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const filterScrollRef = useRef(null);
+  const prevScrollRef = useRef(0);
+  function updateFilters(mutator){
+    if (filterScrollRef.current) prevScrollRef.current = filterScrollRef.current.scrollTop;
+    setFilters(f => (typeof mutator === 'function' ? mutator(f) : mutator));
+    requestAnimationFrame(()=>{
+      if (filterScrollRef.current) filterScrollRef.current.scrollTop = prevScrollRef.current;
+    });
+  }
+
+  // import modal
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importErr, setImportErr] = useState(null);
+
   const [cards, setCards] = useState([]);
   const [loadingCards, setLoadingCards] = useState(false);
-  const [uniqueMode, setUniqueMode] = useState("cards");
   const [err, setErr] = useState(null);
+
+  // view controls
+  const [groupBy, setGroupBy] = useState("type"); // type | ink | none
+  const [sortBy, setSortBy] = useState("cost");   // cost | set | ink | name
 
   // deck
   const [deck, setDeck] = useState(()=>{
@@ -422,7 +488,10 @@ export default function LorcanaDeckBuilderApp(){
   const [copyModal, setCopyModal] = useState({ open:false, text:"" });
   const copyAreaRef = useRef(null);
 
-  // publish (UI only)
+  // print decklist modal
+  const [printOpen, setPrintOpen] = useState(false);
+
+  // publish (poster)
   const [publishOpen, setPublishOpen] = useState(false);
   const [deckName, setDeckName] = useState("My Lorcana Deck");
   const [deckNotes, setDeckNotes] = useState("");
@@ -431,38 +500,57 @@ export default function LorcanaDeckBuilderApp(){
   const [publishedImageUrl, setPublishedImageUrl] = useState(null);
   const [publishErr, setPublishErr] = useState(null);
 
-  // safe close for modal (revokes preview URL)
   const closePublishModal = () => {
-    if (publishedImageUrl) {
-      try { URL.revokeObjectURL(publishedImageUrl); } catch {}
-    }
-    setPublishedImageUrl(null);
-    setPublishedLink(null);
-    setPublishErr(null);
-    setPublishOpen(false);
+    if (publishedImageUrl) { try { URL.revokeObjectURL(publishedImageUrl); } catch {} }
+    setPublishedImageUrl(null); setPublishedLink(null); setPublishErr(null); setPublishOpen(false);
   };
 
   // load sets
-  useEffect(()=>{ (async()=>{ try{ setLoadingSets(true); const s=await fetchSets(); setSets(s); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingSets(false); } })(); },[]);
+  useEffect(()=>{ (async()=>{
+    try{ setLoadingSets(true); const s=await fetchSets(); setSets(s); }
+    catch(e){ setErr(e?.message||String(e)); }
+    finally{ setLoadingSets(false); }
+  })(); },[]);
 
-  // build query (debounced)
+  // compute set ranks newest first
+  const [setRanks, setSetRanks] = useState({});
+  useEffect(()=>{
+    const sorted = [...sets].sort((a,b)=>{
+      const ad=a.releaseDate?Date.parse(a.releaseDate):0;
+      const bd=b.releaseDate?Date.parse(b.releaseDate):0;
+      if (ad && bd) return bd - ad;
+      if (ad || bd) return bd - ad;
+      return 0;
+    });
+    const ranks={}; sorted.forEach((s,idx)=>{ ranks[s.code]=sorted.length-idx; }); setSetRanks(ranks);
+  }, [sets]);
+  function setRankForCode(code){ return code ? (setRanks[code] ?? 0) : 0; }
+
+  // search whenever filters change (debounced)
   const debounceRef = useRef(null);
   useEffect(()=>{
-    const q = buildQuery(filters);
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(()=> setQuery(q), 250);
-  }, [filters]);
+    debounceRef.current = window.setTimeout(async ()=>{
+      try{
+        setErr(null);
+        const hasAny =
+          (filters.text && filters.text.trim().length>0) ||
+          (filters.inks?.length||0) || (filters.types?.length||0) ||
+          (filters.rarities?.length||0) || (filters.sets?.length||0) ||
+          (filters.costs?.length||0) || (filters.inkwell !== "any") ||
+          (filters.keywords?.length||0) || (filters.archetypes?.length||0) ||
+          (filters.format !== "any");
 
-  // search
-  useEffect(()=>{ (async()=>{ try{
-      setErr(null);
-      if(!query || !query.trim()){ setCards([]); return; }
-      setLoadingCards(true);
-      const res=await searchCards(query, uniqueMode);
-      setCards(res);
-    } catch(e){ setErr(e?.message||String(e)); }
-    finally{ setLoadingCards(false); } })();
-  }, [query, uniqueMode]);
+        if(!hasAny){ setCards([]); return; }
+        setLoadingCards(true);
+        const arr = await searchCards(filters, { page: 1, pagesize: 180 });
+        setCards(arr);
+        setPagesShown(1);
+      }catch(e){ setErr(e?.message||String(e)); }
+      finally{ setLoadingCards(false); }
+    }, 250);
+    return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
+  }, [filters]);
 
   // persist deck
   useEffect(()=>{ try{ localStorage.setItem('lorcana_deck_mvp', JSON.stringify(deck)); }catch{} }, [deck]);
@@ -480,23 +568,128 @@ export default function LorcanaDeckBuilderApp(){
   function removeEntry(id){ setDeck(d=>{ const nd={...d}; delete nd[id]; return nd; }); }
   function clearDeck(){ if (confirm('Clear current deck?')) setDeck({}); }
 
-  // deck text
+  // GRID SORT default: ink -> set(new) -> number
+  const inkOrder = useMemo(()=>{ const m={}; ALL_INKS.forEach((ink,i)=> m[ink]=i); return m; }, []);
+  const sortedCards = useMemo(()=> [...cards].sort((a,b)=>{
+    const ai = inkOrder[a.ink] ?? 999;
+    const bi = inkOrder[b.ink] ?? 999;
+    if (ai !== bi) return ai - bi;
+    const as = setRankForCode(a.set?.code);
+    const bs = setRankForCode(b.set?.code);
+    if (as !== bs) return bs - as;
+    const an = parseInt(a.collector_number || "0", 10) || 0;
+    const bn = parseInt(b.collector_number || "0", 10) || 0;
+    return an - bn;
+  }), [cards, inkOrder, setRanks]);
+
+  // Infinite scroll: show cumulative pages
+  const pageSize = 24;
+  const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize));
+  const [pagesShown, setPagesShown] = useState(1);
+  const sentinelRef = useRef(null);
+  const visibleCards = useMemo(()=> sortedCards.slice(0, pagesShown * pageSize), [sortedCards, pagesShown]);
+  useEffect(()=>{
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries)=>{
+      const entry = entries[0];
+      if (entry.isIntersecting) setPagesShown(p => Math.min(pageCount, p + 1));
+    }, { rootMargin: "600px 0px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [pageCount, sortedCards.length]);
+
+  // DECKLIST ORDER/GROUP
+  const deckEntriesSorted = useMemo(()=>{
+    const ents = deckEntries(deck);
+    if (sortBy === "cost"){
+      return ents.sort((a,b)=>{
+        const ca=a.card.cost??999, cb=b.card.cost??999;
+        if (ca!==cb) return ca-cb;
+        const ta=TYPE_ORDER[a.card.type]??999, tb=TYPE_ORDER[b.card.type]??999;
+        if (ta!==tb) return ta-tb;
+        const ia=ALL_INKS.indexOf(a.card.ink??"zz"), ib=ALL_INKS.indexOf(b.card.ink??"zz");
+        if (ia!==ib) return ia-ib;
+        const ra=setRankForCode(a.card.set?.code), rb=setRankForCode(b.card.set?.code);
+        if (ra!==rb) return rb-ra;
+        const na=parseInt(a.card.collector_number||"0",10)||0, nb=parseInt(b.card.collector_number||"0",10)||0;
+        if (na!==nb) return na-nb;
+        return a.card.name.localeCompare(b.card.name);
+      });
+    }
+    if (sortBy === "set"){
+      return ents.sort((a,b)=>{
+        const ra=setRankForCode(a.card.set?.code), rb=setRankForCode(b.card.set?.code);
+        if (ra!==rb) return rb-ra;
+        const na=parseInt(a.card.collector_number||"0",10)||0, nb=parseInt(b.card.collector_number||"0",10)||0;
+        if (na!==nb) return na-nb;
+        return a.card.name.localeCompare(b.card.name);
+      });
+    }
+    if (sortBy === "ink"){
+      return ents.sort((a,b)=>{
+        const ia=ALL_INKS.indexOf(a.card.ink??"zz"), ib=ALL_INKS.indexOf(b.card.ink??"zz");
+        if (ia!==ib) return ia-ib;
+        const ra=setRankForCode(a.card.set?.code), rb=setRankForCode(b.card.set?.code);
+        if (ra!==rb) return rb-ra;
+        const na=parseInt(a.card.collector_number||"0",10)||0, nb=parseInt(b.card.collector_number||"0",10)||0;
+        if (na!==nb) return na-nb;
+        return a.card.name.localeCompare(b.card.name);
+      });
+    }
+    return ents.sort((a,b)=> a.card.name.localeCompare(b.card.name));
+  }, [deck, sortBy, setRanks]);
+
+  const deckGrouped = useMemo(()=>{
+    if (groupBy === "type"){
+      const g = {}; for (const e of deckEntriesSorted){ const k = ALL_TYPES.includes(e.card.type) ? e.card.type : "Other"; (g[k] ||= []).push(e); }
+      const ordered = {}; Object.keys(TYPE_ORDER).forEach(t => { if (g[t]) ordered[t]=g[t]; });
+      Object.keys(g).forEach(k => { if (!(k in ordered)) ordered[k]=g[k]; });
+      return ordered;
+    }
+    if (groupBy === "ink"){
+      const g = {}; for (const e of deckEntriesSorted){ const k=e.card.ink||"—"; (g[k] ||= []).push(e); }
+      const ordered = {}; ALL_INKS.forEach(i => { if (g[i]) ordered[i]=g[i]; });
+      if (g["—"]) ordered["—"] = g["—"];
+      Object.keys(g).forEach(k => { if (!(k in ordered)) ordered[k]=g[k]; });
+      return ordered;
+    }
+    return { All: deckEntriesSorted };
+  }, [deckEntriesSorted, groupBy]);
+
+  // text export
   function buildDeckText(){
     const lines=[]; lines.push(`# Lorcana Deck (${total} cards)`); lines.push(`Inks: ${inksInDeck.join(', ') || '—'}`); lines.push('');
-    Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).forEach(({card,count})=>{
-      const nm=`${card.name}${card.version?` — ${card.version}`:''}`;
-      const setInfo=card.set?` [${card.set.code}#${card.collector_number}]`:'';
-      lines.push(`${count}x ${nm}${setInfo}`);
+    const entries = deckEntries(deck).sort((a,b)=>{
+      const ta = TYPE_ORDER[a.card.type] ?? 999;
+      const tb = TYPE_ORDER[b.card.type] ?? 999;
+      if (ta !== tb) return ta - tb;
+      const ca = a.card.cost ?? 999, cb = b.card.cost ?? 999;
+      if (ca !== cb) return ca - cb;
+      const ia = ALL_INKS.indexOf(a.card.ink ?? "zz"), ib = ALL_INKS.indexOf(b.card.ink ?? "zz");
+      if (ia !== ib) return ia - ib;
+      const ra = setRankForCode(a.card.set?.code), rb = setRankForCode(b.card.set?.code);
+      if (ra !== rb) return rb - ra;
+      const na = parseInt(a.card.collector_number||"0",10)||0, nb = parseInt(b.card.collector_number||"0",10)||0;
+      if (na !== nb) return na - nb;
+      return a.card.name.localeCompare(b.card.name);
     });
+    const groups = {}; for (const e of entries){ const k = ALL_TYPES.includes(e.card.type) ? e.card.type : "Other"; (groups[k] ||= []).push(e); }
+    for (const type of Object.keys(TYPE_ORDER)){
+      if (!groups[type]) continue;
+      lines.push(`## ${type}`);
+      for (const {card,count} of groups[type]){
+        const nm=`${card.name}${card.version?` — ${card.version}`:''}`;
+        const setInfo=card.set?` [${card.set.code}#${card.collector_number}]`:'';
+        lines.push(`${count}x ${nm}${setInfo} · ${card.ink || '—'} · ${typeof card.cost==='number'?card.cost:'—'}`);
+      }
+      lines.push('');
+    }
     return lines.join('\n');
   }
-  async function copyTextExport(){
-    const text=buildDeckText();
-    const method=await copyToClipboardRobust(text);
-    if(method==='api'||method==='exec'){ alert('Deck copied to clipboard as text.'); return; }
-    setCopyModal({open:true, text}); setTimeout(()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); },0);
-  }
-  async function doExport(){
+
+  // export grid (unique with bubbles)
+  async function doExportGrid(){
     setExportErr(null); setExporting(true);
     try{
       const blob=await exportDeckAsPng(deck, { unique: true });
@@ -507,65 +700,84 @@ export default function LorcanaDeckBuilderApp(){
     }catch(e){ setExportErr(e?.message||String(e)); }
     finally{ setExporting(false); }
   }
+  async function doExportList(){
+    setExportErr(null); setExporting(true);
+    try{
+      const blob=await exportDeckListPng(deck, deckName || "Decklist", setRankForCode);
+      if(!blob) throw new Error('Failed to build list image');
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='decklist.png'; a.rel='noopener';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=> URL.revokeObjectURL(url), 1500);
+    }catch(e){ setExportErr(e?.message||String(e)); }
+    finally{ setExporting(false); }
+  }
 
-  // sorting & pagination
-  const [page, setPage] = useState(1);
-  const pageSize = 24;
-  const setOrder = useMemo(()=>{ const m={}; sets.forEach((s,i)=> m[s.code]=i); return m; }, [sets]);
-  const sortedCards = useMemo(()=> [...cards].sort((a,b)=>{
-    const ac=a.set?.code||''; const bc=b.set?.code||'';
-    const ai=setOrder[ac]??9999; const bi=setOrder[bc]??9999; if(ai!==bi) return ai-bi;
-    const an=parseInt(a.collector_number||'0',10)||0; const bn=parseInt(b.collector_number||'0',10)||0; return an-bn;
-  }), [cards, setOrder]);
-  const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize));
-  useEffect(()=> setPage(1), [sortedCards.length]);
-  const view = useMemo(()=> sortedCards.slice((page-1)*pageSize, page*pageSize), [sortedCards, page]);
+  // import flow
+  async function importDeckFromText(){
+    setImportErr(null);
+    const { entries } = parseDeckText(importText);
+    if (!entries.length){ setImportErr("No recognizable lines."); return; }
+    const newDeck = { ...deck };
+    for (const ent of entries){
+      const q = ent.version ? `name~${encodeURIComponent(ent.name)};version~${encodeURIComponent(ent.version)}` : `name~${encodeURIComponent(ent.name)}`;
+      const url = new URL(`${API_ROOT}/cards/fetch`);
+      url.searchParams.set("search", q); url.searchParams.set("page","1"); url.searchParams.set("pagesize","50");
+      try{
+        const r = await fetch(url.toString());
+        if (!r.ok) continue;
+        const arr = (await r.json()).map(normalizeCard);
+        if (!arr.length) continue;
+        let candidate = arr[0];
+        if (ent.setCode){
+          const exact = arr.find(c => (c.set?.code||"").toUpperCase() === ent.setCode && String(c.collector_number) === String(ent.number||""));
+          if (exact) candidate = exact;
+        } else {
+          candidate = arr.sort((a,b)=> ((setRankForCode(b.set?.code) - setRankForCode(a.set?.code)) || ((parseInt(b.collector_number||"0",10)||0) - (parseInt(a.collector_number||"0",10)||0)) ))[0];
+        }
+        const fn = fullNameKey(candidate);
+        const existing = Object.values(newDeck).find(e => fullNameKey(e.card) === fn);
+        const currentCount = existing?.count || 0;
+        const toAdd = Math.min(4 - currentCount, ent.count);
+        if (toAdd > 0){
+          const key = candidate.id;
+          const cur = newDeck[key]?.count || 0;
+          newDeck[key] = { card: candidate, count: cur + toAdd };
+        }
+      }catch{}
+    }
+    setDeck(newDeck);
+    setImportOpen(false);
+    setImportText("");
+  }
 
   /* ============== UI ============== */
   function FiltersSheet(){
     return (
       <div className="fixed inset-0 z-40 flex">
         <div className="flex-1 bg-black/50" onClick={()=> setFiltersOpen(false)} />
-        <div className="w-full max-w-md h-full overflow-y-auto bg-slate-950 border-l border-white/10 p-4 flex flex-col">
-          {/* Header */}
+        <div className="w-full max-w-md h-full overflow-hidden bg-slate-950 border-l border-white/10 p-4 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold">Filters</div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="text-xs px-2 py-1 rounded border border-white/20 text-white/80"
-                onClick={()=> setFilters({ text:'', inks:[], types:[], rarities:[], sets:[], costMin:undefined, costMax:undefined, costs:[], inkwell:'any', keywords:[], archetypes:[], format:'any' })}
-                title="Reset filters"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                className="text-xs px-2 py-1 rounded border border-white/20 text-white/80"
-                onClick={()=> setFiltersOpen(false)}
-                title="Close"
-              >
-                ✕ Close
-              </button>
+              <button type="button" className="text-xs px-2 py-1 rounded border border-white/20 text-white/80"
+                onClick={()=> updateFilters({ text:'', inks:[], types:[], rarities:[], sets:[], costs:[], inkwell:'any', keywords:[], archetypes:[], format:'any' })}>Reset</button>
+              <button type="button" className="text-xs px-2 py-1 rounded border border-white/20 text-white/80" onClick={()=> setFiltersOpen(false)}>✕ Close</button>
             </div>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div ref={filterScrollRef} className="flex-1 overflow-y-auto pr-1">
             <Section title="Search">
               <input className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20 outline-none"
                 placeholder="Name (default), or prefix n: / e: (e.g., e:draw)"
-                value={filters.text} onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
-              <div className="mt-2 text-[11px] text-white/50">
-                Supports i:/t:/r:/s:/c:/iw, <span className="font-mono">keyword:</span>, and <span className="font-mono">format:core|infinity</span>.
-              </div>
+                value={filters.text} onChange={(e)=> updateFilters(f=> ({...f, text:e.target.value}))} />
+              <div className="mt-2 text-[11px] text-white/50">We build lorcana-api syntax for you (AND “;”, OR “;|”).</div>
             </Section>
 
             <Section title="Ink (OR)">
               <div className="flex flex-wrap">
                 {ALL_INKS.map(ink=> (
                   <Chip key={ink} label={ink} active={filters.inks.includes(ink)}
-                    onClick={()=> setFilters(f=> ({...f, inks: f.inks.includes(ink) ? f.inks.filter(x=>x!==ink) : [...f.inks, ink]}))} />
+                    onClick={()=> updateFilters(f=> ({...f, inks: f.inks.includes(ink) ? f.inks.filter(x=>x!==ink) : [...f.inks, ink]}))} />
                 ))}
               </div>
             </Section>
@@ -574,7 +786,7 @@ export default function LorcanaDeckBuilderApp(){
               <div className="flex flex-wrap">
                 {ALL_TYPES.map(t=> (
                   <Chip key={t} label={t} active={filters.types.includes(t)}
-                    onClick={()=> setFilters(f=> ({...f, types: f.types.includes(t) ? f.types.filter(x=>x!==t) : [...f.types, t]}))} />
+                    onClick={()=> updateFilters(f=> ({...f, types: f.types.includes(t) ? f.types.filter(x=>x!==t) : [...f.types, t]}))} />
                 ))}
               </div>
             </Section>
@@ -583,21 +795,21 @@ export default function LorcanaDeckBuilderApp(){
               <div className="flex flex-wrap">
                 {ALL_RARITIES.map(r=> (
                   <Chip key={r} label={r.replace('_',' ')} active={filters.rarities.includes(r)}
-                    onClick={()=> setFilters(f=> ({...f, rarities: f.rarities.includes(r) ? f.rarities.filter(x=>x!==r) : [...f.rarities, r]}))} />
+                    onClick={()=> updateFilters(f=> ({...f, rarities: f.rarities.includes(r) ? f.rarities.filter(x=>x!==r) : [...f.rarities, r]}))} />
                 ))}
               </div>
             </Section>
 
             <Section title="Sets (OR)">
               <div className="max-h-40 overflow-auto pr-2">
-                {loadingSets ? (<div className="text-white/60 text-sm">Loading sets…</div>) : (
-                  <div className="flex flex-wrap">
-                    {sets.map(s=> (
-                      <Chip key={s.code} label={`${s.name} (${s.code})`} active={filters.sets.includes(s.code)}
-                        onClick={()=> setFilters(f=> ({...f, sets: f.sets.includes(s.code) ? f.sets.filter(x=>x!==s.code) : [...f.sets, s.code]}))} />
-                    ))}
-                  </div>
-                )}
+                <div className="flex flex-wrap">
+                  {loadingSets && <div className="text-xs text-white/70">Loading sets…</div>}
+                  {!loadingSets && sets.map(s => (
+                    <Chip key={s.code} label={`${s.code}`} active={filters.sets.includes(s.code)}
+                      title={s.name}
+                      onClick={()=> updateFilters(f=> ({...f, sets: f.sets.includes(s.code) ? f.sets.filter(x=>x!==s.code) : [...f.sets, s.code]}))} />
+                  ))}
+                </div>
               </div>
             </Section>
 
@@ -606,31 +818,31 @@ export default function LorcanaDeckBuilderApp(){
                 {COST_CHOICES.map(n=> (
                   <button key={n} type="button"
                     className={`px-3 py-1 rounded-lg border text-sm ${ (filters.costs||[]).includes(n) ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}
-                    onClick={()=> setFilters(f=> ({...f, costs: (f.costs||[]).includes(n) ? (f.costs||[]).filter(x=>x!==n) : [...(f.costs||[]), n]}))}
+                    onClick={()=> updateFilters(f=> ({...f, costs: (f.costs||[]).includes(n) ? (f.costs||[]).filter(x=>x!==n) : [...(f.costs||[]), n]}))}
                     title={n===9? '9+': String(n)}>{n===9? '9+': n}
                   </button>
                 ))}
                 {(filters.costs?.length ?? 0) > 0 && (
                   <button type="button" className="ml-2 px-2 py-1 rounded border border-white/25 text-xs"
-                    onClick={()=> setFilters(f=> ({...f, costs: []}))}>Clear</button>
+                    onClick={()=> updateFilters(f=> ({...f, costs: []}))}>Clear</button>
                 )}
               </div>
             </Section>
 
             <Section title="Inkwell">
               <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
-                value={filters.inkwell} onChange={(e)=> setFilters(f=> ({...f, inkwell: e.target.value}))}>
+                value={filters.inkwell} onChange={(e)=> updateFilters(f=> ({...f, inkwell: e.target.value}))}>
                 <option value="any">Any</option>
                 <option value="inkable">Inkable only</option>
                 <option value="non-inkable">Non-inkable only</option>
               </select>
             </Section>
 
-            <Section title="Archetypes (Classifications, OR)">
+            <Section title="Archetypes (OR)">
               <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
                 {ALL_ARCHETYPES.map(a=> (
                   <Chip key={a} label={a} active={filters.archetypes?.includes(a) || false}
-                    onClick={()=> setFilters(f=> ({...f, archetypes: (f.archetypes||[]).includes(a) ? (f.archetypes||[]).filter(x=>x!==a) : [...(f.archetypes||[]), a]}))} />
+                    onClick={()=> updateFilters(f=> ({...f, archetypes: (f.archetypes||[]).includes(a) ? (f.archetypes||[]).filter(x=>x!==a) : [...(f.archetypes||[]), a]}))} />
                 ))}
               </div>
             </Section>
@@ -639,14 +851,14 @@ export default function LorcanaDeckBuilderApp(){
               <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
                 {ALL_KEYWORDS.map(k=> (
                   <Chip key={k} label={k} active={filters.keywords?.includes(k) || false}
-                    onClick={()=> setFilters(f=> ({...f, keywords: (f.keywords||[]).includes(k) ? (f.keywords||[]).filter(x=>x!==k) : [...(f.keywords||[]), k]}))} />
+                    onClick={()=> updateFilters(f=> ({...f, keywords: (f.keywords||[]).includes(k) ? (f.keywords||[]).filter(x=>x!==k) : [...(f.keywords||[]), k]}))} />
                 ))}
               </div>
             </Section>
 
             <Section title="Format">
               <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
-                value={filters.format} onChange={(e)=> setFilters(f=> ({...f, format: e.target.value}))}>
+                value={filters.format} onChange={(e)=> updateFilters(f=> ({...f, format: e.target.value}))}>
                 <option value="any">Any</option>
                 <option value="core">Standard/Core legal</option>
                 <option value="infinity">Infinity legal</option>
@@ -654,15 +866,8 @@ export default function LorcanaDeckBuilderApp(){
             </Section>
           </div>
 
-          {/* Footer: Done button */}
           <div className="pt-3 border-t border-white/10">
-            <button
-              type="button"
-              className="w-full h-10 rounded-lg bg-white text-black font-medium"
-              onClick={()=> setFiltersOpen(false)}
-            >
-              Done
-            </button>
+            <button type="button" className="w-full h-10 rounded-lg bg-white text-black font-medium" onClick={()=> setFiltersOpen(false)}>Done</button>
           </div>
         </div>
       </div>
@@ -674,7 +879,27 @@ export default function LorcanaDeckBuilderApp(){
       <header className="sticky top-0 z-30 backdrop-blur bg-[#0b0f1a]/75 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <div className="text-lg font-bold">lorcana deck builder</div>
-          <div className="text-xs text-white/60 ml-auto">Data & Images: Lorcast</div>
+          <div className="flex items-center gap-2 ml-6">
+            <button className="h-9 px-3 rounded-xl bg-[#2a2f45] border border-white/10 text-sm" onClick={()=> setFiltersOpen(true)}>Filters</button>
+            <button className="h-9 px-3 rounded-xl bg-[#2a2f45] border border-white/10 text-sm" onClick={()=> setImportOpen(true)}>Import</button>
+            <button className="h-9 px-3 rounded-xl bg-[#2a2f45] border border-white/10 text-sm" onClick={()=> setPrintOpen(true)}>Print Decklist</button>
+          </div>
+          <div className="ml-auto flex items-center gap-3 text-xs">
+            <label className="opacity-70">Group by</label>
+            <select className="px-2 py-1 rounded border border-white/20 bg-transparent" value={groupBy} onChange={e=> setGroupBy(e.target.value)}>
+              <option value="type">Type</option>
+              <option value="ink">Ink</option>
+              <option value="none">None</option>
+            </select>
+            <label className="opacity-70 ml-2">Sort by</label>
+            <select className="px-2 py-1 rounded border border-white/20 bg-transparent" value={sortBy} onChange={e=> setSortBy(e.target.value)}>
+              <option value="cost">Cost</option>
+              <option value="set">Set</option>
+              <option value="ink">Ink</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+          <div className="text-xs text-white/60 ml-4">Data & Images: lorcana-api</div>
         </div>
       </header>
 
@@ -685,39 +910,29 @@ export default function LorcanaDeckBuilderApp(){
             <div className="flex-1 relative">
               <input className="w-full h-11 pl-11 pr-40 rounded-xl bg-[#12172a] border border-white/10 outline-none placeholder-white/40"
                 placeholder="Search…" value={filters.text}
-                onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
+                onChange={(e)=> updateFilters(f=> ({...f, text:e.target.value}))} />
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">🔎</div>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-white/60">{sortedCards.length} cards</div>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-white/60">{cards.length} cards</div>
             </div>
-            <button type="button" className="h-11 px-4 rounded-xl bg-[#2a2f45] border border-white/10 hover:border-white/30"
-              onClick={()=> setFiltersOpen(true)}>Filters</button>
             <button type="button" className="h-11 px-3 rounded-xl bg-[#2a2f45] border border-white/10 text-sm"
-              onClick={()=> setFilters(f=> ({...f, text: 'i:amber or i:amethyst or i:emerald or i:ruby or i:sapphire or i:steel'}))}>
+              onClick={()=> updateFilters(f=> ({...f, text: 'i:amber or i:amethyst or i:emerald or i:ruby or i:sapphire or i:steel'}))}>
               Show all
             </button>
           </div>
 
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {view.map(c=> (
-              <CardTile key={`${c.id}-${c.collector_number}`} card={c} onAdd={(card)=> addToDeck(card,1)} />
+            {visibleCards.map(c=> (
+              <CardTile key={`${c.id}-${c.collector_number || c.name}`} card={c} onAdd={(card)=> addToDeck(card,1)} />
             ))}
           </div>
 
+          <div ref={sentinelRef} className="h-8"></div>
+
           <div className="mt-4 mb-1 flex items-center justify-between">
-            <div className="text-sm text-white/70">{loadingCards ? 'Searching…' : `${sortedCards.length} results`}</div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs">Unique:</label>
-              <select className="px-2 py-1 rounded border border-white/20 bg-[#12172a] text-sm" value={uniqueMode}
-                onChange={(e)=> setUniqueMode(e.target.value)}>
-                <option value="cards">Cards</option>
-                <option value="prints">Prints</option>
-              </select>
-              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
-                onClick={()=> setPage(p=> Math.max(1, p-1))}>← Prev</button>
-              <div className="text-sm">Page {page} / {pageCount}</div>
-              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
-                onClick={()=> setPage(p=> Math.min(pageCount, p+1))}>Next →</button>
+            <div className="text-sm text-white/70">
+              {loadingCards ? 'Searching…' : `${visibleCards.length} / ${sortedCards.length} shown`}
             </div>
+            <div className="text-xs text-white/50">Scroll to load more</div>
           </div>
 
           {err && (<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm">{err}</div>)}
@@ -740,11 +955,20 @@ export default function LorcanaDeckBuilderApp(){
             </div>
 
             <div className="mt-3 flex gap-2 flex-wrap">
-              <button type="button" onClick={copyTextExport}
+              <button type="button" onClick={async()=>{
+                  const text=buildDeckText();
+                  const method=await copyToClipboardRobust(text);
+                  if(method==='api'||method==='exec'){ alert('Deck copied to clipboard as text.'); }
+                  else { setCopyModal({open:true, text}); setTimeout(()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); },0); }
+                }}
                 className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">Copy Text</button>
-              <button type="button" disabled={exporting} onClick={doExport}
+              <button type="button" disabled={exporting} onClick={doExportGrid}
                 className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">
                 {exporting? 'Exporting…' : 'Export PNG'}
+              </button>
+              <button type="button" disabled={exporting} onClick={doExportList}
+                className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">
+                {exporting? 'Exporting…' : 'Export Decklist (PNG)'}
               </button>
               <button type="button" onClick={()=> setPublishOpen(true)}
                 className="px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm">
@@ -755,15 +979,20 @@ export default function LorcanaDeckBuilderApp(){
             </div>
 
             <div className="mt-3">
-              {Object.values(deck).length === 0 ? (
+              {Object.keys(deckGrouped).length === 0 ? (
                 <div className="text-sm text-white/60">Add cards from the grid →</div>
               ) : (
-                Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).map(e=> (
-                  <DeckRow key={e.card.id} entry={e}
-                    onInc={()=> addToDeck(e.card,1)}
-                    onDec={()=> decEntry(e.card.id)}
-                    onRemove={()=> removeEntry(e.card.id)}
-                  />
+                Object.entries(deckGrouped).map(([group, items]) => (
+                  <div key={group} className="mb-2">
+                    {groupBy !== "none" && <div className="text-xs uppercase tracking-wider text-white/60 mt-2 mb-1">{group}</div>}
+                    {items.map(e=> (
+                      <DeckRow key={e.card.id} entry={e}
+                        onInc={()=> addToDeck(e.card,1)}
+                        onDec={()=> decEntry(e.card.id)}
+                        onRemove={()=> removeEntry(e.card.id)}
+                      />
+                    ))}
+                  </div>
                 ))
               )}
             </div>
@@ -798,6 +1027,58 @@ export default function LorcanaDeckBuilderApp(){
             <div className="mt-3 flex justify-end">
               <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
                 onClick={()=> setCopyModal({open:false, text:''})}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import modal */}
+      {importOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={()=> setImportOpen(false)} />
+          <div className="relative bg-[#0b0f1a] border border-white/10 rounded-xl w-[min(96vw,900px)] max-h-[90vh] overflow-auto p-4">
+            <div className="text-sm font-semibold mb-2">Import decklist (Dreamborn style)</div>
+            <div className="text-xs text-white/70 mb-2">Paste lines like: <code>4x Elsa — Snow Queen [TFC#123]</code></div>
+            <textarea rows={12} value={importText} onChange={e=> setImportText(e.target.value)}
+              className="w-full px-3 py-2 rounded bg-black/30 border border-white/10 font-mono text-xs" />
+            {importErr && <div className="mt-2 text-xs text-rose-300">{importErr}</div>}
+            <div className="mt-3 flex justify-end gap-2">
+              <button className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setImportOpen(false)}>Cancel</button>
+              <button className="px-3 py-1.5 rounded-lg bg-white text-black text-sm" onClick={importDeckFromText}>Import</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print Decklist modal */}
+      {printOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center print:block">
+          <div className="absolute inset-0 bg-black/60 print:hidden" onClick={()=> setPrintOpen(false)} />
+          <div className="relative bg-white text-black border border-white/10 rounded-xl w-[min(96vw,900px)] max-h-[90vh] overflow-auto p-6 print:w-auto print:h-auto print:rounded-none print:overflow-visible">
+            <div className="flex items-center justify-between mb-4 print:hidden">
+              <div className="text-lg font-semibold">Print Decklist</div>
+              <div className="flex gap-2">
+                <button className="px-3 py-1.5 rounded border text-sm" onClick={()=> window.print()}>Print</button>
+                <button className="px-3 py-1.5 rounded border text-sm" onClick={()=> setPrintOpen(false)}>Close</button>
+              </div>
+            </div>
+            <div className="prose prose-sm max-w-none">
+              <h2 className="mt-0">{deckName || "Decklist"}</h2>
+              <p className="mt-0 text-sm text-gray-600">Generated {new Date().toLocaleString()}</p>
+              {Object.entries(deckGrouped).map(([group, items]) => (
+                <div key={group} className="mt-4">
+                  {groupBy !== "none" && <h3 className="mb-2">{group}</h3>}
+                  <ul className="m-0">
+                    {items.map(({card,count}) => (
+                      <li key={card.id} className="text-sm list-none">
+                        <span className="font-medium">{count}x {card.name}{card.version ? ` — ${card.version}` : ""}</span>
+                        <span className="ml-2 opacity-70">{card.ink || "—"} · {typeof card.cost==='number'?card.cost:'—'}</span>
+                        {card.set?.code && card.collector_number && <span className="ml-2 opacity-60">[{card.set.code}#{card.collector_number}]</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -847,7 +1128,7 @@ export default function LorcanaDeckBuilderApp(){
                   setPublishedLink(null);
                   if (publishedImageUrl) { try{ URL.revokeObjectURL(publishedImageUrl); }catch{} setPublishedImageUrl(null); }
                   try {
-                    const blob = await exportDeckPoster(deck, deckName || 'Untitled Deck', deckNotes, { unique: true });
+                    const blob = await exportDeckAsPng(deck, { unique: true });
                     const url = URL.createObjectURL(blob);
                     setPublishedImageUrl(url);
                     const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(
