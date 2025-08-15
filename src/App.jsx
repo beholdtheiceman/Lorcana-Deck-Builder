@@ -262,7 +262,7 @@ export default function LorcanaDeckBuilderApp(){
   }, [filters]);
 
   // Search (guard empty)
-  useEffect(()=>{ (async()=>{ try{ setErr(null); if(!query || !query.trim()){ setCards([]); return; } setLoadingCards=true; const res=await searchCards(query, uniqueMode); setCards(res); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingCards(false); } })(); }, [query, uniqueMode]);
+  useEffect(()=>{ (async()=>{ try{ setErr(null); if(!query || !query.trim()){ setCards([]); return; } setLoadingCards(true); const res=await searchCards(query, uniqueMode); setCards(res); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingCards(false); } })(); }, [query, uniqueMode]);
 
   // Persist deck
   useEffect(()=>{ try{ localStorage.setItem('lorcana_deck_mvp', JSON.stringify(deck)); }catch{} }, [deck]);
