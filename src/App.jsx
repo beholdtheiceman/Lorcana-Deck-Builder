@@ -12,11 +12,139 @@ import {
 } from "recharts";
 
 /** =========================
- *  Provider selector (Lorcana-API now, Lorcast later)
+ *  Provider selector
+ *  (Default to LORCAST per your request)
  * ========================= */
-const DATA_PROVIDER = (import.meta.env.VITE_DATA_PROVIDER || "lorcana-api").toLowerCase();
+const DATA_PROVIDER = (import.meta.env.VITE_DATA_PROVIDER || "lorcast").toLowerCase();
 
-/** ---- Lorcana-API provider (current) ---- */
+/** =========================
+ *  Lorcast Provider
+ * ========================= */
+const LORCAST_BASE = import.meta.env.VITE_LORCAST_BASE || "";
+
+function buildLorcastQuery({
+  q,
+  colors,
+  types,
+  cost,
+  set,
+  rarity,
+  text,
+  keywords = [],
+  archetype = "",
+  page = 1,
+  pagesize = 24,
+  orderby = "Color,Set_Num,Name",
+  sortdirection = "ASC",
+}) {
+  // We don't know Lorcast's exact grammar, so we send common-sense params.
+  // Adjust keys here to match your Lorcast server once known.
+  const params = new URLSearchParams();
+
+  if (q) params.set("name", q);
+  if (text) params.set("text", text);
+  if (keywords.length) params.set("keywords", keywords.join(","));
+  if (archetype) params.set("archetype", archetype);
+
+  if (colors?.length) params.set("color", colors.join(",")); // e.g., Amber,Emerald
+  if (types?.length) params.set("type", types.join(","));    // e.g., Character,Song
+
+  if (cost && cost !== "Any") {
+    if (cost === "9+") {
+      params.set("minCost", "9");
+    } else {
+      params.set("cost", String(cost));
+    }
+  }
+
+  if (set) params.set("set", set);
+  if (rarity) params.set("rarity", rarity);
+
+  params.set("page", String(page));
+  params.set("pageSize", String(pagesize)); // common naming; server can alias
+
+  // Sort mapping best-effort
+  // Map known fields to lowercase plausible server keys.
+  const mappedSort = orderby
+    .split(",")
+    .map((k) => k.trim().toLowerCase().replace("set_num", "setnumber"))
+    .join(",");
+  params.set("sort", mappedSort);
+  params.set("dir", (sortdirection || "ASC").toUpperCase());
+
+  return params;
+}
+
+function normalizeLorcastCard(x) {
+  // Normalize various possible field names coming from Lorcast
+  const Name = x.Name ?? x.name ?? x.cardName ?? x.title ?? "";
+  const Color = x.Color ?? x.color ?? x.ink ?? x.inkColor ?? "";
+  const Cost = x.Cost ?? x.cost ?? x.inkCost ?? x.playCost ?? "";
+  const Type = x.Type ?? x.type ?? x.cardType ?? "";
+  const Rarity = x.Rarity ?? x.rarity ?? "";
+  const Set = x.Set ?? x.setName ?? x.set ?? "";
+  const Set_Num = x.Set_Num ?? x.setNumber ?? x.number ?? x.collectorNumber ?? "";
+  const Image =
+    x.Image ??
+    x.image ??
+    x.imageUrl ??
+    (x.images && (x.images.large || x.images.normal || x.images.small)) ??
+    "";
+  const Rules = x.Rules ?? x.text ?? x.oracleText ?? x.rules ?? "";
+
+  return {
+    ...x,
+    Name,
+    Color,
+    Cost,
+    Type,
+    Rarity,
+    Set,
+    Set_Num,
+    Image,
+    Rules,
+  };
+}
+
+async function fetchFromLorcast(query) {
+  if (!LORCAST_BASE) {
+    throw new Error(
+      "VITE_LORCAST_BASE is not set. Please add it in your env (Preview/Production)."
+    );
+  }
+  // Try a couple of common endpoints: /cards, /api/cards, /cards/search
+  const endpoints = ["/cards", "/api/cards", "/cards/search"];
+  let lastErr;
+  for (const path of endpoints) {
+    const url = `${LORCAST_BASE.replace(/\/+$/, "")}${path}?${query.toString()}`;
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        lastErr = new Error(`Lorcast ${res.status} on ${path}`);
+        continue;
+      }
+      const data = await res.json();
+      // Accept either an array or {results:[], total: n}
+      const list = Array.isArray(data) ? data : data.results || [];
+      return list.map(normalizeLorcastCard);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Lorcast request failed");
+}
+
+const lorcastProvider = {
+  async fetchCards(filters) {
+    const qs = buildLorcastQuery(filters);
+    return fetchFromLorcast(qs);
+  },
+  label: LORCAST_BASE ? new URL(LORCAST_BASE).host : "Lorcast",
+};
+
+/** =========================
+ *  (Optional) Lorcana-API Provider (kept as fallback)
+ * ========================= */
 const LORCANA_BASE =
   import.meta.env.VITE_LORCANA_BASE || "https://api.lorcana-api.com";
 
@@ -34,22 +162,13 @@ function buildLorcanaSearch({
   const parts = [];
   if (q) parts.push(`name~${encodeURIComponent(q)}`);
   if (text) parts.push(`rules~${encodeURIComponent(text)}`);
-
-  if (keywords.length) {
-    // best-effort: match in rules text
-    parts.push(
-      keywords.map((k) => `rules~${encodeURIComponent(k)}`).join(";")
-    );
+  if (keywords?.length) {
+    parts.push(keywords.map((k) => `rules~${encodeURIComponent(k)}`).join(";"));
   }
-  if (archetype) {
-    // best-effort: match in rules/name
-    parts.push(`rules~${encodeURIComponent(archetype)}`);
-  }
-
-  if (colors.length)
+  if (archetype) parts.push(`rules~${encodeURIComponent(archetype)}`);
+  if (colors?.length)
     parts.push(colors.map((c) => `color=${encodeURIComponent(c)}`).join(";"));
-  if (types.length) {
-    // "Song" (not "Action - Song")
+  if (types?.length) {
     const normalized = types.map((t) => (t === "Song" ? "Song" : t));
     parts.push(
       normalized.map((t) => `type~${encodeURIComponent(t)}`).join(";")
@@ -108,20 +227,7 @@ const lorcanaProvider = {
   label: "api.lorcana-api.com",
 };
 
-/** ---- Lorcast provider (safe placeholder) ---- */
-const LORCAST_BASE =
-  import.meta.env.VITE_LORCAST_BASE || "https://YOUR-LORCAST-ENDPOINT";
-const lorcastProvider = {
-  async fetchCards(/* filters */) {
-    // Safe placeholder so the app never hard-crashes if VITE_DATA_PROVIDER=lorcast
-    console.warn("[Lorcast] Provider not configured yet. Returning 0 results.");
-    return [];
-    // When ready, implement mapping to Lorcast here and switch VITE_DATA_PROVIDER=lorcast
-  },
-  label: "Lorcast",
-};
-
-const provider = DATA_PROVIDER === "lorcast" ? lorcastProvider : lorcanaProvider;
+const provider = DATA_PROVIDER === "lorcana-api" ? lorcanaProvider : lorcastProvider;
 
 /** =========================
  *  Shared helpers
@@ -353,8 +459,8 @@ export default function App() {
   // Filters / search
   const [q, setQ] = useState("");
   const [textSearch, setTextSearch] = useState("");
-  const [keywords, setKeywords] = useState([]); // NEW
-  const [archetype, setArchetype] = useState(""); // NEW
+  const [keywords, setKeywords] = useState([]);
+  const [archetype, setArchetype] = useState("");
   const [colors, setColors] = useState([]);
   const [types, setTypes] = useState([]);
   const [cost, setCost] = useState("Any");
@@ -540,10 +646,10 @@ export default function App() {
     const setName = String(c.Set || "");
     const found = SETS.find((s) => s.name === setName);
     const setId = found?.id ?? Number(c.Set_Num ?? 0);
-    return setId >= 5; // Standard Core: sets 5+
+    return setId >= 5; // Standard Core ⇒ sets 5+
   }
 
-  // Extra client-side filters
+  // Extra client-side filters (keywords/archetype if backend didn't)
   function passesClientFilters(c) {
     const textBlob = [c.Rules, c.Traits, c.Subtypes, c.Type, c.Name]
       .map((x) => String(x || "").toLowerCase())
@@ -923,12 +1029,11 @@ export default function App() {
           <span className="hidden sm:inline text-xs text-white/60">
             Data: {provider.label}
           </span>
-          {/* Mobile deck toggle */}
           <button
             className="sm:hidden px-3 py-2 rounded-md border border-white/10 bg-white/5"
             onClick={() => setDeckOpen(true)}
           >
-            Open Deck ({Object.values(deck).reduce((s, d) => s + (d.__count || 0), 0)})
+            Open Deck ({totalDeckCards})
           </button>
         </div>
       </div>
@@ -936,7 +1041,6 @@ export default function App() {
       <div className="p-4 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
         {/* Left: Search & Results */}
         <div>
-          {/* Search row (mobile-friendly) */}
           <div className="flex flex-wrap gap-2 items-center mb-3">
             <input
               className="flex-1 min-w-[180px] px-3 py-2 rounded-md bg-[#0f1324] border border-white/10 outline-none"
@@ -999,7 +1103,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Results grid */}
           {err && (
             <div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">
               {err}
@@ -1072,10 +1175,7 @@ export default function App() {
         <div className="hidden lg:block bg-[#0f1324] rounded-xl border border-white/10 p-3 h-fit sticky top-4">
           <DeckPanel
             deck={deck}
-            totalDeckCards={Object.values(deck).reduce(
-              (s, d) => s + (d.__count || 0),
-              0
-            )}
+            totalDeckCards={totalDeckCards}
             addToDeck={addToDeck}
             setCount={setCount}
             clearDeck={clearDeck}
@@ -1100,12 +1200,7 @@ export default function App() {
           <div className="absolute inset-x-0 bottom-0 max-h-[85%] bg-[#0b1120] border-t border-white/10 rounded-t-2xl p-3 overflow-auto">
             <div className="flex items-center mb-2">
               <h2 className="text-lg font-semibold">
-                Your Deck (
-                {Object.values(deck).reduce(
-                  (s, d) => s + (d.__count || 0),
-                  0
-                )}
-                )
+                Your Deck ({totalDeckCards})
               </h2>
               <button
                 className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
@@ -1116,10 +1211,7 @@ export default function App() {
             </div>
             <DeckPanel
               deck={deck}
-              totalDeckCards={Object.values(deck).reduce(
-                (s, d) => s + (d.__count || 0),
-                0
-              )}
+              totalDeckCards={totalDeckCards}
               addToDeck={addToDeck}
               setCount={setCount}
               clearDeck={clearDeck}
@@ -1136,7 +1228,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Filters Drawer (with Keywords/Archetype/Format) */}
+      {/* Filters Drawer */}
       {filtersOpen && (
         <div className="fixed inset-0 z-40">
           <div
