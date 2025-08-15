@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
 /* =========================
-   Constants / simple types
+   Constants / simple lists
    ========================= */
 const API_ROOT = "https://api.lorcast.com/v0";
 
@@ -94,7 +94,7 @@ async function copyToClipboardRobust(text){
    EXPORT HELPERS (images)
    ========================= */
 
-// proxy remote images through a CORS-friendly host so canvas can draw them
+// CORS-safe proxy for drawing remote images on canvas
 function proxyImageUrl(rawUrl) {
   if (!rawUrl) return null;
   const noProto = rawUrl.replace(/^https?:\/\//, "");
@@ -127,16 +127,39 @@ function drawCountBubble(ctx, x, y, n) {
   ctx.restore();
 }
 
-// Card grid export (used by Export PNG and reused by poster)
-async function exportDeckAsPng(deck) {
+// UNIQUE tile grid (one tile per full name) or per-copy grid (old mode)
+async function exportDeckAsPng(deck, { unique = false } = {}) {
+  // Build entries
   const entries = Object.values(deck)
-    .filter((e) => e.count > 0)
-    .sort((a, b) => (a.card.cost ?? 0) - (b.card.cost ?? 0) || (a.card.name > b.card.name ? 1 : -1));
+    .filter(e => e.count > 0)
+    .sort((a, b) =>
+      (a.card.cost ?? 0) - (b.card.cost ?? 0) ||
+      (a.card.name > b.card.name ? 1 : -1)
+    );
 
+  // Totals per full name + representative print
+  const totalByFullName = {};
+  const repByFullName = {};
   const prints = [];
-  for (const { card, count } of entries) for (let i = 0; i < count; i++) prints.push(card);
 
-  const cols = 10, cellW = 134, cellH = 187, pad = 10;
+  for (const { card, count } of entries) {
+    const key = fullNameKey(card);
+    totalByFullName[key] = (totalByFullName[key] || 0) + count;
+    if (!repByFullName[key]) repByFullName[key] = card;
+    if (!unique) {
+      for (let i = 0; i < count; i++) prints.push(card);
+    }
+  }
+  if (unique) {
+    for (const key of Object.keys(repByFullName)) prints.push(repByFullName[key]);
+  }
+
+  // Layout
+  const cols = unique ? 8 : 10;
+  const cellW = unique ? 180 : 134;
+  const cellH = unique ? 255 : 187;
+  const pad = 12;
+
   const rows = Math.max(1, Math.ceil(prints.length / cols));
   const W = pad + cols * (cellW + pad);
   const H = pad + rows * (cellH + pad);
@@ -148,28 +171,22 @@ async function exportDeckAsPng(deck) {
 
   ctx.fillStyle = "#0b0f1a"; ctx.fillRect(0, 0, W, H);
 
-  const totalById = {};
-  entries.forEach(({ card, count }) => (totalById[card.id] = count));
-
   for (let idx = 0; idx < prints.length; idx++) {
     const card = prints[idx];
-    const col = idx % cols, row = Math.floor(idx / cols);
-    const x = pad + col * (cellW + pad), y = pad + row * (cellH + pad);
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const x = pad + col * (cellW + pad);
+    const y = pad + row * (cellH + pad);
 
-    // placeholder + border
+    // frame
     ctx.fillStyle = "#171b2b"; ctx.fillRect(x, y, cellW, cellH);
     ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.strokeRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
 
-    // small name always
-    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "10px ui-sans-serif, system-ui";
-    const nm = `${card.name}${card.version ? ` — ${card.version}` : ""}`;
-    ctx.fillText(nm, x + 6, y + 14);
-
+    // image
     const rawImg =
       card.image_uris?.digital?.large ||
       card.image_uris?.digital?.normal ||
       card.image_uris?.digital?.small;
-
     const proxied = proxyImageUrl(rawImg);
     if (proxied) {
       try {
@@ -178,25 +195,31 @@ async function exportDeckAsPng(deck) {
         const w = img.width * scale, h = img.height * scale;
         const cx = x + (cellW - w) / 2, cy = y + (cellH - h) / 2;
         ctx.drawImage(img, cx, cy, w, h);
-      } catch {
-        // leave placeholder
-      }
+      } catch { /* keep placeholder */ }
     }
 
-    const firstIdx = prints.findIndex((p) => p.id === card.id);
-    if (firstIdx === idx) drawCountBubble(ctx, x + cellW - 18, y + 18, totalById[card.id] || 0);
+    // count bubble
+    const key = fullNameKey(card);
+    const totalForThis = totalByFullName[key] || 0;
+    if (unique) {
+      drawCountBubble(ctx, x + cellW - 18, y + 18, totalForThis);
+    } else {
+      const firstIdx = prints.findIndex(p => fullNameKey(p) === key);
+      if (firstIdx === idx) drawCountBubble(ctx, x + cellW - 18, y + 18, totalForThis);
+    }
   }
 
+  // footer
   ctx.fillStyle = "#fff"; ctx.font = "10px ui-sans-serif, system-ui";
   ctx.fillText(`Exported ${new Date().toLocaleString()} — Powered by Lorcast`, pad, H - 6);
 
-  return new Promise((res) => canvas.toBlob((b) => res(b), "image/png"));
+  return new Promise(res => canvas.toBlob(b => res(b), "image/png"));
 }
 
 /* Poster export for Publish: grid (left) + decklist/notes (right) */
-async function exportDeckPoster(deck, title, notes) {
+async function exportDeckPoster(deck, title, notes, { unique = false } = {}) {
   // grid image
-  const gridBlob = await exportDeckAsPng(deck);
+  const gridBlob = await exportDeckAsPng(deck, { unique });
   if (!gridBlob) throw new Error("Failed to build grid image");
   const gridUrl = URL.createObjectURL(gridBlob);
 
@@ -207,7 +230,7 @@ async function exportDeckPoster(deck, title, notes) {
     img.src = gridUrl;
   });
 
-  // decklist entries for right column
+  // decklist for right column
   const entries = Object.values(deck)
     .sort((a, b) => (a.card.cost ?? 0) - (b.card.cost ?? 0) || (a.card.name > b.card.name ? 1 : -1))
     .map((e) => ({
@@ -233,8 +256,7 @@ async function exportDeckPoster(deck, title, notes) {
   const W = gridImg.width + pad + rightW + pad * 2;
 
   const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#0b0f1a";
@@ -446,7 +468,7 @@ export default function LorcanaDeckBuilderApp(){
   useEffect(()=>{ (async()=>{ try{
       setErr(null);
       if(!query || !query.trim()){ setCards([]); return; }
-      setLoadingCards(true);               // FIXED: call the setter, don't assign
+      setLoadingCards(true);
       const res=await searchCards(query, uniqueMode);
       setCards(res);
     } catch(e){ setErr(e?.message||String(e)); }
@@ -488,7 +510,8 @@ export default function LorcanaDeckBuilderApp(){
   async function doExport(){
     setExportErr(null); setExporting(true);
     try{
-      const blob=await exportDeckAsPng(deck);
+      // unique tiles with count bubbles
+      const blob=await exportDeckAsPng(deck, { unique: true });
       if(!blob) throw new Error('Failed to build image blob');
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a'); a.href=url; a.download='lorcana-deck.png'; a.rel='noopener';
@@ -814,8 +837,8 @@ export default function LorcanaDeckBuilderApp(){
                   onClick={async()=>{
                     setPublishing(true); setPublishErr(null); setPublishedLink(null); setPublishedImageUrl(null);
                     try {
-                      // build poster (grid + decklist/notes)
-                      const blob = await exportDeckPoster(deck, deckName || 'Untitled Deck', deckNotes);
+                      // UNIQUE poster (one tile per card + bubble)
+                      const blob = await exportDeckPoster(deck, deckName || 'Untitled Deck', deckNotes, { unique: true });
                       const url = URL.createObjectURL(blob);
                       setPublishedImageUrl(url);
 
