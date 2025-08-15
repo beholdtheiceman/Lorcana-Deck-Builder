@@ -1,34 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
-/**
- * Lorcana Deck Builder – Dreamborn-style two-pane
- * - Filters (inks/types/rarities/sets/cost chips/inkwell/keywords/archetypes/format)
- * - Sorting by set then collector number
- * - Deck: ≥60 min, ≤4 per full name, ≤2 inks
- * - Export PNG (grid of prints) with CORS-safe image proxy
- * - Copy Text export w/ clipboard fallback
- * - Optional publish modal (no backend calls unless configured in env)
- */
-
-/** @typedef {"Amber"|"Amethyst"|"Emerald"|"Ruby"|"Sapphire"|"Steel"} Ink */
-/** @typedef {{
- *  id: string,
- *  name: string,
- *  version?: string|null,
- *  image_uris?: { digital?: { small?: string, normal?: string, large?: string } },
- *  cost?: number|null,
- *  inkwell?: boolean,
- *  ink?: Ink|null,
- *  type?: string[],
- *  classifications?: string[]|null,
- *  text?: string|null,
- *  rarity?: string|null,
- *  set?: { id: string, code: string, name: string },
- *  collector_number?: string
- * }} Card */
-
+/* =========================
+   Constants / simple types
+   ========================= */
 const API_ROOT = "https://api.lorcast.com/v0";
+
 const ALL_INKS = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
 const ALL_TYPES = ["Character","Action","Song","Item","Location"];
 const ALL_RARITIES = ["Common","Uncommon","Rare","Super_rare","Legendary","Enchanted","Promo"];
@@ -43,15 +20,18 @@ const ALL_KEYWORDS = [
 const ALL_ARCHETYPES = [
   "Storyborn","Dreamborn","Floodborn","Hero","Villain","Ally","Mentor","Alien","Broom","Captain","Deity","Detective","Dragon","Fairy","Hyena","Inventor","King","Knight","Madrigal","Musketeer","Pirate","Prince","Princess","Puppy","Queen","Racer","Robot","Seven Dwarfs","Sorcerer","Tigger","Titan",
 ];
-const COST_CHOICES = [1,2,3,4,5,6,7,8,9]; // 9 -> 9+
+const COST_CHOICES = [1,2,3,4,5,6,7,8,9]; // 9 => 9+
 
+/* =========================
+   API helpers
+   ========================= */
 function fullNameKey(card){ return `${card.name} — ${card.version ?? ""}`.trim(); }
 
 async function fetchSets(){
   const r = await fetch(`${API_ROOT}/sets`);
   if (!r.ok) throw new Error("Failed to load sets");
   const j = await r.json();
-  return (j.results ?? []);
+  return j.results ?? [];
 }
 
 async function searchCards(query, unique = "cards"){
@@ -61,7 +41,7 @@ async function searchCards(query, unique = "cards"){
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error("Search failed");
   const j = await r.json();
-  return (j.results ?? []);
+  return j.results ?? [];
 }
 
 function buildQuery(f){
@@ -91,7 +71,9 @@ function buildQuery(f){
   return parts.join(" ").trim();
 }
 
-// Deck helpers
+/* =========================
+   Deck helpers
+   ========================= */
 function deckCount(deck){ return Object.values(deck).reduce((n,e)=> n + e.count, 0); }
 function deckInks(deck){ const s=new Set(); Object.values(deck).forEach(({card})=>{ if(card.ink) s.add(card.ink); }); return Array.from(s); }
 function fullNameTotals(deck){ const m={}; Object.values(deck).forEach(({card,count})=>{ const k=fullNameKey(card); m[k]=(m[k]||0)+count; }); return m; }
@@ -108,8 +90,11 @@ async function copyToClipboardRobust(text){
   return 'manual';
 }
 
-/* -------------------- EXPORT HELPERS (CORS-safe) -------------------- */
+/* =========================
+   EXPORT HELPERS (images)
+   ========================= */
 
+// proxy remote images through a CORS-friendly host so canvas can draw them
 function proxyImageUrl(rawUrl) {
   if (!rawUrl) return null;
   const noProto = rawUrl.replace(/^https?:\/\//, "");
@@ -142,6 +127,7 @@ function drawCountBubble(ctx, x, y, n) {
   ctx.restore();
 }
 
+// Card grid export (used by Export PNG and reused by poster)
 async function exportDeckAsPng(deck) {
   const entries = Object.values(deck)
     .filter((e) => e.count > 0)
@@ -207,27 +193,139 @@ async function exportDeckAsPng(deck) {
   return new Promise((res) => canvas.toBlob((b) => res(b), "image/png"));
 }
 
-/* -------------------- Decklist image (for Publish preview) -------------------- */
+/* Poster export for Publish: grid (left) + decklist/notes (right) */
+async function exportDeckPoster(deck, title, notes) {
+  // grid image
+  const gridBlob = await exportDeckAsPng(deck);
+  if (!gridBlob) throw new Error("Failed to build grid image");
+  const gridUrl = URL.createObjectURL(gridBlob);
 
-async function generateDeckListImage(entries, title, notes){
-  const pad=24, lineH=22, headerH=70, footerH=28, colGap=40; const maxPerCol=30; const cols=Math.ceil(entries.length/maxPerCol)||1; const colW=420; const W=pad*2+cols*colW+(cols-1)*colGap; const rows=Math.ceil(entries.length/cols); const bodyH=rows*lineH; const H=pad+headerH+bodyH+footerH+(notes?80:0);
-  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H; const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#0b0f1a'; ctx.fillRect(0,0,W,H);
-  ctx.font='bold 20px ui-sans-serif, system-ui'; ctx.fillStyle='#fff'; ctx.fillText(title, pad, pad+24);
-  ctx.font='12px ui-sans-serif, system-ui'; ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.fillText(new Date().toLocaleString(), pad, pad+44);
-  let x=pad, y=pad+headerH; ctx.font='14px ui-sans-serif, system-ui'; ctx.fillStyle='#fff';
-  for(let i=0;i<entries.length;i++){ const e=entries[i]; const line=`${e.count}x  ${e.name}${e.set && e.num ? ` [${e.set}#${e.num}]` : ''}  · ${e.ink || '—'} · ${typeof e.cost==='number'?e.cost:'—'}`; ctx.fillText(line,x,y); y+=lineH; if((i+1)%maxPerCol===0){ x+=colW+colGap; y=pad+headerH; } }
-  if(notes){ const boxY=H-footerH-70; ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(pad,boxY,W-pad*2,60); ctx.fillStyle='#fff'; ctx.font='bold 13px ui-sans-serif, system-ui'; ctx.fillText('Notes', pad+10, boxY+20); ctx.font='12px ui-sans-serif, system-ui'; wrapText(ctx, notes, pad+10, boxY+40, W-pad*2-20, 16); }
-  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px ui-sans-serif, system-ui'; ctx.fillText('Generated with Lorcast data · deckbuilder', pad, H-8);
-  return new Promise(resolve=> canvas.toBlob(b=>resolve(b), 'image/png', 0.92));
-  function wrapText(c,t,ox,oy,maxW,lh){ const words=(t||'').split(/\s+/); let line='', y=oy; for(const w of words){ const test=line?line+' '+w:w; if(c.measureText(test).width>maxW){ c.fillText(line,ox,y); line=w; y+=lh; } else line=test; } if(line) c.fillText(line,ox,y); }
+  const gridImg = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = gridUrl;
+  });
+
+  // decklist entries for right column
+  const entries = Object.values(deck)
+    .sort((a, b) => (a.card.cost ?? 0) - (b.card.cost ?? 0) || (a.card.name > b.card.name ? 1 : -1))
+    .map((e) => ({
+      count: e.count,
+      name: `${e.card.name}${e.card.version ? ` — ${e.card.version}` : ""}`,
+      set: e.card.set?.code,
+      num: e.card.collector_number,
+      cost: e.card.cost,
+      ink: e.card.ink,
+    }));
+
+  // layout
+  const pad = 24;
+  const rightW = 460;
+  const lineH = 20;
+  const headerH = 64;
+  const footerH = 28;
+
+  const H = Math.max(
+    gridImg.height + pad * 2,
+    pad + headerH + entries.length * lineH + footerH + (notes ? 90 : 0)
+  );
+  const W = gridImg.width + pad + rightW + pad * 2;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#0b0f1a";
+  ctx.fillRect(0, 0, W, H);
+
+  // grid
+  const gridX = pad;
+  const gridY = pad;
+  ctx.drawImage(gridImg, gridX, gridY);
+
+  // right column bg
+  const rightX = gridX + gridImg.width + pad;
+  ctx.fillStyle = "#0a0e19";
+  ctx.fillRect(rightX, pad, rightW, H - pad * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.strokeRect(rightX + 0.5, pad + 0.5, rightW - 1, H - pad * 2 - 1);
+
+  // header
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 20px ui-sans-serif, system-ui";
+  ctx.fillText(title || "Untitled Deck", rightX + 14, pad + 26);
+  ctx.font = "12px ui-sans-serif, system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText(new Date().toLocaleString(), rightX + 14, pad + 44);
+
+  // decklist
+  ctx.fillStyle = "#fff";
+  ctx.font = "13px ui-sans-serif, system-ui";
+  let y = pad + headerH;
+  for (const e of entries) {
+    const line = `${e.count}x  ${e.name}${
+      e.set && e.num ? ` [${e.set}#${e.num}]` : ""
+    }  · ${e.ink || "—"} · ${typeof e.cost === "number" ? e.cost : "—"}`;
+    ctx.fillText(line, rightX + 14, y);
+    y += lineH;
+  }
+
+  // notes
+  if (notes) {
+    const boxY = Math.min(y + 12, H - footerH - 78);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(rightX + 10, boxY, rightW - 20, 60);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 12px ui-sans-serif, system-ui";
+    ctx.fillText("Notes", rightX + 18, boxY + 18);
+    ctx.font = "12px ui-sans-serif, system-ui";
+    wrap(ctx, notes, rightX + 18, boxY + 36, rightW - 36, 16);
+  }
+
+  // footer
+  ctx.font = "11px ui-sans-serif, system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillText(
+    "Generated with Lorcast data · deckbuilder",
+    rightX + 14,
+    H - 10
+  );
+
+  URL.revokeObjectURL(gridUrl);
+
+  return new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b), "image/png", 0.92)
+  );
+
+  function wrap(c, text, x, oy, maxW, lh) {
+    const words = (text || "").split(/\s+/);
+    let line = "";
+    let y2 = oy;
+    for (const w of words) {
+      const test = line ? line + " " + w : w;
+      if (c.measureText(test).width > maxW) {
+        c.fillText(line, x, y2);
+        line = w;
+        y2 += lh;
+      } else {
+        line = test;
+      }
+    }
+    if (line) c.fillText(line, x, y2);
+  }
 }
 
-/* ----------------------------- UI atoms ----------------------------- */
-
+/* =========================
+   Small UI atoms
+   ========================= */
 function Chip({ active, label, onClick, title }){
   return (
-    <button type="button" title={title} onClick={onClick} className={`px-3 py-1 rounded-full border text-sm mr-2 mb-2 transition ${active ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}>
+    <button type="button" title={title} onClick={onClick}
+      className={`px-3 py-1 rounded-full border text-sm mr-2 mb-2 transition ${
+        active ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'
+      }`}>
       {label}
     </button>
   );
@@ -257,7 +355,10 @@ function CardTile({ card, onAdd }){
           {typeof card.cost === 'number' && (<span className="text-xs px-2 py-0.5 rounded-full border border-white/20">Cost {card.cost}</span>)}
         </div>
       </div>
-      <button type="button" onClick={()=> onAdd && onAdd(card)} className="mt-auto w-full text-center py-2 rounded-lg bg-white text-black font-medium hover:opacity-90">+ Add</button>
+      <button type="button" onClick={()=> onAdd && onAdd(card)}
+        className="mt-auto w-full text-center py-2 rounded-lg bg-white text-black font-medium hover:opacity-90">
+        + Add
+      </button>
     </div>
   );
 }
@@ -284,15 +385,20 @@ function DeckRow({ entry, onInc, onDec, onRemove }){
   );
 }
 
-/* --------------------------- Main Component --------------------------- */
-
+/* =========================
+   Main component
+   ========================= */
 export default function LorcanaDeckBuilderApp(){
-  // Sets
+  // sets
   const [sets, setSets] = useState([]);
   const [loadingSets, setLoadingSets] = useState(true);
 
-  // Filters & results
-  const [filters, setFilters] = useState({ text:"", inks:[], types:[], rarities:[], sets:[], costMin:undefined, costMax:undefined, costs:[], inkwell:"any", keywords:[], archetypes:[], format:"any" });
+  // filters & results
+  const [filters, setFilters] = useState({
+    text:"", inks:[], types:[], rarities:[], sets:[],
+    costMin:undefined, costMax:undefined, costs:[],
+    inkwell:"any", keywords:[], archetypes:[], format:"any"
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cards, setCards] = useState([]);
@@ -300,21 +406,23 @@ export default function LorcanaDeckBuilderApp(){
   const [uniqueMode, setUniqueMode] = useState("cards");
   const [err, setErr] = useState(null);
 
-  // Deck
-  const [deck, setDeck] = useState(()=>{ try{ const raw=localStorage.getItem('lorcana_deck_mvp'); return raw? JSON.parse(raw) : {}; }catch{ return {}; } });
+  // deck
+  const [deck, setDeck] = useState(()=>{
+    try{ const raw=localStorage.getItem('lorcana_deck_mvp'); return raw? JSON.parse(raw) : {}; }catch{ return {}; }
+  });
   const total = deckCount(deck);
   const inksInDeck = deckInks(deck);
   const inkableStats = useMemo(()=> deckInkableStats(deck), [deck]);
   const curveData = useMemo(()=> curveDataFromDeck(deck), [deck]);
   const fullTotals = useMemo(()=> fullNameTotals(deck), [deck]);
 
-  // Export/Copy
+  // export & copy
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState(null);
   const [copyModal, setCopyModal] = useState({ open:false, text:"" });
   const copyAreaRef = useRef(null);
 
-  // Publish (UI only; no backend without env config)
+  // publish (UI only)
   const [publishOpen, setPublishOpen] = useState(false);
   const [deckName, setDeckName] = useState("My Lorcana Deck");
   const [deckNotes, setDeckNotes] = useState("");
@@ -323,10 +431,10 @@ export default function LorcanaDeckBuilderApp(){
   const [publishedImageUrl, setPublishedImageUrl] = useState(null);
   const [publishErr, setPublishErr] = useState(null);
 
-  // Load sets
+  // load sets
   useEffect(()=>{ (async()=>{ try{ setLoadingSets(true); const s=await fetchSets(); setSets(s); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingSets(false); } })(); },[]);
 
-  // Build query (debounce)
+  // build query (debounced)
   const debounceRef = useRef(null);
   useEffect(()=>{
     const q = buildQuery(filters);
@@ -334,32 +442,75 @@ export default function LorcanaDeckBuilderApp(){
     debounceRef.current = window.setTimeout(()=> setQuery(q), 250);
   }, [filters]);
 
-  // Search (guard empty)
-  useEffect(()=>{ (async()=>{ try{ setErr(null); if(!query || !query.trim()){ setCards([]); return; } setLoadingCards(true); const res=await searchCards(query, uniqueMode); setCards(res); } catch(e){ setErr(e?.message||String(e)); } finally{ setLoadingCards(false); } })(); }, [query, uniqueMode]);
+  // search
+  useEffect(()=>{ (async()=>{ try{
+      setErr(null);
+      if(!query || !query.trim()){ setCards([]); return; }
+      setLoadingCards(true);               // FIXED: call the setter, don't assign
+      const res=await searchCards(query, uniqueMode);
+      setCards(res);
+    } catch(e){ setErr(e?.message||String(e)); }
+    finally{ setLoadingCards(false); } })();
+  }, [query, uniqueMode]);
 
-  // Persist deck
+  // persist deck
   useEffect(()=>{ try{ localStorage.setItem('lorcana_deck_mvp', JSON.stringify(deck)); }catch{} }, [deck]);
 
-  // Deck ops
-  function canAdd(card, n=1){ const fn=fullNameKey(card); const already=fullTotals[fn]||0; if(already+n>4) return {ok:false, reason:'Max 4 copies per full name.'}; if(card.ink){ const s=new Set(inksInDeck); s.add(card.ink); if(s.size>2) return {ok:false, reason:'Deck can only include up to 2 inks.'}; } return {ok:true}; }
-  function addToDeck(card, n=1){ const chk=canAdd(card,n); if(!chk.ok){ alert(chk.reason); return; } setDeck(d=>{ const cur=d[card.id]?.count||0; return { ...d, [card.id]: { card, count: cur+n } }; }); }
+  // deck ops
+  function canAdd(card, n=1){
+    const fn=fullNameKey(card); const already=fullTotals[fn]||0;
+    if(already+n>4) return {ok:false, reason:'Max 4 copies per full name.'};
+    if(card.ink){ const s=new Set(inksInDeck); s.add(card.ink); if(s.size>2) return {ok:false, reason:'Deck can only include up to 2 inks.'}; }
+    return {ok:true};
+  }
+  function addToDeck(card, n=1){ const chk=canAdd(card,n); if(!chk.ok){ alert(chk.reason); return; }
+    setDeck(d=>{ const cur=d[card.id]?.count||0; return { ...d, [card.id]: { card, count: cur+n } }; }); }
   function decEntry(id){ setDeck(d=>{ const cur=d[id]?.count||0; const next=Math.max(0, cur-1); const nd={...d}; if(next===0) delete nd[id]; else nd[id]={ card:d[id].card, count:next }; return nd; }); }
   function removeEntry(id){ setDeck(d=>{ const nd={...d}; delete nd[id]; return nd; }); }
   function clearDeck(){ if (confirm('Clear current deck?')) setDeck({}); }
 
-  function buildDeckText(){ const lines=[]; lines.push(`# Lorcana Deck (${total} cards)`); lines.push(`Inks: ${inksInDeck.join(', ') || '—'}`); lines.push(''); Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).forEach(({card,count})=>{ const nm=`${card.name}${card.version?` — ${card.version}`:''}`; const setInfo=card.set?` [${card.set.code}#${card.collector_number}]`:''; lines.push(`${count}x ${nm}${setInfo}`); }); return lines.join('\n'); }
-  async function copyTextExport(){ const text=buildDeckText(); const method=await copyToClipboardRobust(text); if(method==='api'||method==='exec'){ alert('Deck copied to clipboard as text.'); return; } setCopyModal({open:true, text}); setTimeout(()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); },0); }
-  async function doExport(){ setExportErr(null); setExporting(true); try{ const blob=await exportDeckAsPng(deck); if(!blob) throw new Error('Failed to build image blob'); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='lorcana-deck.png'; a.rel='noopener'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=> URL.revokeObjectURL(url), 1500); } catch(e){ setExportErr(e?.message||String(e)); } finally{ setExporting(false); } }
+  // deck text
+  function buildDeckText(){
+    const lines=[]; lines.push(`# Lorcana Deck (${total} cards)`); lines.push(`Inks: ${inksInDeck.join(', ') || '—'}`); lines.push('');
+    Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).forEach(({card,count})=>{
+      const nm=`${card.name}${card.version?` — ${card.version}`:''}`;
+      const setInfo=card.set?` [${card.set.code}#${card.collector_number}]`:'';
+      lines.push(`${count}x ${nm}${setInfo}`);
+    });
+    return lines.join('\n');
+  }
+  async function copyTextExport(){
+    const text=buildDeckText();
+    const method=await copyToClipboardRobust(text);
+    if(method==='api'||method==='exec'){ alert('Deck copied to clipboard as text.'); return; }
+    setCopyModal({open:true, text}); setTimeout(()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); },0);
+  }
+  async function doExport(){
+    setExportErr(null); setExporting(true);
+    try{
+      const blob=await exportDeckAsPng(deck);
+      if(!blob) throw new Error('Failed to build image blob');
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='lorcana-deck.png'; a.rel='noopener';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=> URL.revokeObjectURL(url), 1500);
+    }catch(e){ setExportErr(e?.message||String(e)); }
+    finally{ setExporting(false); }
+  }
 
-  // Sorting & pagination
+  // sorting & pagination
   const [page, setPage] = useState(1);
   const pageSize = 24;
   const setOrder = useMemo(()=>{ const m={}; sets.forEach((s,i)=> m[s.code]=i); return m; }, [sets]);
-  const sortedCards = useMemo(()=> [...cards].sort((a,b)=>{ const ac=a.set?.code||''; const bc=b.set?.code||''; const ai=setOrder[ac]??9999; const bi=setOrder[bc]??9999; if(ai!==bi) return ai-bi; const an=parseInt(a.collector_number||'0',10)||0; const bn=parseInt(b.collector_number||'0',10)||0; return an-bn; }), [cards, setOrder]);
+  const sortedCards = useMemo(()=> [...cards].sort((a,b)=>{
+    const ac=a.set?.code||''; const bc=b.set?.code||'';
+    const ai=setOrder[ac]??9999; const bi=setOrder[bc]??9999; if(ai!==bi) return ai-bi;
+    const an=parseInt(a.collector_number||'0',10)||0; const bn=parseInt(b.collector_number||'0',10)||0; return an-bn;
+  }), [cards, setOrder]);
   const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize));
   useEffect(()=> setPage(1), [sortedCards.length]);
   const view = useMemo(()=> sortedCards.slice((page-1)*pageSize, page*pageSize), [sortedCards, page]);
 
+  /* ============== UI ============== */
   function FiltersSheet(){
     return (
       <div className="fixed inset-0 z-40 flex">
@@ -367,75 +518,107 @@ export default function LorcanaDeckBuilderApp(){
         <div className="w-full max-w-md h-full overflow-y-auto bg-slate-950 border-l border-white/10 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold">Filters</div>
-            <button type="button" className="text-xs underline text-white/70" onClick={()=> setFilters({ text:'', inks:[], types:[], rarities:[], sets:[], costMin:undefined, costMax:undefined, costs:[], inkwell:'any', keywords:[], archetypes:[], format:'any' })}>Reset</button>
+            <button type="button" className="text-xs underline text-white/70"
+              onClick={()=> setFilters({ text:'', inks:[], types:[], rarities:[], sets:[], costMin:undefined, costMax:undefined, costs:[], inkwell:'any', keywords:[], archetypes:[], format:'any' })}>
+              Reset
+            </button>
           </div>
+
           <Section title="Search">
-            <input className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20 outline-none" placeholder="Name (default), or prefix n: / e: (e.g., e:draw)" value={filters.text} onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
-            <div className="mt-2 text-[11px] text-white/50">Supports i:/t:/r:/s:/c:/iw, <span className="font-mono">keyword:</span>, and <span className="font-mono">format:core|infinity</span>.</div>
+            <input className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20 outline-none"
+              placeholder="Name (default), or prefix n: / e: (e.g., e:draw)"
+              value={filters.text} onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
+            <div className="mt-2 text-[11px] text-white/50">
+              Supports i:/t:/r:/s:/c:/iw, <span className="font-mono">keyword:</span>, and <span className="font-mono">format:core|infinity</span>.
+            </div>
           </Section>
+
           <Section title="Ink (OR)">
             <div className="flex flex-wrap">
               {ALL_INKS.map(ink=> (
-                <Chip key={ink} label={ink} active={filters.inks.includes(ink)} onClick={()=> setFilters(f=> ({...f, inks: f.inks.includes(ink) ? f.inks.filter(x=>x!==ink) : [...f.inks, ink]}))} />
+                <Chip key={ink} label={ink} active={filters.inks.includes(ink)}
+                  onClick={()=> setFilters(f=> ({...f, inks: f.inks.includes(ink) ? f.inks.filter(x=>x!==ink) : [...f.inks, ink]}))} />
               ))}
             </div>
           </Section>
+
           <Section title="Type (OR)">
             <div className="flex flex-wrap">
               {ALL_TYPES.map(t=> (
-                <Chip key={t} label={t} active={filters.types.includes(t)} onClick={()=> setFilters(f=> ({...f, types: f.types.includes(t) ? f.types.filter(x=>x!==t) : [...f.types, t]}))} />
+                <Chip key={t} label={t} active={filters.types.includes(t)}
+                  onClick={()=> setFilters(f=> ({...f, types: f.types.includes(t) ? f.types.filter(x=>x!==t) : [...f.types, t]}))} />
               ))}
             </div>
           </Section>
+
           <Section title="Rarity (OR)">
             <div className="flex flex-wrap">
               {ALL_RARITIES.map(r=> (
-                <Chip key={r} label={r.replace('_',' ')} active={filters.rarities.includes(r)} onClick={()=> setFilters(f=> ({...f, rarities: f.rarities.includes(r) ? f.rarities.filter(x=>x!==r) : [...f.rarities, r]}))} />
+                <Chip key={r} label={r.replace('_',' ')} active={filters.rarities.includes(r)}
+                  onClick={()=> setFilters(f=> ({...f, rarities: f.rarities.includes(r) ? f.rarities.filter(x=>x!==r) : [...f.rarities, r]}))} />
               ))}
             </div>
           </Section>
+
           <Section title="Sets (OR)">
             <div className="max-h-40 overflow-auto pr-2">
               {loadingSets ? (<div className="text-white/60 text-sm">Loading sets…</div>) : (
-                <div className="flex flex-wrap">{sets.map(s=> (
-                  <Chip key={s.code} label={`${s.name} (${s.code})`} active={filters.sets.includes(s.code)} onClick={()=> setFilters(f=> ({...f, sets: f.sets.includes(s.code) ? f.sets.filter(x=>x!==s.code) : [...f.sets, s.code]}))} />
-                ))}</div>
+                <div className="flex flex-wrap">
+                  {sets.map(s=> (
+                    <Chip key={s.code} label={`${s.name} (${s.code})`} active={filters.sets.includes(s.code)}
+                      onClick={()=> setFilters(f=> ({...f, sets: f.sets.includes(s.code) ? f.sets.filter(x=>x!==s.code) : [...f.sets, s.code]}))} />
+                  ))}
+                </div>
               )}
             </div>
           </Section>
+
           <Section title="Cost">
             <div className="flex flex-wrap gap-2">
               {COST_CHOICES.map(n=> (
-                <button key={n} type="button" className={`px-3 py-1 rounded-lg border text-sm ${(filters.costs||[]).includes(n) ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`} onClick={()=> setFilters(f=> ({...f, costs: (f.costs||[]).includes(n) ? (f.costs||[]).filter(x=>x!==n) : [...(f.costs||[]), n]}))} title={n===9? '9+': String(n)}>{n===9? '9+': n}</button>
+                <button key={n} type="button"
+                  className={`px-3 py-1 rounded-lg border text-sm ${ (filters.costs||[]).includes(n) ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}
+                  onClick={()=> setFilters(f=> ({...f, costs: (f.costs||[]).includes(n) ? (f.costs||[]).filter(x=>x!==n) : [...(f.costs||[]), n]}))}
+                  title={n===9? '9+': String(n)}>{n===9? '9+': n}
+                </button>
               ))}
               {(filters.costs?.length ?? 0) > 0 && (
-                <button type="button" className="ml-2 px-2 py-1 rounded border border-white/25 text-xs" onClick={()=> setFilters(f=> ({...f, costs: []}))}>Clear</button>
+                <button type="button" className="ml-2 px-2 py-1 rounded border border-white/25 text-xs"
+                  onClick={()=> setFilters(f=> ({...f, costs: []}))}>Clear</button>
               )}
             </div>
           </Section>
+
           <Section title="Inkwell">
-            <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20" value={filters.inkwell} onChange={(e)=> setFilters(f=> ({...f, inkwell: e.target.value}))}>
+            <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
+              value={filters.inkwell} onChange={(e)=> setFilters(f=> ({...f, inkwell: e.target.value}))}>
               <option value="any">Any</option>
               <option value="inkable">Inkable only</option>
               <option value="non-inkable">Non-inkable only</option>
             </select>
           </Section>
+
           <Section title="Archetypes (Classifications, OR)">
             <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
               {ALL_ARCHETYPES.map(a=> (
-                <Chip key={a} label={a} active={filters.archetypes?.includes(a) || false} onClick={()=> setFilters(f=> ({...f, archetypes: (f.archetypes||[]).includes(a) ? (f.archetypes||[]).filter(x=>x!==a) : [...(f.archetypes||[]), a]}))} />
+                <Chip key={a} label={a} active={filters.archetypes?.includes(a) || false}
+                  onClick={()=> setFilters(f=> ({...f, archetypes: (f.archetypes||[]).includes(a) ? (f.archetypes||[]).filter(x=>x!==a) : [...(f.archetypes||[]), a]}))} />
               ))}
             </div>
           </Section>
+
           <Section title="Keywords (OR)">
             <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
               {ALL_KEYWORDS.map(k=> (
-                <Chip key={k} label={k} active={filters.keywords?.includes(k) || false} onClick={()=> setFilters(f=> ({...f, keywords: (f.keywords||[]).includes(k) ? (f.keywords||[]).filter(x=>x!==k) : [...(f.keywords||[]), k]}))} />
+                <Chip key={k} label={k} active={filters.keywords?.includes(k) || false}
+                  onClick={()=> setFilters(f=> ({...f, keywords: (f.keywords||[]).includes(k) ? (f.keywords||[]).filter(x=>x!==k) : [...(f.keywords||[]), k]}))} />
               ))}
             </div>
           </Section>
+
           <Section title="Format">
-            <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20" value={filters.format} onChange={(e)=> setFilters(f=> ({...f, format: e.target.value}))}>
+            <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
+              value={filters.format} onChange={(e)=> setFilters(f=> ({...f, format: e.target.value}))}>
               <option value="any">Any</option>
               <option value="core">Standard/Core legal</option>
               <option value="infinity">Infinity legal</option>
@@ -456,16 +639,22 @@ export default function LorcanaDeckBuilderApp(){
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 grid gap-6 md:grid-cols-[minmax(0,1fr),400px]">
-        {/* LEFT COLUMN */}
+        {/* LEFT: card search/grid */}
         <section>
           <div className="flex items-center gap-2 mb-3">
             <div className="flex-1 relative">
-              <input className="w-full h-11 pl-11 pr-40 rounded-xl bg-[#12172a] border border-white/10 outline-none placeholder-white/40" placeholder="Search…" value={filters.text} onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
+              <input className="w-full h-11 pl-11 pr-40 rounded-xl bg-[#12172a] border border-white/10 outline-none placeholder-white/40"
+                placeholder="Search…" value={filters.text}
+                onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">🔎</div>
               <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-white/60">{sortedCards.length} cards</div>
             </div>
-            <button type="button" className="h-11 px-4 rounded-xl bg-[#2a2f45] border border-white/10 hover:border-white/30" onClick={()=> setFiltersOpen(true)}>Filters</button>
-            <button type="button" className="h-11 px-3 rounded-xl bg-[#2a2f45] border border-white/10 text-sm" onClick={()=> setFilters(f=> ({...f, text: 'i:amber or i:amethyst or i:emerald or i:ruby or i:sapphire or i:steel'}))}>Show all</button>
+            <button type="button" className="h-11 px-4 rounded-xl bg-[#2a2f45] border border-white/10 hover:border-white/30"
+              onClick={()=> setFiltersOpen(true)}>Filters</button>
+            <button type="button" className="h-11 px-3 rounded-xl bg-[#2a2f45] border border-white/10 text-sm"
+              onClick={()=> setFilters(f=> ({...f, text: 'i:amber or i:amethyst or i:emerald or i:ruby or i:sapphire or i:steel'}))}>
+              Show all
+            </button>
           </div>
 
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -478,26 +667,31 @@ export default function LorcanaDeckBuilderApp(){
             <div className="text-sm text-white/70">{loadingCards ? 'Searching…' : `${sortedCards.length} results`}</div>
             <div className="flex items-center gap-2">
               <label className="text-xs">Unique:</label>
-              <select className="px-2 py-1 rounded border border-white/20 bg-[#12172a] text-sm" value={uniqueMode} onChange={(e)=> setUniqueMode(e.target.value)}>
+              <select className="px-2 py-1 rounded border border-white/20 bg-[#12172a] text-sm" value={uniqueMode}
+                onChange={(e)=> setUniqueMode(e.target.value)}>
                 <option value="cards">Cards</option>
                 <option value="prints">Prints</option>
               </select>
-              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setPage(p=> Math.max(1, p-1))}>← Prev</button>
+              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
+                onClick={()=> setPage(p=> Math.max(1, p-1))}>← Prev</button>
               <div className="text-sm">Page {page} / {pageCount}</div>
-              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setPage(p=> Math.min(pageCount, p+1))}>Next →</button>
+              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
+                onClick={()=> setPage(p=> Math.min(pageCount, p+1))}>Next →</button>
             </div>
           </div>
 
           {err && (<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm">{err}</div>)}
         </section>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT: deck panel */}
         <aside className="md:sticky md:top-16 h-fit">
           <div className="rounded-xl bg-[#0a0e19] border border-white/10 p-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-semibold">Unsaved deck</div>
-                <div className="text-xs text-white/60">{total} cards · Inks: {inksInDeck.join(', ') || '—'} {total < 60 && <span className="ml-1 text-amber-300">(needs ≥ 60)</span>}</div>
+                <div className="text-xs text-white/60">
+                  {total} cards · Inks: {inksInDeck.join(', ') || '—'} {total < 60 && <span className="ml-1 text-amber-300">(needs ≥ 60)</span>}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-xs">Inkable: <span className="text-emerald-300 font-medium">{inkableStats.inkable}</span></div>
@@ -514,9 +708,14 @@ export default function LorcanaDeckBuilderApp(){
               {Object.values(deck).length === 0 ? (
                 <div className="text-white/60 text-sm">Add cards from the grid →</div>
               ) : (
-                Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).map((e)=> (
-                  <DeckRow key={e.card.id} entry={e} onInc={()=> addToDeck(e.card,1)} onDec={()=> decEntry(e.card.id)} onRemove={()=> removeEntry(e.card.id)} />
-                ))
+                Object.values(deck)
+                  .sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1))
+                  .map((e)=> (
+                    <DeckRow key={e.card.id} entry={e}
+                      onInc={()=> addToDeck(e.card,1)}
+                      onDec={()=> decEntry(e.card.id)}
+                      onRemove={()=> removeEntry(e.card.id)} />
+                  ))
               )}
             </div>
 
@@ -537,7 +736,8 @@ export default function LorcanaDeckBuilderApp(){
             <div className="mt-3 flex items-center gap-2">
               <button type="button" className="px-3 py-1.5 rounded-lg bg-[#2a2f45] border border-white/10 text-sm" onClick={copyTextExport}>Copy Text</button>
               <button type="button" className={`px-3 py-1.5 rounded-lg border text-sm ${exporting? 'opacity-60 cursor-wait border-white/10':'border-white/20'}`} onClick={doExport} disabled={exporting} aria-busy={exporting}>{exporting? 'Exporting…':'Export PNG'}</button>
-              <button type="button" className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm" onClick={()=> setPublishOpen(true)}>Publish</button>
+              <button type="button" className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm"
+                onClick={()=> setPublishOpen(true)}>Publish</button>
               <button type="button" className="ml-auto px-3 py-1.5 rounded-lg bg-[#2a2f45] border border-white/10 text-sm" onClick={clearDeck}>Clear</button>
             </div>
 
@@ -560,14 +760,17 @@ export default function LorcanaDeckBuilderApp(){
             </div>
             <textarea ref={copyAreaRef} className="w-full h-64 p-2 rounded-lg bg-black/40 border border-white/20 font-mono text-xs" value={copyModal.text} readOnly />
             <div className="mt-2 flex gap-2">
-              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); try { document.execCommand('copy'); alert('Text selected. Press Ctrl/Cmd+C if not auto-copied.'); } catch { alert('Select all (Ctrl/Cmd+A) then copy.'); } }}>Select all & Copy</button>
+              <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm"
+                onClick={()=>{ copyAreaRef.current?.focus?.(); copyAreaRef.current?.select?.(); try { document.execCommand('copy'); alert('Text selected. Press Ctrl/Cmd+C if not auto-copied.'); } catch { alert('Select all (Ctrl/Cmd+A) then copy.'); } }}>
+                Select all & Copy
+              </button>
               <button type="button" className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setCopyModal({ open:false, text:"" })}>Done</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Publish modal (UI only unless env configured) */}
+      {/* Publish modal */}
       {publishOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-4">
@@ -578,12 +781,15 @@ export default function LorcanaDeckBuilderApp(){
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-white/70">Deck name</label>
-                <input className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/20" value={deckName} onChange={(e)=> setDeckName(e.target.value)} />
+                <input className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/20"
+                  value={deckName} onChange={(e)=> setDeckName(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs text-white/70">Notes (optional)</label>
-                <textarea className="w-full mt-1 h-28 p-2 rounded-lg bg-black/40 border border-white/20" value={deckNotes} onChange={(e)=> setDeckNotes(e.target.value)} />
+                <textarea className="w-full mt-1 h-28 p-2 rounded-lg bg-black/40 border border-white/20"
+                  value={deckNotes} onChange={(e)=> setDeckNotes(e.target.value)} />
               </div>
+
               {publishedImageUrl && (
                 <div className="mt-2">
                   <div className="text-xs text-white/70 mb-1">Preview</div>
@@ -593,22 +799,39 @@ export default function LorcanaDeckBuilderApp(){
               {publishedLink && (
                 <div className="mt-2 text-xs break-all">
                   Permalink: <a className="underline" href={publishedLink} target="_blank" rel="noreferrer">{publishedLink}</a>
-                  <button className="ml-2 text-[11px] px-2 py-1 rounded border border-white/20" onClick={async()=>{ await copyToClipboardRobust(publishedLink); alert('Link copied'); }}>Copy link</button>
+                  <button className="ml-2 text-[11px] px-2 py-1 rounded border border-white/20"
+                    onClick={async()=>{ await copyToClipboardRobust(publishedLink); alert('Link copied'); }}>
+                    Copy link
+                  </button>
                 </div>
               )}
               {publishErr && <div className="p-2 rounded bg-red-500/10 border border-red-500/30 text-xs">{publishErr}</div>}
+
               <div className="flex items-center gap-2">
-                <button className={`px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm ${publishing?'opacity-60 cursor-wait':''}`} disabled={publishing} onClick={async()=>{
-                  setPublishing(true); setPublishErr(null); setPublishedLink(null); setPublishedImageUrl(null);
-                  try {
-                    const entries = Object.values(deck).sort((a,b)=>(a.card.cost??0)-(b.card.cost??0)||(a.card.name>b.card.name?1:-1)).map((e)=> ({ name: `${e.card.name}${e.card.version ? ` — ${e.card.version}` : ''}`, set: e.card.set?.code, num: e.card.collector_number, cost: e.card.cost, ink: e.card.ink, count: e.count }));
-                    const blob = await generateDeckListImage(entries, deckName || 'Untitled Deck', deckNotes);
-                    const url = URL.createObjectURL(blob); setPublishedImageUrl(url);
-                    const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(deck)))))}&title=${encodeURIComponent(deckName)}`;
-                    setPublishedLink(share);
-                    const a = document.createElement('a'); a.href = url; a.download = 'decklist.png'; document.body.appendChild(a); a.click(); a.remove();
-                  } catch(e){ setPublishErr(e?.message || String(e)); } finally { setPublishing(false); }
-                }}>{publishing? 'Publishing…':'Publish'}</button>
+                <button
+                  className={`px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm ${publishing?'opacity-60 cursor-wait':''}`}
+                  disabled={publishing}
+                  onClick={async()=>{
+                    setPublishing(true); setPublishErr(null); setPublishedLink(null); setPublishedImageUrl(null);
+                    try {
+                      // build poster (grid + decklist/notes)
+                      const blob = await exportDeckPoster(deck, deckName || 'Untitled Deck', deckNotes);
+                      const url = URL.createObjectURL(blob);
+                      setPublishedImageUrl(url);
+
+                      // share link (deck encoded in hash)
+                      const share = `${location.origin}${location.pathname}#deck=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(deck)))))}&title=${encodeURIComponent(deckName)}`;
+                      setPublishedLink(share);
+
+                      // auto-download the poster
+                      const a = document.createElement('a');
+                      a.href = url; a.download = 'deck_poster.png';
+                      document.body.appendChild(a); a.click(); a.remove();
+                    } catch(e){ setPublishErr(e?.message || String(e)); }
+                    finally { setPublishing(false); }
+                  }}>
+                  {publishing? 'Publishing…':'Publish'}
+                </button>
                 <button className="px-3 py-1.5 rounded-lg border border-white/20 text-sm" onClick={()=> setPublishOpen(false)}>Close</button>
               </div>
             </div>
