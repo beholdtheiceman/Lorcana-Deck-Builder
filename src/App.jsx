@@ -1,34 +1,59 @@
-// src/App.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 /** =========================
  *  Provider selector (Lorcana-API now, Lorcast later)
  * ========================= */
 const DATA_PROVIDER = (import.meta.env.VITE_DATA_PROVIDER || "lorcana-api").toLowerCase();
 
-/** ---- Lorcana-API provider (current, working) ---- */
-const LORCANA_BASE = import.meta.env.VITE_LORCANA_BASE || "https://api.lorcana-api.com";
+/** ---- Lorcana-API provider (current) ---- */
+const LORCANA_BASE =
+  import.meta.env.VITE_LORCANA_BASE || "https://api.lorcana-api.com";
 
-function buildLorcanaSearch({ q, colors, types, cost, set, rarity, text, keywords, archetype }) {
+function buildLorcanaSearch({
+  q,
+  colors,
+  types,
+  cost,
+  set,
+  rarity,
+  text,
+  keywords,
+  archetype,
+}) {
   const parts = [];
   if (q) parts.push(`name~${encodeURIComponent(q)}`);
   if (text) parts.push(`rules~${encodeURIComponent(text)}`);
 
   if (keywords.length) {
-    // best-effort: search rules text for keywords
-    parts.push(keywords.map((k) => `rules~${encodeURIComponent(k)}`).join(";"));
+    // best-effort: match in rules text
+    parts.push(
+      keywords.map((k) => `rules~${encodeURIComponent(k)}`).join(";")
+    );
   }
   if (archetype) {
-    // best-effort: search rules/name for archetype tag
+    // best-effort: match in rules/name
     parts.push(`rules~${encodeURIComponent(archetype)}`);
   }
 
-  if (colors.length) parts.push(colors.map((c) => `color=${encodeURIComponent(c)}`).join(";"));
+  if (colors.length)
+    parts.push(colors.map((c) => `color=${encodeURIComponent(c)}`).join(";"));
   if (types.length) {
-    // user wants Song, not "Action - Song"
+    // "Song" (not "Action - Song")
     const normalized = types.map((t) => (t === "Song" ? "Song" : t));
-    parts.push(normalized.map((t) => `type~${encodeURIComponent(t)}`).join(";"));
+    parts.push(
+      normalized.map((t) => `type~${encodeURIComponent(t)}`).join(";")
+    );
   }
   if (set) parts.push(`set=${encodeURIComponent(set)}`);
   if (rarity) parts.push(`rarity=${encodeURIComponent(rarity)}`);
@@ -51,11 +76,31 @@ async function fetchFromLorcanaApi(paramsObj) {
 const lorcanaProvider = {
   async fetchCards(filters) {
     const {
-      q, colors, types, cost = "Any", set, rarity, text,
-      keywords = [], archetype = "",
-      page = 1, pagesize = 24, orderby = "Color,Set_Num,Name", sortdirection = "ASC",
+      q,
+      colors,
+      types,
+      cost = "Any",
+      set,
+      rarity,
+      text,
+      keywords = [],
+      archetype = "",
+      page = 1,
+      pagesize = 24,
+      orderby = "Color,Set_Num,Name",
+      sortdirection = "ASC",
     } = filters;
-    const search = buildLorcanaSearch({ q, colors, types, cost, set, rarity, text, keywords, archetype });
+    const search = buildLorcanaSearch({
+      q,
+      colors,
+      types,
+      cost,
+      set,
+      rarity,
+      text,
+      keywords,
+      archetype,
+    });
     const query = { page, pagesize, orderby, sortdirection };
     if (search) query.search = search;
     return fetchFromLorcanaApi(query);
@@ -63,30 +108,15 @@ const lorcanaProvider = {
   label: "api.lorcana-api.com",
 };
 
-/** ---- Lorcast provider (stub: fill in when you switch) ----
- * Set VITE_DATA_PROVIDER="lorcast" and implement the mapping below.
- */
-const LORCAST_BASE = import.meta.env.VITE_LORCAST_BASE || "https://YOUR-LORCAST-ENDPOINT";
+/** ---- Lorcast provider (safe placeholder) ---- */
+const LORCAST_BASE =
+  import.meta.env.VITE_LORCAST_BASE || "https://YOUR-LORCAST-ENDPOINT";
 const lorcastProvider = {
-  async fetchCards(filters) {
-    // TODO: Map your filters → Lorcast query
-    // Example shape (replace with Lorcast’s real API):
-    // const params = new URLSearchParams();
-    // if (filters.q) params.set("name", filters.q);
-    // if (filters.colors?.length) params.set("color", filters.colors.join(","));
-    // if (filters.types?.length) params.set("type", filters.types.join(","));
-    // if (filters.keywords?.length) params.set("keywords", filters.keywords.join(","));
-    // if (filters.archetype) params.set("archetype", filters.archetype);
-    // if (filters.cost && filters.cost !== "Any") params.set("cost", filters.cost);
-    // params.set("page", filters.page || 1);
-    // params.set("pagesize", filters.pagesize || 24);
-    // const res = await fetch(`${LORCAST_BASE}/cards?${params.toString()}`);
-    // if (!res.ok) throw new Error(`lorcast ${res.status}`);
-    // const data = await res.json();
-    // return Array.isArray(data) ? data : [];
-
-    // For now, keep things building while you wire it up:
-    throw new Error("Lorcast provider not configured. Set VITE_DATA_PROVIDER=lorcana-api for now, or implement lorcastProvider.fetchCards.");
+  async fetchCards(/* filters */) {
+    // Safe placeholder so the app never hard-crashes if VITE_DATA_PROVIDER=lorcast
+    console.warn("[Lorcast] Provider not configured yet. Returning 0 results.");
+    return [];
+    // When ready, implement mapping to Lorcast here and switch VITE_DATA_PROVIDER=lorcast
   },
   label: "Lorcast",
 };
@@ -114,21 +144,35 @@ const getCached = (q) => {
 const setCached = (q, v) => {
   const k = cacheKeyFor(q);
   cache.set(k, v);
-  try { sessionStorage.setItem(`lorcana.cache.${k}`, JSON.stringify(v)); } catch {}
+  try {
+    sessionStorage.setItem(`lorcana.cache.${k}`, JSON.stringify(v));
+  } catch {}
 };
 function proxyImageUrl(src) {
   if (!src) return "";
-  try { const u = new URL(src); if (u.hostname.includes("weserv.nl")) return src; } catch {}
-  return `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg&il`;
+  try {
+    const u = new URL(src);
+    if (u.hostname.includes("weserv.nl")) return src;
+  } catch {}
+  return `https://images.weserv.nl/?url=${encodeURIComponent(
+    src
+  )}&output=jpg&il`;
 }
 
 /** =========================
  *  UI Data
  * ========================= */
 const INKS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"];
-const TYPES = ["Character", "Action", "Song", "Item", "Location"]; // ← Song only
+const TYPES = ["Character", "Action", "Song", "Item", "Location"]; // Song only
 const COSTS = ["Any", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9+"];
-const RARITIES = ["Common", "Uncommon", "Rare", "Super Rare", "Legendary", "Fabled"];
+const RARITIES = [
+  "Common",
+  "Uncommon",
+  "Rare",
+  "Super Rare",
+  "Legendary",
+  "Fabled",
+];
 const SETS = [
   { id: 1, name: "The First Chapter" },
   { id: 2, name: "Rise of the Floodborn" },
@@ -140,14 +184,31 @@ const SETS = [
   { id: 8, name: "Set 9" },
 ];
 
-const INK_COLORS = { Amber: "#ffb703", Amethyst: "#9b5de5", Emerald: "#00a884", Ruby: "#e63946", Sapphire: "#1e90ff", Steel: "#9aa0a6" };
+const INK_COLORS = {
+  Amber: "#ffb703",
+  Amethyst: "#9b5de5",
+  Emerald: "#00a884",
+  Ruby: "#e63946",
+  Sapphire: "#1e90ff",
+  Steel: "#9aa0a6",
+};
 
 /** =========================
  *  Deck & Utils
  * ========================= */
-const cardKey = (c) => `${c.Set_ID ?? ""}|${c.Set_Num ?? ""}|${c.Name ?? ""}|${c.Image ?? ""}`;
+const cardKey = (c) =>
+  `${c.Set_ID ?? ""}|${c.Set_Num ?? ""}|${c.Name ?? ""}|${c.Image ?? ""}`;
 const toCSV = (rows) => {
-  const headers = ["Name", "Color", "Cost", "Type", "Rarity", "Set", "Set_Num", "Count"];
+  const headers = [
+    "Name",
+    "Color",
+    "Cost",
+    "Type",
+    "Rarity",
+    "Set",
+    "Set_Num",
+    "Count",
+  ];
   const lines = [
     headers.join(","),
     ...rows.map((r) =>
@@ -167,7 +228,10 @@ const toCSV = (rows) => {
 };
 function deckIssues(deckMap) {
   const issues = [];
-  const total = Object.values(deckMap).reduce((s, d) => s + (d.__count || 0), 0);
+  const total = Object.values(deckMap).reduce(
+    (s, d) => s + (d.__count || 0),
+    0
+  );
   if (total < 60) issues.push(`Deck has ${total} cards (need at least 60).`);
   const byName = {};
   for (const d of Object.values(deckMap)) {
@@ -180,7 +244,12 @@ function deckIssues(deckMap) {
   return issues;
 }
 const copyText = (txt) => {
-  try { navigator.clipboard.writeText(txt); return true; } catch { return false; }
+  try {
+    navigator.clipboard.writeText(txt);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 /** =========================
@@ -191,7 +260,10 @@ function useToasts() {
   const push = useCallback((msg, tone = "info") => {
     const id = Math.random().toString(36).slice(2);
     setToasts((t) => [...t, { id, msg, tone }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2500);
+    setTimeout(
+      () => setToasts((t) => t.filter((x) => x.id !== id)),
+      2500
+    );
   }, []);
   return { toasts, push };
 }
@@ -200,22 +272,41 @@ function useToasts() {
  *  URL Sync
  * ========================= */
 function useUrlSync(filters, setters) {
-  const { q, textSearch, keywords, archetype, colors, types, cost, rarity, setName, format, pagesize, orderby, sortdirection } = filters;
+  const {
+    q,
+    textSearch,
+    keywords,
+    archetype,
+    colors,
+    types,
+    cost,
+    rarity,
+    setName,
+    format,
+    pagesize,
+    orderby,
+    sortdirection,
+  } = filters;
   useEffect(() => {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
     if (sp.has("q")) setters.setQ(sp.get("q") || "");
     if (sp.has("text")) setters.setTextSearch(sp.get("text") || "");
-    if (sp.has("keywords")) setters.setKeywords((sp.get("keywords") || "").split(",").filter(Boolean));
+    if (sp.has("keywords"))
+      setters.setKeywords(sp.get("keywords").split(",").filter(Boolean));
     if (sp.has("archetype")) setters.setArchetype(sp.get("archetype") || "");
-    if (sp.has("colors")) setters.setColors((sp.get("colors") || "").split(",").filter(Boolean));
-    if (sp.has("types")) setters.setTypes((sp.get("types") || "").split(",").filter(Boolean));
+    if (sp.has("colors"))
+      setters.setColors(sp.get("colors").split(",").filter(Boolean));
+    if (sp.has("types"))
+      setters.setTypes(sp.get("types").split(",").filter(Boolean));
     if (sp.has("cost")) setters.setCost(sp.get("cost") || "Any");
     if (sp.has("rarity")) setters.setRarity(sp.get("rarity") || "");
     if (sp.has("set")) setters.setSetName(sp.get("set") || "");
     if (sp.has("format")) setters.setFormat(sp.get("format") || "Infinity");
-    if (sp.has("pagesize")) setters.setPagesize(Number(sp.get("pagesize") || 24));
-    if (sp.has("orderby")) setters.setOrderby(sp.get("orderby") || "Color,Set_Num,Name");
+    if (sp.has("pagesize"))
+      setters.setPagesize(Number(sp.get("pagesize") || 24));
+    if (sp.has("orderby"))
+      setters.setOrderby(sp.get("orderby") || "Color,Set_Num,Name");
     if (sp.has("dir")) setters.setSortdirection(sp.get("dir") || "ASC");
   }, []);
 
@@ -238,7 +329,21 @@ function useUrlSync(filters, setters) {
     const qs = sp.toString();
     const url = qs ? `?${qs}` : window.location.pathname;
     window.history.replaceState({}, "", url);
-  }, [q, textSearch, keywords, archetype, colors, types, cost, rarity, setName, format, pagesize, orderby, sortdirection]);
+  }, [
+    q,
+    textSearch,
+    keywords,
+    archetype,
+    colors,
+    types,
+    cost,
+    rarity,
+    setName,
+    format,
+    pagesize,
+    orderby,
+    sortdirection,
+  ]);
 }
 
 /** =========================
@@ -248,14 +353,14 @@ export default function App() {
   // Filters / search
   const [q, setQ] = useState("");
   const [textSearch, setTextSearch] = useState("");
-  const [keywords, setKeywords] = useState([]);     // NEW
-  const [archetype, setArchetype] = useState("");   // NEW
+  const [keywords, setKeywords] = useState([]); // NEW
+  const [archetype, setArchetype] = useState(""); // NEW
   const [colors, setColors] = useState([]);
   const [types, setTypes] = useState([]);
   const [cost, setCost] = useState("Any");
   const [rarity, setRarity] = useState("");
   const [setName, setSetName] = useState("");
-  const [format, setFormat] = useState("Infinity"); // NEW: Infinity | Standard Core
+  const [format, setFormat] = useState("Infinity"); // Infinity | Standard Core
 
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -283,8 +388,36 @@ export default function App() {
 
   // URL sync
   useUrlSync(
-    { q, textSearch, keywords, archetype, colors, types, cost, rarity, setName, format, pagesize, orderby, sortdirection },
-    { setQ, setTextSearch, setKeywords, setArchetype, setColors, setTypes, setCost, setRarity, setSetName, setFormat, setPagesize, setOrderby, setSortdirection }
+    {
+      q,
+      textSearch,
+      keywords,
+      archetype,
+      colors,
+      types,
+      cost,
+      rarity,
+      setName,
+      format,
+      pagesize,
+      orderby,
+      sortdirection,
+    },
+    {
+      setQ,
+      setTextSearch,
+      setKeywords,
+      setArchetype,
+      setColors,
+      setTypes,
+      setCost,
+      setRarity,
+      setSetName,
+      setFormat,
+      setPagesize,
+      setOrderby,
+      setSortdirection,
+    }
   );
 
   // localStorage persistence
@@ -313,27 +446,73 @@ export default function App() {
     } catch {}
   }, []);
   useEffect(() => {
-    const payload = { deck, filters: { q, textSearch, keywords, archetype, colors, types, cost, rarity, setName, format, pagesize, orderby, sortdirection } };
-    try { localStorage.setItem("lorcana.deckbuilder.v3", JSON.stringify(payload)); } catch {}
-  }, [deck, q, textSearch, keywords, archetype, colors, types, cost, rarity, setName, format, pagesize, orderby, sortdirection]);
+    const payload = {
+      deck,
+      filters: {
+        q,
+        textSearch,
+        keywords,
+        archetype,
+        colors,
+        types,
+        cost,
+        rarity,
+        setName,
+        format,
+        pagesize,
+        orderby,
+        sortdirection,
+      },
+    };
+    try {
+      localStorage.setItem("lorcana.deckbuilder.v3", JSON.stringify(payload));
+    } catch {}
+  }, [
+    deck,
+    q,
+    textSearch,
+    keywords,
+    archetype,
+    colors,
+    types,
+    cost,
+    rarity,
+    setName,
+    format,
+    pagesize,
+    orderby,
+    sortdirection,
+  ]);
 
   // Keyboard shortcuts
   useEffect(() => {
     function onKey(e) {
-      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable)) return;
+      if (
+        e.target &&
+        (e.target.tagName === "INPUT" ||
+          e.target.tagName === "TEXTAREA" ||
+          e.target.isContentEditable)
+      )
+        return;
       if (!lastAddedKey) return;
       if (e.key === "+") {
         setDeck((prev) => {
-          const d = prev[lastAddedKey]; if (!d) return prev;
-          return { ...prev, [lastAddedKey]: { ...d, __count: (d.__count || 0) + 1 } };
+          const d = prev[lastAddedKey];
+          if (!d) return prev;
+          return {
+            ...prev,
+            [lastAddedKey]: { ...d, __count: (d.__count || 0) + 1 },
+          };
         });
         push("Added +1", "success");
       } else if (e.key === "-") {
         setDeck((prev) => {
-          const d = prev[lastAddedKey]; if (!d) return prev;
+          const d = prev[lastAddedKey];
+          if (!d) return prev;
           const n = Math.max(0, (d.__count || 0) - 1);
           const copy = { ...prev };
-          if (n === 0) delete copy[lastAddedKey]; else copy[lastAddedKey] = { ...d, __count: n };
+          if (n === 0) delete copy[lastAddedKey];
+          else copy[lastAddedKey] = { ...d, __count: n };
           return copy;
         });
         push("Removed −1", "info");
@@ -347,7 +526,6 @@ export default function App() {
    *  Fetch
    * ========================= */
   async function fetchCards(filters) {
-    // cache key includes provider
     const key = { provider: provider.label, ...filters };
     const cached = getCached(key);
     if (cached) return cached;
@@ -361,19 +539,25 @@ export default function App() {
     if (format === "Infinity") return true;
     const setName = String(c.Set || "");
     const found = SETS.find((s) => s.name === setName);
-    const setId = found?.id ?? Number(c.Set_Num ?? 0); // fallback
-    return setId >= 5; // Standard Core ⇒ sets 5+
+    const setId = found?.id ?? Number(c.Set_Num ?? 0);
+    return setId >= 5; // Standard Core: sets 5+
   }
 
-  // Apply client-side keyword/archetype extra filters if provider didn’t
+  // Extra client-side filters
   function passesClientFilters(c) {
-    const textBlob = [c.Rules, c.Traits, c.Subtypes, c.Type, c.Name].map((x) => String(x || "").toLowerCase()).join(" ");
-    if (keywords.length && !keywords.every((k) => textBlob.includes(String(k).toLowerCase()))) return false;
-    if (archetype && !textBlob.includes(String(archetype).toLowerCase())) return false;
+    const textBlob = [c.Rules, c.Traits, c.Subtypes, c.Type, c.Name]
+      .map((x) => String(x || "").toLowerCase())
+      .join(" ");
+    if (
+      keywords.length &&
+      !keywords.every((k) => textBlob.includes(String(k).toLowerCase()))
+    )
+      return false;
+    if (archetype && !textBlob.includes(String(archetype).toLowerCase()))
+      return false;
     return true;
   }
 
-  // Initial + whenever filters change
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -382,18 +566,24 @@ export default function App() {
     debounceRef.current = setTimeout(async () => {
       try {
         const first = await fetchCards({
-          q, colors, types, cost,
+          q,
+          colors,
+          types,
+          cost,
           set: setName || undefined,
           rarity: rarity || undefined,
           text: textSearch || undefined,
           keywords,
           archetype,
-          page: 1, pagesize, orderby, sortdirection,
+          page: 1,
+          pagesize,
+          orderby,
+          sortdirection,
         });
         const filtered = first.filter(passesFormat).filter(passesClientFilters);
         setCards(filtered);
         setPage(1);
-        setHasMore(first.length === pagesize); // paging based on raw fetch (safe)
+        setHasMore(first.length === pagesize);
         setHasFetchedOnce(true);
       } catch (e) {
         setErr(e?.message || "Failed to load cards");
@@ -405,40 +595,85 @@ export default function App() {
     }, 250);
     return () => clearTimeout(debounceRef.current);
     // eslint-disable-next-line
-  }, [q, textSearch, keywords.join("|"), archetype, colors.join("|"), types.join("|"), cost, rarity, setName, format, pagesize, orderby, sortdirection, DATA_PROVIDER]);
+  }, [
+    q,
+    textSearch,
+    keywords.join("|"),
+    archetype,
+    colors.join("|"),
+    types.join("|"),
+    cost,
+    rarity,
+    setName,
+    format,
+    pagesize,
+    orderby,
+    sortdirection,
+    DATA_PROVIDER,
+  ]);
 
   // Infinite scroll
   useEffect(() => {
     if (!sentinelRef.current) return;
     const el = sentinelRef.current;
-    const io = new IntersectionObserver(async ([entry]) => {
-      if (!entry.isIntersecting || loading || !hasMore || !hasFetchedOnce) return;
-      try {
-        setLoading(true);
-        const next = page + 1;
-        const data = await fetchCards({
-          q, colors, types, cost,
-          set: setName || undefined,
-          rarity: rarity || undefined,
-          text: textSearch || undefined,
-          keywords,
-          archetype,
-          page: next, pagesize, orderby, sortdirection,
-        });
-        const filtered = data.filter(passesFormat).filter(passesClientFilters);
-        setCards((prev) => [...prev, ...filtered]);
-        setPage(next);
-        setHasMore(data.length === pagesize);
-      } catch (e) {
-        setErr(e?.message || "Failed to load more");
-        setHasMore(false);
-      } finally {
-        setLoading(false);
-      }
-    }, { rootMargin: "600px 0px" });
+    const io = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry.isIntersecting || loading || !hasMore || !hasFetchedOnce)
+          return;
+        try {
+          setLoading(true);
+          const next = page + 1;
+          const data = await fetchCards({
+            q,
+            colors,
+            types,
+            cost,
+            set: setName || undefined,
+            rarity: rarity || undefined,
+            text: textSearch || undefined,
+            keywords,
+            archetype,
+            page: next,
+            pagesize,
+            orderby,
+            sortdirection,
+          });
+          const filtered = data
+            .filter(passesFormat)
+            .filter(passesClientFilters);
+          setCards((prev) => [...prev, ...filtered]);
+          setPage(next);
+          setHasMore(data.length === pagesize);
+        } catch (e) {
+          setErr(e?.message || "Failed to load more");
+          setHasMore(false);
+        } finally {
+          setLoading(false);
+        }
+      },
+      { rootMargin: "600px 0px" }
+    );
     io.observe(el);
     return () => io.disconnect();
-  }, [page, loading, hasMore, hasFetchedOnce, q, textSearch, keywords.join("|"), archetype, colors.join("|"), types.join("|"), cost, rarity, setName, format, pagesize, orderby, sortdirection]);
+  }, [
+    page,
+    loading,
+    hasMore,
+    hasFetchedOnce,
+    q,
+    textSearch,
+    keywords.join("|"),
+    archetype,
+    colors.join("|"),
+    types.join("|"),
+    cost,
+    rarity,
+    setName,
+    format,
+    pagesize,
+    orderby,
+    sortdirection,
+  ]);
 
   /** =========================
    *  Analytics
@@ -448,13 +683,24 @@ export default function App() {
     [deck]
   );
   const manaCurve = useMemo(() => {
-    const buckets = { "0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":0,"9+":0 };
+    const buckets = {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9+": 0,
+    };
     for (const d of Object.values(deck)) {
       const cost = Number(d.Cost ?? 0);
       const key = cost >= 9 ? "9+" : String(cost);
       buckets[key] = (buckets[key] || 0) + (d.__count || 0);
     }
-    return Object.entries(buckets).map(([k,v]) => ({ cost: k, count: v }));
+    return Object.entries(buckets).map(([k, v]) => ({ cost: k, count: v }));
   }, [deck]);
   const inkDistribution = useMemo(() => {
     const cnt = {};
@@ -462,7 +708,9 @@ export default function App() {
       const color = d.Color || "Unknown";
       cnt[color] = (cnt[color] || 0) + (d.__count || 0);
     }
-    return Object.entries(cnt).map(([ink, count]) => ({ ink, count })).sort((a,b) => b.count - a.count);
+    return Object.entries(cnt)
+      .map(([ink, count]) => ({ ink, count }))
+      .sort((a, b) => b.count - a.count);
   }, [deck]);
 
   /** =========================
@@ -486,19 +734,28 @@ export default function App() {
     const key = cardKey(card);
     const n = Math.max(0, Number(count || 0));
     setDeck((prev) => {
-      if (n === 0) { const copy = { ...prev }; delete copy[key]; return copy; }
+      if (n === 0) {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      }
       return { ...prev, [key]: { ...card, __count: n } };
     });
     setLastAddedKey(key);
   }
-  function clearDeck() { setDeck({}); push("Deck cleared", "info"); }
+  function clearDeck() {
+    setDeck({});
+    push("Deck cleared", "info");
+  }
 
   /** =========================
    *  UI helpers
    * ========================= */
   const sorted = useMemo(() => {
     const copy = cards.slice();
-    copy.sort((a, b) => String(a.Name || "").localeCompare(String(b.Name || "")));
+    copy.sort((a, b) =>
+      String(a.Name || "").localeCompare(String(b.Name || ""))
+    );
     return copy;
   }, [cards]);
 
@@ -510,12 +767,150 @@ export default function App() {
   // Mobile deck panel toggle
   const [deckOpen, setDeckOpen] = useState(false);
 
+  // Export helpers
+  function triggerDownload(url, filename) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL?.(url), 2000);
+  }
+  function exportJSON() {
+    const rows = Object.values(deck).map((d) => ({
+      Name: d.Name,
+      Color: d.Color,
+      Cost: d.Cost,
+      Type: d.Type,
+      Rarity: d.Rarity,
+      Set: d.Set,
+      Set_Num: d.Set_Num,
+      Count: d.__count,
+      Image: d.Image,
+    }));
+    const blob = new Blob([JSON.stringify(rows, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, "deck.json");
+    push("Exported JSON", "success");
+  }
+  function exportCSV() {
+    const rows = Object.values(deck);
+    const csv = toCSV(rows);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, "deck.csv");
+    push("Exported CSV", "success");
+  }
+  async function exportPNG() {
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = true;
+    try {
+      const entries = Object.values(deck);
+      if (!entries.length) {
+        alert("Deck is empty.");
+        return;
+      }
+      const cols = 6;
+      const cardW = 300;
+      const cardH = Math.round(cardW * (2048 / 1468));
+      const pad = 12;
+      const badgeH = 36;
+      const rows = Math.ceil(entries.length / cols);
+      const canvasW = cols * (cardW + pad) + pad;
+      const canvasH = rows * (cardH + pad + badgeH) + pad;
+
+      const canvas = canvasRef.current;
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0a0f1d";
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      for (let i = 0; i < entries.length; i++) {
+        const c = entries[i];
+        const imgURL = proxyImageUrl(c.Image);
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = pad + col * (cardW + pad);
+        const y = pad + row * (cardH + pad + badgeH);
+
+        ctx.fillStyle = "#0f1320";
+        ctx.fillRect(x - 2, y - 2, cardW + 4, cardH + 4);
+
+        const img = await loadImage(imgURL);
+        const { sx, sy, sw, sh, dx, dy, dw, dh } = cover(
+          img.width,
+          img.height,
+          cardW,
+          cardH,
+          x,
+          y
+        );
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fillRect(x, y + cardH, cardW, badgeH);
+        ctx.fillStyle = "#fff";
+        ctx.font =
+          "bold 20px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${c.__count}×  ${c.Name ?? ""}`, x + 10, y + cardH + badgeH / 2);
+      }
+
+      const url = canvas.toDataURL("image/png");
+      triggerDownload(url, "deck.png");
+      push("Exported PNG", "success");
+    } catch (e) {
+      console.error(e);
+      alert("PNG export failed.");
+    } finally {
+      exportBusyRef.current = false;
+    }
+  }
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("image load error"));
+      img.src = src;
+    });
+  }
+  function cover(sw, sh, dw, dh, dx, dy) {
+    const sRatio = sw / sh;
+    const dRatio = dw / dh;
+    let sx = 0,
+      sy = 0,
+      sw2 = sw,
+      sh2 = sh;
+    if (sRatio > dRatio) {
+      sh2 = sh;
+      sw2 = sh2 * dRatio;
+      sx = (sw - sw2) / 2;
+    } else {
+      sw2 = sw;
+      sh2 = sw2 / dRatio;
+      sy = (sh - sh2) / 2;
+    }
+    return { sx, sy, sw: sw2, sh: sh2, dx, dy, dw, dh };
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0f1d] text-white">
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((t) => (
-          <div key={t.id} className={`px-3 py-2 rounded-md border text-sm shadow ${t.tone === "success" ? "bg-emerald-600/20 border-emerald-500/40" : t.tone === "info" ? "bg-sky-600/20 border-sky-500/40" : "bg-rose-600/20 border-rose-500/40"}`}>
+          <div
+            key={t.id}
+            className={`px-3 py-2 rounded-md border text-sm shadow ${
+              t.tone === "success"
+                ? "bg-emerald-600/20 border-emerald-500/40"
+                : t.tone === "info"
+                ? "bg-sky-600/20 border-sky-500/40"
+                : "bg-rose-600/20 border-rose-500/40"
+            }`}
+          >
             {t.msg}
           </div>
         ))}
@@ -525,13 +920,15 @@ export default function App() {
       <div className="p-4 border-b border-white/10 flex items-center gap-3">
         <h1 className="text-xl font-semibold">Lorcana Deck Builder</h1>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:inline text-xs text-white/60">Data: {provider.label}</span>
+          <span className="hidden sm:inline text-xs text-white/60">
+            Data: {provider.label}
+          </span>
           {/* Mobile deck toggle */}
           <button
             className="sm:hidden px-3 py-2 rounded-md border border-white/10 bg-white/5"
             onClick={() => setDeckOpen(true)}
           >
-            Open Deck ({totalDeckCards})
+            Open Deck ({Object.values(deck).reduce((s, d) => s + (d.__count || 0), 0)})
           </button>
         </div>
       </div>
@@ -545,13 +942,19 @@ export default function App() {
               className="flex-1 min-w-[180px] px-3 py-2 rounded-md bg-[#0f1324] border border-white/10 outline-none"
               placeholder="Search name…"
               value={q}
-              onChange={(e) => { setPage(1); setQ(e.target.value); }}
+              onChange={(e) => {
+                setPage(1);
+                setQ(e.target.value);
+              }}
             />
             <input
               className="flex-1 min-w-[180px] px-3 py-2 rounded-md bg-[#0f1324] border border-white/10 outline-none"
               placeholder="Text in rules…"
               value={textSearch}
-              onChange={(e) => { setPage(1); setTextSearch(e.target.value); }}
+              onChange={(e) => {
+                setPage(1);
+                setTextSearch(e.target.value);
+              }}
             />
             <button
               className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition"
@@ -582,14 +985,21 @@ export default function App() {
               <select
                 className="px-2 py-2 rounded-md bg-[#0f1324] border border-white/10"
                 value={pagesize}
-                onChange={(e) => { setPage(1); setPagesize(Number(e.target.value)); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setPagesize(Number(e.target.value));
+                }}
               >
-                {[12, 24, 48].map((n) => <option key={n} value={n}>{n}/page</option>)}
+                {[12, 24, 48].map((n) => (
+                  <option key={n} value={n}>
+                    {n}/page
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Results grid (better mobile columns) */}
+          {/* Results grid */}
           {err && (
             <div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">
               {err}
@@ -604,8 +1014,14 @@ export default function App() {
                   key={`${c.Set_ID}-${c.Name}-${c.Image}-${c.Set_Num}`}
                   className="bg-[#0f1320] rounded-lg overflow-hidden border border-white/10 text-left hover:border-white/20 transition"
                   title="Click to add to deck"
-                  onClick={() => { addToDeck(c, 1); push(`Added ${c.Name}`, "success"); }}
-                  onDoubleClick={(e) => { e.stopPropagation(); setModalCard(c); }}
+                  onClick={() => {
+                    addToDeck(c, 1);
+                    push(`Added ${c.Name}`, "success");
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setModalCard(c);
+                  }}
                 >
                   <div className="aspect-[1468/2048] bg-black/40">
                     {img ? (
@@ -620,17 +1036,25 @@ export default function App() {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src =
                             "data:image/svg+xml;utf8," +
-                            encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='300' height='420'><rect width='100%' height='100%' fill='#111827'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='system-ui' font-size='14' fill='#9ca3af'>Image unavailable</text></svg>");
+                            encodeURIComponent(
+                              "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='420'><rect width='100%' height='100%' fill='#111827'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='system-ui' font-size='14' fill='#9ca3af'>Image unavailable</text></svg>"
+                            );
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-white/40">No image</div>
+                      <div className="w-full h-full flex items-center justify-center text-xs text-white/40">
+                        No image
+                      </div>
                     )}
                   </div>
                   <div className="p-2 text-sm">
                     <div className="font-medium line-clamp-2">{c.Name}</div>
-                    <div className="text-xs text-white/60">{c.Color ?? "—"} · Cost {c.Cost ?? "—"}</div>
-                    <div className="text-xs text-white/40">{c.Rarity ?? "—"} · {c.Set ?? "—"}</div>
+                    <div className="text-xs text-white/60">
+                      {c.Color ?? "—"} · Cost {c.Cost ?? "—"}
+                    </div>
+                    <div className="text-xs text-white/40">
+                      {c.Rarity ?? "—"} · {c.Set ?? "—"}
+                    </div>
                   </div>
                 </button>
               );
@@ -639,14 +1063,19 @@ export default function App() {
 
           <div ref={sentinelRef} className="h-8" />
           {loading && <div className="text-white/60 mt-2">Loading…</div>}
-          {!loading && !sorted.length && <div className="text-white/60 mt-2">0 results</div>}
+          {!loading && !sorted.length && (
+            <div className="text-white/60 mt-2">0 results</div>
+          )}
         </div>
 
         {/* Right: Deck panel (desktop) */}
         <div className="hidden lg:block bg-[#0f1324] rounded-xl border border-white/10 p-3 h-fit sticky top-4">
           <DeckPanel
             deck={deck}
-            totalDeckCards={totalDeckCards}
+            totalDeckCards={Object.values(deck).reduce(
+              (s, d) => s + (d.__count || 0),
+              0
+            )}
             addToDeck={addToDeck}
             setCount={setCount}
             clearDeck={clearDeck}
@@ -661,18 +1090,36 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile bottom sheet for deck panel */}
+      {/* Mobile bottom sheet */}
       {deckOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setDeckOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setDeckOpen(false)}
+          />
           <div className="absolute inset-x-0 bottom-0 max-h-[85%] bg-[#0b1120] border-t border-white/10 rounded-t-2xl p-3 overflow-auto">
             <div className="flex items-center mb-2">
-              <h2 className="text-lg font-semibold">Your Deck ({totalDeckCards})</h2>
-              <button className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setDeckOpen(false)}>Close</button>
+              <h2 className="text-lg font-semibold">
+                Your Deck (
+                {Object.values(deck).reduce(
+                  (s, d) => s + (d.__count || 0),
+                  0
+                )}
+                )
+              </h2>
+              <button
+                className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => setDeckOpen(false)}
+              >
+                Close
+              </button>
             </div>
             <DeckPanel
               deck={deck}
-              totalDeckCards={totalDeckCards}
+              totalDeckCards={Object.values(deck).reduce(
+                (s, d) => s + (d.__count || 0),
+                0
+              )}
               addToDeck={addToDeck}
               setCount={setCount}
               clearDeck={clearDeck}
@@ -689,14 +1136,25 @@ export default function App() {
         </div>
       )}
 
-      {/* Filters Drawer (now with Keywords/Archetype/Format) */}
+      {/* Filters Drawer (with Keywords/Archetype/Format) */}
       {filtersOpen && (
         <div className="fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setFiltersOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setFiltersOpen(false)}
+          />
           <div className="absolute right-0 top-0 bottom-0 w-full sm:w-[520px] bg-[#0a0f1d] border-l border-white/10 p-4 overflow-auto">
             <div className="flex items-center mb-4">
               <h3 className="text-lg font-semibold">Filters</h3>
-              <button className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => { setPage(1); setFiltersOpen(false); }}>Done</button>
+              <button
+                className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => {
+                  setPage(1);
+                  setFiltersOpen(false);
+                }}
+              >
+                Done
+              </button>
             </div>
 
             <div className="space-y-5">
@@ -707,7 +1165,11 @@ export default function App() {
                   {["Infinity", "Standard Core"].map((f) => (
                     <button
                       key={f}
-                      className={`px-3 py-1.5 rounded-full border text-sm ${format === f ? "bg-white/20 border-white/40" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                      className={`px-3 py-1.5 rounded-full border text-sm ${
+                        format === f
+                          ? "bg-white/20 border-white/40"
+                          : "bg-white/5 border-white/10 hover:bg-white/10"
+                      }`}
                       onClick={() => setFormat(f)}
                     >
                       {f}
@@ -728,7 +1190,11 @@ export default function App() {
                     return (
                       <button
                         key={ink}
-                        className={`px-3 py-1.5 rounded-full border text-sm ${active ? "bg-white/20 border-white/40" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                        className={`px-3 py-1.5 rounded-full border text-sm ${
+                          active
+                            ? "bg-white/20 border-white/40"
+                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                        }`}
                         onClick={() => toggleSel(colors, setColors, ink)}
                       >
                         {ink}
@@ -736,7 +1202,10 @@ export default function App() {
                     );
                   })}
                   {colors.length > 0 && (
-                    <button className="ml-auto px-3 py-1.5 rounded-full border border-white/10 text-xs bg-white/5 hover:bg-white/10" onClick={() => setColors([])}>
+                    <button
+                      className="ml-auto px-3 py-1.5 rounded-full border border-white/10 text-xs bg-white/5 hover:bg-white/10"
+                      onClick={() => setColors([])}
+                    >
                       Clear Ink
                     </button>
                   )}
@@ -752,7 +1221,11 @@ export default function App() {
                     return (
                       <button
                         key={t}
-                        className={`px-3 py-1.5 rounded-full border text-sm ${active ? "bg-white/20 border-white/40" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                        className={`px-3 py-1.5 rounded-full border text-sm ${
+                          active
+                            ? "bg-white/20 border-white/40"
+                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                        }`}
                         onClick={() => toggleSel(types, setTypes, t)}
                       >
                         {t}
@@ -760,7 +1233,10 @@ export default function App() {
                     );
                   })}
                   {types.length > 0 && (
-                    <button className="ml-auto px-3 py-1.5 rounded-full border border-white/10 text-xs bg-white/5 hover:bg-white/10" onClick={() => setTypes([])}>
+                    <button
+                      className="ml-auto px-3 py-1.5 rounded-full border border-white/10 text-xs bg-white/5 hover:bg-white/10"
+                      onClick={() => setTypes([])}
+                    >
                       Clear Type
                     </button>
                   )}
@@ -774,8 +1250,15 @@ export default function App() {
                   {COSTS.map((c) => (
                     <button
                       key={c}
-                      className={`px-3 py-1.5 rounded-full border text-sm ${cost === c ? "bg-white/20 border-white/40" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
-                      onClick={() => { setCost(c); setPage(1); }}
+                      className={`px-3 py-1.5 rounded-full border text-sm ${
+                        cost === c
+                          ? "bg-white/20 border-white/40"
+                          : "bg-white/5 border-white/10 hover:bg-white/10"
+                      }`}
+                      onClick={() => {
+                        setCost(c);
+                        setPage(1);
+                      }}
                     >
                       {c}
                     </button>
@@ -789,10 +1272,17 @@ export default function App() {
                 <select
                   className="w-full px-3 py-2 rounded-md bg-[#0f1324] border border-white/10"
                   value={rarity}
-                  onChange={(e) => { setRarity(e.target.value); setPage(1); }}
+                  onChange={(e) => {
+                    setRarity(e.target.value);
+                    setPage(1);
+                  }}
                 >
                   <option value="">Any</option>
-                  {RARITIES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {RARITIES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -804,10 +1294,15 @@ export default function App() {
                   className="w-full px-3 py-2 rounded-md bg-[#0f1324] border border-white/10"
                   placeholder="Any (type to search)…"
                   value={setName}
-                  onChange={(e) => { setSetName(e.target.value); setPage(1); }}
+                  onChange={(e) => {
+                    setSetName(e.target.value);
+                    setPage(1);
+                  }}
                 />
                 <datalist id="sets">
-                  {SETS.map((s) => <option key={s.id} value={s.name} />)}
+                  {SETS.map((s) => (
+                    <option key={s.id} value={s.name} />
+                  ))}
                 </datalist>
               </div>
 
@@ -815,7 +1310,9 @@ export default function App() {
               <div>
                 <div className="text-sm text-white/70 mb-2">Keywords</div>
                 <KeywordInput values={keywords} setValues={setKeywords} />
-                <div className="text-xs text-white/50 mt-1">Press Enter to add; we match inside rules text.</div>
+                <div className="text-xs text-white/50 mt-1">
+                  Press Enter to add; we match inside rules text.
+                </div>
               </div>
 
               {/* Archetype */}
@@ -834,11 +1331,20 @@ export default function App() {
                 <button
                   className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
                   onClick={() => {
-                    setColors([]); setTypes([]); setCost("Any"); setRarity("");
-                    setSetName(""); setTextSearch(""); setQ("");
-                    setKeywords([]); setArchetype(""); setFormat("Infinity");
-                    setOrderby("Color,Set_Num,Name"); setSortdirection("ASC");
-                    setPagesize(24); setPage(1);
+                    setColors([]);
+                    setTypes([]);
+                    setCost("Any");
+                    setRarity("");
+                    setSetName("");
+                    setTextSearch("");
+                    setQ("");
+                    setKeywords([]);
+                    setArchetype("");
+                    setFormat("Infinity");
+                    setOrderby("Color,Set_Num,Name");
+                    setSortdirection("ASC");
+                    setPagesize(24);
+                    setPage(1);
                   }}
                 >
                   Reset Filters
@@ -852,34 +1358,61 @@ export default function App() {
       {/* Modal */}
       {modalCard && (
         <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setModalCard(null)} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setModalCard(null)}
+          />
           <div className="absolute inset-0 flex items-center justify-center p-4">
             <div className="w-full max-w-3xl bg-[#0b1120] rounded-xl border border-white/10 overflow-hidden">
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-1/2 bg-black/40">
                   {modalCard.Image ? (
-                    <img src={proxyImageUrl(modalCard.Image)} alt={modalCard.Name} className="w-full h-full object-cover" />
+                    <img
+                      src={proxyImageUrl(modalCard.Image)}
+                      alt={modalCard.Name}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/60">No image</div>
+                    <div className="w-full h-full flex items-center justify-center text-white/60">
+                      No image
+                    </div>
                   )}
                 </div>
                 <div className="md:w-1/2 p-4">
                   <div className="flex items-start gap-2">
                     <h4 className="text-lg font-semibold">{modalCard.Name}</h4>
-                    <button className="ml-auto px-2 py-1 rounded-md bg-white/10 hover:bg-white/20" onClick={() => setModalCard(null)}>✕</button>
+                    <button
+                      className="ml-auto px-2 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                      onClick={() => setModalCard(null)}
+                    >
+                      ✕
+                    </button>
                   </div>
                   <div className="text-sm text-white/70 mt-1">
-                    {modalCard.Color ?? "—"} · Cost {modalCard.Cost ?? "—"} · {modalCard.Rarity ?? "—"}
+                    {modalCard.Color ?? "—"} · Cost {modalCard.Cost ?? "—"} ·{" "}
+                    {modalCard.Rarity ?? "—"}
                   </div>
                   <div className="text-sm text-white/60 mt-3 whitespace-pre-wrap">
                     {modalCard.Rules || "—"}
                   </div>
 
                   <div className="mt-4 flex gap-2">
-                    <button className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => { addToDeck(modalCard, 1); push(`Added ${modalCard.Name}`, "success"); }}>
+                    <button
+                      className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                      onClick={() => {
+                        addToDeck(modalCard, 1);
+                        push(`Added ${modalCard.Name}`, "success");
+                      }}
+                    >
                       +1 to Deck
                     </button>
-                    <button className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => { addToDeck(modalCard, 4); push(`Added 4× ${modalCard.Name}`, "success"); }}>
+                    <button
+                      className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                      onClick={() => {
+                        addToDeck(modalCard, 4);
+                        push(`Added 4× ${modalCard.Name}`, "success");
+                      }}
+                    >
                       +4 to Deck
                     </button>
                   </div>
@@ -912,9 +1445,17 @@ function KeywordInput({ values, setValues }) {
     <div>
       <div className="flex flex-wrap gap-2 mb-2">
         {values.map((k) => (
-          <span key={k} className="px-2 py-1 rounded-full border border-white/10 bg-white/5 text-sm">
+          <span
+            key={k}
+            className="px-2 py-1 rounded-full border border-white/10 bg-white/5 text-sm"
+          >
             {k}
-            <button className="ml-2 text-white/60 hover:text-white" onClick={() => setValues(values.filter((x) => x !== k))}>×</button>
+            <button
+              className="ml-2 text-white/60 hover:text-white"
+              onClick={() => setValues(values.filter((x) => x !== k))}
+            >
+              ×
+            </button>
           </span>
         ))}
       </div>
@@ -923,48 +1464,98 @@ function KeywordInput({ values, setValues }) {
         placeholder="Add keyword then press Enter"
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") add(input); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") add(input);
+        }}
       />
     </div>
   );
 }
 
 function DeckPanel({
-  deck, totalDeckCards, addToDeck, setCount, clearDeck,
-  manaCurve, inkDistribution, canvasRef, exportPNG, exportJSON, exportCSV, push, compact = false
+  deck,
+  totalDeckCards,
+  addToDeck,
+  setCount,
+  clearDeck,
+  manaCurve,
+  inkDistribution,
+  canvasRef,
+  exportPNG,
+  exportJSON,
+  exportCSV,
+  push,
+  compact = false,
 }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
         <h2 className="text-lg font-semibold">Your Deck</h2>
         <span className="text-xs text-white/60">({totalDeckCards} cards)</span>
-        <button className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm" onClick={clearDeck}>Clear</button>
+        <button
+          className="ml-auto px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
+          onClick={clearDeck}
+        >
+          Clear
+        </button>
       </div>
 
       <div className="max-h-[40vh] lg:max-h-[48vh] overflow-auto pr-1">
         {Object.values(deck).length === 0 ? (
-          <div className="text-sm text-white/60">Tap cards to add them to your deck.</div>
+          <div className="text-sm text-white/60">
+            Tap cards to add them to your deck.
+          </div>
         ) : (
           <ul className="space-y-1">
             {Object.values(deck)
               .sort((a, b) => {
-                const ia = String(a.Color || ""); const ib = String(b.Color || "");
+                const ia = String(a.Color || "");
+                const ib = String(b.Color || "");
                 if (ia !== ib) return ia.localeCompare(ib);
-                const ca = Number(a.Cost ?? 0); const cb = Number(b.Cost ?? 0);
+                const ca = Number(a.Cost ?? 0);
+                const cb = Number(b.Cost ?? 0);
                 if (ca !== cb) return ca - cb;
-                return String(a.Name || "").localeCompare(String(b.Name || ""));
+                return String(a.Name || "").localeCompare(
+                  String(b.Name || "")
+                );
               })
               .map((d) => (
-                <li key={cardKey(d)} className="flex items-center gap-2 p-2 rounded-lg bg-black/10 border border-white/10">
-                  <div className="text-xs w-6 text-center font-semibold">{d.__count}×</div>
+                <li
+                  key={`${d.Set_ID ?? ""}|${d.Set_Num ?? ""}|${d.Name ?? ""}|${
+                    d.Image ?? ""
+                  }`}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-black/10 border border-white/10"
+                >
+                  <div className="text-xs w-6 text-center font-semibold">
+                    {d.__count}×
+                  </div>
                   <div className="flex-1">
                     <div className="text-sm">{d.Name}</div>
-                    <div className="text-xs text-white/50">{d.Color ?? "—"} · Cost {d.Cost ?? "—"} · {d.Rarity ?? "—"}</div>
+                    <div className="text-xs text-white/50">
+                      {d.Color ?? "—"} · Cost {d.Cost ?? "—"} ·{" "}
+                      {d.Rarity ?? "—"}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button className="px-3 py-2 text-base rounded-md bg-white/10 hover:bg-white/20" onClick={() => addToDeck(d, -1)} title="Remove one">−</button>
-                    <input className="w-16 px-2 py-2 text-sm rounded-md bg-[#0a0f1d] border border-white/10 text-center" value={d.__count} onChange={(e) => setCount(d, e.target.value)} />
-                    <button className="px-3 py-2 text-base rounded-md bg-white/10 hover:bg-white/20" onClick={() => addToDeck(d, +1)} title="Add one">+</button>
+                    <button
+                      className="px-3 py-2 text-base rounded-md bg-white/10 hover:bg-white/20"
+                      onClick={() => addToDeck(d, -1)}
+                      title="Remove one"
+                    >
+                      −
+                    </button>
+                    <input
+                      className="w-16 px-2 py-2 text-sm rounded-md bg-[#0a0f1d] border border-white/10 text-center"
+                      value={d.__count}
+                      onChange={(e) => setCount(d, e.target.value)}
+                    />
+                    <button
+                      className="px-3 py-2 text-base rounded-md bg-white/10 hover:bg-white/20"
+                      onClick={() => addToDeck(d, +1)}
+                      title="Add one"
+                    >
+                      +
+                    </button>
                   </div>
                 </li>
               ))}
@@ -974,39 +1565,76 @@ function DeckPanel({
 
       {/* Exports */}
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <button className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm" onClick={exportJSON}>Export JSON</button>
-        <button className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm" onClick={exportCSV}>Export CSV</button>
-        <button className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm" onClick={exportPNG} title="Exports a PNG sheet">Export PNG</button>
+        <button
+          className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
+          onClick={exportJSON}
+        >
+          Export JSON
+        </button>
+        <button
+          className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
+          onClick={exportCSV}
+        >
+          Export CSV
+        </button>
+        <button
+          className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
+          onClick={exportPNG}
+          title="Exports a PNG sheet"
+        >
+          Export PNG
+        </button>
       </div>
 
       {/* Analytics */}
       <div className="mt-4">
         <div className="text-sm text-white/70 mb-2">Mana Curve</div>
         <div className="h-40 bg-black/10 rounded-lg border border-white/10 p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={manaCurve}>
-              <XAxis dataKey="cost" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" />
-            </BarChart>
-          </ResponsiveContainer>
+          {Array.isArray(manaCurve) && manaCurve.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={manaCurve}>
+                <XAxis dataKey="cost" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-white/40 text-sm">
+              No data yet
+            </div>
+          )}
         </div>
       </div>
 
       <div className="mt-4">
         <div className="text-sm text-white/70 mb-2">Ink Distribution</div>
         <div className="h-40 bg-black/10 rounded-lg border border-white/10 p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={inkDistribution} dataKey="count" nameKey="ink" outerRadius={70} label>
-                {inkDistribution.map((entry, idx) => (
-                  <Cell key={`cell-${idx}`} fill={INK_COLORS[entry.ink] || "#999"} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {Array.isArray(inkDistribution) && inkDistribution.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={inkDistribution}
+                  dataKey="count"
+                  nameKey="ink"
+                  outerRadius={70}
+                  label
+                >
+                  {inkDistribution.map((entry, idx) => (
+                    <Cell
+                      key={`cell-${idx}`}
+                      fill={INK_COLORS[entry.ink] || "#999"}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-white/40 text-sm">
+              No data yet
+            </div>
+          )}
         </div>
       </div>
 
