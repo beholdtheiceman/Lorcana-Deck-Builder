@@ -42,7 +42,7 @@ async function apiSearchCards({
   if (format) params.set("format", format);
 
   // NOTE: Adjust the endpoint if your lorcana-api host differs
-  const url = `https://lorcana-api.com/cards?${params.toString()}`;
+  const url = `${LORCAST_BASE.replace(/\/+$/, "")}/cards?${params.toString()}`;
 
   try {
     const res = await fetch(url, { mode: "cors" });
