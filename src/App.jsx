@@ -94,7 +94,6 @@ async function copyToClipboardRobust(text){
    EXPORT HELPERS (images)
    ========================= */
 
-// CORS-safe proxy for drawing remote images on canvas
 function proxyImageUrl(rawUrl) {
   if (!rawUrl) return null;
   const noProto = rawUrl.replace(/^https?:\/\//, "");
@@ -127,7 +126,6 @@ function drawCountBubble(ctx, x, y, n) {
   ctx.restore();
 }
 
-// UNIQUE tile grid (one tile per full name) or per-copy grid
 async function exportDeckAsPng(deck, { unique = false } = {}) {
   const entries = Object.values(deck)
     .filter(e => e.count > 0)
@@ -190,7 +188,7 @@ async function exportDeckAsPng(deck, { unique = false } = {}) {
         const w = img.width * scale, h = img.height * scale;
         const cx = x + (cellW - w) / 2, cy = y + (cellH - h) / 2;
         ctx.drawImage(img, cx, cy, w, h);
-      } catch { /* keep placeholder */ }
+      } catch { /* placeholder if fails */ }
     }
 
     const key = fullNameKey(card);
@@ -348,7 +346,7 @@ function CardTile({ card, onAdd }){
   return (
     <div className="group bg-[#0f1320] hover:bg-[#141828] rounded-xl p-2 flex flex-col gap-2 border border-white/10 transition">
       <div className="aspect-[488/681] w-full bg-black/40 rounded-lg overflow-hidden flex items-center justify-center">
-        {img ? (<img src={img} alt={name} className="w-full h-full object-contain" />) : (<div className="text-white/40 text-xs">No image</div>)}
+        {img ? (<img loading="lazy" src={img} alt={name} className="w-full h-full object-contain" />) : (<div className="text-white/40 text-xs">No image</div>)}
       </div>
       <div className="text-sm leading-tight">
         <div className="font-medium">{name}</div>
@@ -371,7 +369,7 @@ function DeckRow({ entry, onInc, onDec, onRemove }){
   return (
     <div className="flex items-center gap-2 py-2 border-b border-white/10">
       <div className="w-10 h-14 bg-black/40 rounded overflow-hidden flex items-center justify-center">
-        {card.image_uris?.digital?.small ? (<img src={card.image_uris.digital.small} alt={name} className="h-full object-contain" />) : null}
+        {card.image_uris?.digital?.small ? (<img loading="lazy" src={card.image_uris.digital.small} alt={name} className="h-full object-contain" />) : null}
       </div>
       <div className="flex-1 min-w-0">
         <div className="truncate font-medium text-sm">{name}</div>
@@ -501,7 +499,7 @@ export default function LorcanaDeckBuilderApp(){
   async function doExport(){
     setExportErr(null); setExporting(true);
     try{
-      const blob=await exportDeckAsPng(deck, { unique: true }); // unique tiles
+      const blob=await exportDeckAsPng(deck, { unique: true });
       if(!blob) throw new Error('Failed to build image blob');
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a'); a.href=url; a.download='lorcana-deck.png'; a.rel='noopener';
@@ -528,122 +526,151 @@ export default function LorcanaDeckBuilderApp(){
     return (
       <div className="fixed inset-0 z-40 flex">
         <div className="flex-1 bg-black/50" onClick={()=> setFiltersOpen(false)} />
-        <div className="w-full max-w-md h-full overflow-y-auto bg-slate-950 border-l border-white/10 p-4">
+        <div className="w-full max-w-md h-full overflow-y-auto bg-slate-950 border-l border-white/10 p-4 flex flex-col">
+          {/* Header */}
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold">Filters</div>
-            <button type="button" className="text-xs underline text-white/70"
-              onClick={()=> setFilters({ text:'', inks:[], types:[], rarities:[], sets:[], costMin:undefined, costMax:undefined, costs:[], inkwell:'any', keywords:[], archetypes:[], format:'any' })}>
-              Reset
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="text-xs px-2 py-1 rounded border border-white/20 text-white/80"
+                onClick={()=> setFilters({ text:'', inks:[], types:[], rarities:[], sets:[], costMin:undefined, costMax:undefined, costs:[], inkwell:'any', keywords:[], archetypes:[], format:'any' })}
+                title="Reset filters"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="text-xs px-2 py-1 rounded border border-white/20 text-white/80"
+                onClick={()=> setFiltersOpen(false)}
+                title="Close"
+              >
+                ✕ Close
+              </button>
+            </div>
           </div>
 
-          <Section title="Search">
-            <input className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20 outline-none"
-              placeholder="Name (default), or prefix n: / e: (e.g., e:draw)"
-              value={filters.text} onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
-            <div className="mt-2 text-[11px] text-white/50">
-              Supports i:/t:/r:/s:/c:/iw, <span className="font-mono">keyword:</span>, and <span className="font-mono">format:core|infinity</span>.
-            </div>
-          </Section>
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto pr-1">
+            <Section title="Search">
+              <input className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20 outline-none"
+                placeholder="Name (default), or prefix n: / e: (e.g., e:draw)"
+                value={filters.text} onChange={(e)=> setFilters(f=> ({...f, text:e.target.value}))} />
+              <div className="mt-2 text-[11px] text-white/50">
+                Supports i:/t:/r:/s:/c:/iw, <span className="font-mono">keyword:</span>, and <span className="font-mono">format:core|infinity</span>.
+              </div>
+            </Section>
 
-          <Section title="Ink (OR)">
-            <div className="flex flex-wrap">
-              {ALL_INKS.map(ink=> (
-                <Chip key={ink} label={ink} active={filters.inks.includes(ink)}
-                  onClick={()=> setFilters(f=> ({...f, inks: f.inks.includes(ink) ? f.inks.filter(x=>x!==ink) : [...f.inks, ink]}))} />
-              ))}
-            </div>
-          </Section>
+            <Section title="Ink (OR)">
+              <div className="flex flex-wrap">
+                {ALL_INKS.map(ink=> (
+                  <Chip key={ink} label={ink} active={filters.inks.includes(ink)}
+                    onClick={()=> setFilters(f=> ({...f, inks: f.inks.includes(ink) ? f.inks.filter(x=>x!==ink) : [...f.inks, ink]}))} />
+                ))}
+              </div>
+            </Section>
 
-          <Section title="Type (OR)">
-            <div className="flex flex-wrap">
-              {ALL_TYPES.map(t=> (
-                <Chip key={t} label={t} active={filters.types.includes(t)}
-                  onClick={()=> setFilters(f=> ({...f, types: f.types.includes(t) ? f.types.filter(x=>x!==t) : [...f.types, t]}))} />
-              ))}
-            </div>
-          </Section>
+            <Section title="Type (OR)">
+              <div className="flex flex-wrap">
+                {ALL_TYPES.map(t=> (
+                  <Chip key={t} label={t} active={filters.types.includes(t)}
+                    onClick={()=> setFilters(f=> ({...f, types: f.types.includes(t) ? f.types.filter(x=>x!==t) : [...f.types, t]}))} />
+                ))}
+              </div>
+            </Section>
 
-          <Section title="Rarity (OR)">
-            <div className="flex flex-wrap">
-              {ALL_RARITIES.map(r=> (
-                <Chip key={r} label={r.replace('_',' ')} active={filters.rarities.includes(r)}
-                  onClick={()=> setFilters(f=> ({...f, rarities: f.rarities.includes(r) ? f.rarities.filter(x=>x!==r) : [...f.rarities, r]}))} />
-              ))}
-            </div>
-          </Section>
+            <Section title="Rarity (OR)">
+              <div className="flex flex-wrap">
+                {ALL_RARITIES.map(r=> (
+                  <Chip key={r} label={r.replace('_',' ')} active={filters.rarities.includes(r)}
+                    onClick={()=> setFilters(f=> ({...f, rarities: f.rarities.includes(r) ? f.rarities.filter(x=>x!==r) : [...f.rarities, r]}))} />
+                ))}
+              </div>
+            </Section>
 
-          <Section title="Sets (OR)">
-            <div className="max-h-40 overflow-auto pr-2">
-              {loadingSets ? (<div className="text-white/60 text-sm">Loading sets…</div>) : (
-                <div className="flex flex-wrap">
-                  {sets.map(s=> (
-                    <Chip key={s.code} label={`${s.name} (${s.code})`} active={filters.sets.includes(s.code)}
-                      onClick={()=> setFilters(f=> ({...f, sets: f.sets.includes(s.code) ? f.sets.filter(x=>x!==s.code) : [...f.sets, s.code]}))} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </Section>
+            <Section title="Sets (OR)">
+              <div className="max-h-40 overflow-auto pr-2">
+                {loadingSets ? (<div className="text-white/60 text-sm">Loading sets…</div>) : (
+                  <div className="flex flex-wrap">
+                    {sets.map(s=> (
+                      <Chip key={s.code} label={`${s.name} (${s.code})`} active={filters.sets.includes(s.code)}
+                        onClick={()=> setFilters(f=> ({...f, sets: f.sets.includes(s.code) ? f.sets.filter(x=>x!==s.code) : [...f.sets, s.code]}))} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Section>
 
-          <Section title="Cost">
-            <div className="flex flex-wrap gap-2">
-              {COST_CHOICES.map(n=> (
-                <button key={n} type="button"
-                  className={`px-3 py-1 rounded-lg border text-sm ${ (filters.costs||[]).includes(n) ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}
-                  onClick={()=> setFilters(f=> ({...f, costs: (f.costs||[]).includes(n) ? (f.costs||[]).filter(x=>x!==n) : [...(f.costs||[]), n]}))}
-                  title={n===9? '9+': String(n)}>{n===9? '9+': n}
-                </button>
-              ))}
-              {(filters.costs?.length ?? 0) > 0 && (
-                <button type="button" className="ml-2 px-2 py-1 rounded border border-white/25 text-xs"
-                  onClick={()=> setFilters(f=> ({...f, costs: []}))}>Clear</button>
-              )}
-            </div>
-          </Section>
+            <Section title="Cost">
+              <div className="flex flex-wrap gap-2">
+                {COST_CHOICES.map(n=> (
+                  <button key={n} type="button"
+                    className={`px-3 py-1 rounded-lg border text-sm ${ (filters.costs||[]).includes(n) ? 'bg-white text-black border-white' : 'border-white/25 hover:border-white/60'}`}
+                    onClick={()=> setFilters(f=> ({...f, costs: (f.costs||[]).includes(n) ? (f.costs||[]).filter(x=>x!==n) : [...(f.costs||[]), n]}))}
+                    title={n===9? '9+': String(n)}>{n===9? '9+': n}
+                  </button>
+                ))}
+                {(filters.costs?.length ?? 0) > 0 && (
+                  <button type="button" className="ml-2 px-2 py-1 rounded border border-white/25 text-xs"
+                    onClick={()=> setFilters(f=> ({...f, costs: []}))}>Clear</button>
+                )}
+              </div>
+            </Section>
 
-          <Section title="Inkwell">
-            <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
-              value={filters.inkwell} onChange={(e)=> setFilters(f=> ({...f, inkwell: e.target.value}))}>
-              <option value="any">Any</option>
-              <option value="inkable">Inkable only</option>
-              <option value="non-inkable">Non-inkable only</option>
-            </select>
-          </Section>
+            <Section title="Inkwell">
+              <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
+                value={filters.inkwell} onChange={(e)=> setFilters(f=> ({...f, inkwell: e.target.value}))}>
+                <option value="any">Any</option>
+                <option value="inkable">Inkable only</option>
+                <option value="non-inkable">Non-inkable only</option>
+              </select>
+            </Section>
 
-          <Section title="Archetypes (Classifications, OR)">
-            <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
-              {ALL_ARCHETYPES.map(a=> (
-                <Chip key={a} label={a} active={filters.archetypes?.includes(a) || false}
-                  onClick={()=> setFilters(f=> ({...f, archetypes: (f.archetypes||[]).includes(a) ? (f.archetypes||[]).filter(x=>x!==a) : [...(f.archetypes||[]), a]}))} />
-              ))}
-            </div>
-          </Section>
+            <Section title="Archetypes (Classifications, OR)">
+              <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
+                {ALL_ARCHETYPES.map(a=> (
+                  <Chip key={a} label={a} active={filters.archetypes?.includes(a) || false}
+                    onClick={()=> setFilters(f=> ({...f, archetypes: (f.archetypes||[]).includes(a) ? (f.archetypes||[]).filter(x=>x!==a) : [...(f.archetypes||[]), a]}))} />
+                ))}
+              </div>
+            </Section>
 
-          <Section title="Keywords (OR)">
-            <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
-              {ALL_KEYWORDS.map(k=> (
-                <Chip key={k} label={k} active={filters.keywords?.includes(k) || false}
-                  onClick={()=> setFilters(f=> ({...f, keywords: (f.keywords||[]).includes(k) ? (f.keywords||[]).filter(x=>x!==k) : [...(f.keywords||[]), k]}))} />
-              ))}
-            </div>
-          </Section>
+            <Section title="Keywords (OR)">
+              <div className="max-h-32 overflow-auto pr-1 flex flex-wrap">
+                {ALL_KEYWORDS.map(k=> (
+                  <Chip key={k} label={k} active={filters.keywords?.includes(k) || false}
+                    onClick={()=> setFilters(f=> ({...f, keywords: (f.keywords||[]).includes(k) ? (f.keywords||[]).filter(x=>x!==k) : [...(f.keywords||[]), k]}))} />
+                ))}
+              </div>
+            </Section>
 
-          <Section title="Format">
-            <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
-              value={filters.format} onChange={(e)=> setFilters(f=> ({...f, format: e.target.value}))}>
-              <option value="any">Any</option>
-              <option value="core">Standard/Core legal</option>
-              <option value="infinity">Infinity legal</option>
-            </select>
-          </Section>
+            <Section title="Format">
+              <select className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/20"
+                value={filters.format} onChange={(e)=> setFilters(f=> ({...f, format: e.target.value}))}>
+                <option value="any">Any</option>
+                <option value="core">Standard/Core legal</option>
+                <option value="infinity">Infinity legal</option>
+              </select>
+            </Section>
+          </div>
+
+          {/* Footer: Done button */}
+          <div className="pt-3 border-t border-white/10">
+            <button
+              type="button"
+              className="w-full h-10 rounded-lg bg-white text-black font-medium"
+              onClick={()=> setFiltersOpen(false)}
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen text-white bg-[#0b0f1a]">
+    <div className="min-h-screen text-white bg-[#0b0f1a] pb-[calc(env(safe-area-inset-bottom)+64px)]">
       <header className="sticky top-0 z-30 backdrop-blur bg-[#0b0f1a]/75 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <div className="text-lg font-bold">lorcana deck builder</div>
@@ -670,7 +697,7 @@ export default function LorcanaDeckBuilderApp(){
             </button>
           </div>
 
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {view.map(c=> (
               <CardTile key={`${c.id}-${c.collector_number}`} card={c} onAdd={(card)=> addToDeck(card,1)} />
             ))}
@@ -697,7 +724,7 @@ export default function LorcanaDeckBuilderApp(){
         </section>
 
         {/* RIGHT: deck panel */}
-        <aside className="md:sticky md:top-16 h-fit">
+        <aside className="md:sticky md:top-16 h-fit hidden md:block">
           <div className="rounded-xl bg-[#0a0e19] border border-white/10 p-3">
             <div className="flex items-center justify-between">
               <div>
@@ -786,7 +813,7 @@ export default function LorcanaDeckBuilderApp(){
             <div className="grid gap-4 md:grid-cols-[1fr,320px]">
               <div className="bg-black/20 border border-white/10 rounded-lg min-h-[280px] flex items-center justify-center">
                 {publishedImageUrl
-                  ? <img src={publishedImageUrl} alt="Poster preview" className="max-w-full max-h-[60vh] object-contain" />
+                  ? <img loading="lazy" src={publishedImageUrl} alt="Poster preview" className="max-w-full max-h-[60vh] object-contain" />
                   : <div className="text-white/50 text-sm">No poster yet. Click “Publish” to generate.</div>}
               </div>
 
