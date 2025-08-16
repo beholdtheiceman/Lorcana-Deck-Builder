@@ -49,7 +49,7 @@ import {
 // Configuration
 // -----------------------------------------------------------------------------
 
-const APP_VERSION = "1.0.0-lorcast-monolith";
+const APP_VERSION = "1.0.1-lorcast-monolith+api";
 
 // Lorcast configuration: tweak if your endpoints/CDN differ.
 // We intentionally implement a robust resolver that tries multiple URL shapes
@@ -58,7 +58,7 @@ const LORCAST_CONFIG = {
   // Example API base for metadata. If you already have your own card API,
   // keep that and only use the image resolver below.
   // Leaving this as null means "don't fetch cards from Lorcast; only resolve images."
-  API_BASE: null,
+  API_BASE: "https://api.lorcast.com/v0",
 
   // Common image base paths seen in community projects:
   IMAGE_BASES: [
@@ -329,32 +329,46 @@ async function fetchAllCards({ signal } = {}) {
   return [];
 }
 
+
 function normalizeCard(raw) {
-  // Attempt to map common fields
+  // Prefer Lorcast v0 model if present
+  const lorcastSet = raw.set && (raw.set.code || raw.set.name) ? raw.set : null;
+  const setCode = lorcastSet ? (lorcastSet.code ?? lorcastSet.id ?? lorcastSet.name) : (raw.set || raw.set_code || raw.setCode || raw.setName || "Unknown");
+  const setName = lorcastSet ? (lorcastSet.name ?? lorcastSet.code) : (raw.setName || null);
+
+  const collectorNo = raw.collector_number || raw.number || raw.no || 0;
+  const name = raw.name || raw.title || "Unknown Card";
   const id =
     raw.id ||
     raw._id ||
-    `${raw.set || raw.set_code || raw.setCode || "UNK"}-${raw.number || raw.no || raw.collector_number || raw.name}`;
+    `${setCode}-${collectorNo}-${name}`;
 
-  const name = raw.name || raw.title || "Unknown Card";
-  const set = raw.set || raw.set_code || raw.setCode || raw.setName || "Unknown";
-  const number = raw.number || raw.no || raw.collector_number || 0;
-  const cost = getCost(raw);
-  const inks = getInks(raw);
-  const type = raw.type || raw.cardType || raw.category || "Unknown";
+  // Handle 'type' which might be array in Lorcast
+  const typeRaw = raw.type || raw.cardType || raw.category || "Unknown";
+  const type = Array.isArray(typeRaw) ? typeRaw.join("/") : typeRaw;
+
+  // Lorcast uses 'ink' (string) and 'inkwell' boolean
+  let inks = getInks(raw);
+  if (!inks.length && typeof raw.ink === "string") inks = [raw.ink];
+
   const rarity = raw.rarity || raw.rarityLabel || "Unknown";
-
   const text =
-    raw.rules_text ||
     raw.text ||
+    raw.rules_text ||
     raw.abilityText ||
     raw.rules ||
     raw.abilities ||
     "";
 
-  // If the raw data comes with an image, we still prioritize Lorcast.
-  // We'll keep the raw image as last-gasp fallback.
+  // Prefer Lorcast-provided AVIF URIs; fall back to any known fields
+  const apiImg =
+    raw.image_uris?.digital?.normal ||
+    raw.image_uris?.digital?.small ||
+    raw.image_uris?.digital?.large ||
+    null;
+
   const rawImage =
+    apiImg ||
     raw.image ||
     raw.image_url ||
     raw.picture ||
@@ -364,20 +378,27 @@ function normalizeCard(raw) {
     raw.images?.png ||
     null;
 
+  // Prefer explicit cost field names
+  const cost =
+    raw.cost ?? raw.ink_cost ?? raw.inkCost ?? (typeof raw.move_cost === "number" ? raw.move_cost : 0);
+
   return {
     id,
     name,
-    set,
-    number,
+    set: setCode,
+    setName: setName || undefined,
+    number: collectorNo,
     cost,
     inks,
     type,
     rarity,
     text,
     _rawImage: rawImage,
+    _imageFromAPI: apiImg || null,
     _raw: raw,
   };
 }
+
 
 // -----------------------------------------------------------------------------
 // Local storage & caching
@@ -897,7 +918,7 @@ function useCardImage(card) {
         setSrc(cached);
         return;
       }
-      const found = await resolveLorcastImage(card, abort.signal).catch(() => null);
+      const found = card._imageFromAPI || await resolveLorcastImage(card, abort.signal).catch(() => null);
       const finalSrc = found || card._rawImage || FALLBACK_IMG;
       if (mounted) {
         setSrc(finalSrc);
