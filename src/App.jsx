@@ -5,7 +5,7 @@
 // Author: ChatGPT (GPT-5 Thinking)
 // Notes:
 //   - This is a single-file React app designed to drop into an existing Vite/CRA
-//     project as src/app.jsx (or App.jsx) and render the full experience..
+//     project as src/app.jsx (or App.jsx) and render the full experience.
 //   - It includes: search, filters, sort, deck panel, stats, curve chart, cost
 //     breakdowns, ink color filters, rarity filters, set filters, text search,
 //     type filters, advanced rules for deck validation, import/export (JSON +
@@ -100,7 +100,7 @@ const SETS = [
   { code: "TFC", name: "The First Chapter" },
   { code: "ROC", name: "Rise of the Floodborn" },
   { code: "IAT", name: "Into the Inklands" },
-  { code: "URS", name: "Ursula’s Return" },
+  { code: "URS", name: "Ursula's Return" },
   { code: "ITI", name: "Into the Inklands (Intl Variant)" },
   { code: "ST6", name: "Set 6" },
   { code: "ST7", name: "Set 7" },
@@ -557,7 +557,6 @@ function deckReducer(state, action) {
       nextEntries[key] = { card, count: clamp(count, 0, DECK_RULES.MAX_COPIES) };
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
       const next = { ...state, entries: nextEntries, total: newTotal };
-      saveLS(LS_KEYS.DECK, next);
       return next;
     }
     case "REMOVE": {
@@ -1094,10 +1093,7 @@ function DeckRow({ entry, onSetCount, onRemove }) {
       </div>
     </div>
   );
-}
-
-// Stats & charts --------------------------------------------------------------
-
+},
 function DeckStats({ deck }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
 
@@ -1172,363 +1168,383 @@ function DeckStats({ deck }) {
       <ChartCard title="Types">
         <div className="w-full h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={typeCounts}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="type" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-    </div>
-  );
+          // ... existing code from previous message ...
+
+<ChartCard title="Types">
+  <div className="w-full h-56">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={typeCounts}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="type" />
+        <YAxis allowDecimals={false} />
+        <Tooltip />
+        <Bar dataKey="count" />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</ChartCard>
+</div>
+);
 }
 
 function StatCard({ title, value, subtitle }) {
-  return (
-    <div className="p-3 bg-gray-900 rounded-xl border border-gray-800">
-      <div className="text-sm text-gray-400">{title}</div>
-      <div className="text-2xl font-semibold">{value}</div>
-      {subtitle && <div className="text-xs text-gray-500">{subtitle}</div>}
-    </div>
-  );
+return (
+<div className="p-3 bg-gray-900 rounded-xl border border-gray-800">
+<div className="text-sm text-gray-400">{title}</div>
+<div className="text-2xl font-semibold">{value}</div>
+{subtitle && <div className="text-xs text-gray-500">{subtitle}</div>}
+</div>
+);
 }
 
 function ChartCard({ title, children }) {
-  return (
-    <div className="p-3 bg-gray-900 rounded-xl border border-gray-800">
-      <div className="text-sm text-gray-300 mb-2">{title}</div>
-      {children}
-    </div>
-  );
+return (
+<div className="p-3 bg-gray-900 rounded-xl border border-gray-800">
+<div className="text-sm text-gray-300 mb-2">{title}</div>
+{children}
+</div>
+);
 }
 
 // Modals ---------------------------------------------------------------------
 
 function Modal({ open, onClose, title, children, footer }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-[min(100%-2rem,900px)] max-h-[85vh] overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-          <div className="text-lg font-semibold">{title}</div>
-          <button
-            className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
-            onClick={onClose}
-          >
-            Close
-          </button>
-        </div>
-        <div className="p-4 overflow-auto">{children}</div>
-        {footer && <div className="px-4 py-3 border-t border-gray-800">{footer}</div>}
-      </div>
-    </div>
-  );
+if (!open) return null;
+return (
+<div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+<div className="bg-gray-900 border border-gray-800 rounded-2xl w-[min(100%-2rem,900px)] max-h-[85vh] overflow-hidden shadow-2xl">
+  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+    <div className="text-lg font-semibold">{title}</div>
+    <button
+      className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+      onClick={onClose}
+    >
+      Close
+    </button>
+  </div>
+  <div className="p-4 overflow-auto">{children}</div>
+  {footer && <div className="px-4 py-3 border-t border-gray-800">{footer}</div>}
+</div>
+</div>
+);
 }
 
 // Inspect card modal ---------------------------------------------------------
 
 function InspectCardModal({ open, card, onClose, onAdd }) {
-  const imgSrc = useCardImage(card || {});
-  if (!open || !card) return null;
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`${card.name} • ${card.set} #${card.number}`}
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <button
-            className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
-            onClick={() => onAdd(card)}
-          >
-            Add to Deck
-          </button>
-        </div>
-      }
+const imgSrc = useCardImage(card || {});
+if (!open || !card) return null;
+return (
+<Modal
+open={open}
+onClose={onClose}
+title={`${card.name} • ${card.set} #${card.number}`}
+footer={
+  <div className="flex items-center justify-end gap-2">
+    <button
+      className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
+      onClick={() => onAdd(card)}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <img src={imgSrc} alt={card.name} className="w-full rounded-xl border border-gray-800" />
-        <div className="space-y-2">
-          <div className="text-sm text-gray-300">
-            <span className="font-semibold">Type:</span> {card.type} •{" "}
-            <span className="font-semibold">Rarity:</span> {card.rarity} •{" "}
-            <span className="font-semibold">Cost:</span> {getCost(card)}
-          </div>
-          <div className="text-sm text-gray-300">
-            <span className="font-semibold">Inks:</span> {getInks(card).join(", ") || "—"}
-          </div>
-          <div className="p-3 bg-gray-950 rounded-xl border border-gray-800">
-            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Card Text</div>
-            <div className="whitespace-pre-wrap">{card.text || "—"}</div>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
+      Add to Deck
+    </button>
+  </div>
+}
+>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <img src={imgSrc} alt={card.name} className="w-full rounded-xl border border-gray-800" />
+  <div className="space-y-2">
+    <div className="text-sm text-gray-300">
+      <span className="font-semibold">Type:</span> {card.type} •{" "}
+      <span className="font-semibold">Rarity:</span> {card.rarity} •{" "}
+      <span className="font-semibold">Cost:</span> {getCost(card)}
+    </div>
+    <div className="text-sm text-gray-300">
+      <span className="font-semibold">Inks:</span> {getInks(card).join(", ") || "—"}
+    </div>
+    <div className="p-3 bg-gray-950 rounded-xl border border-gray-800">
+      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Card Text</div>
+      <div className="whitespace-pre-wrap">{card.text || "—"}</div>
+    </div>
+  </div>
+</div>
+</Modal>
+);
 }
 
 // Import/Export modals -------------------------------------------------------
 
 function ExportModal({ open, deck, onClose }) {
-  const json = JSON.stringify(deck, null, 2);
-  return (
-    <Modal open={open} onClose={onClose} title="Export Deck">
-      <div className="space-y-3">
-        <div>
-          <div className="text-sm text-gray-400 mb-1">Deck JSON</div>
-          <textarea
-            className="w-full h-64 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
-            readOnly
-            value={json}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
-            onClick={() => {
-              navigator.clipboard.writeText(json);
-            }}
-          >
-            Copy JSON
-          </button>
-          <a
-            className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
-            href={`data:application/json;charset=utf-8,${encodeURIComponent(json)}`}
-            download={`${(deck.name || "deck").replace(/\s+/g, "_")}.json`}
-          >
-            Download JSON
-          </a>
-        </div>
-      </div>
-    </Modal>
-  );
+const json = JSON.stringify(deck, null, 2);
+return (
+<Modal open={open} onClose={onClose} title="Export Deck">
+<div className="space-y-3">
+  <div>
+    <div className="text-sm text-gray-400 mb-1">Deck JSON</div>
+    <textarea
+      className="w-full h-64 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
+      readOnly
+      value={json}
+    />
+  </div>
+  <div className="flex items-center gap-2">
+    <button
+      className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
+      onClick={() => {
+        navigator.clipboard.writeText(json);
+      }}
+    >
+      Copy JSON
+    </button>
+    <a
+      className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+      href={`data:application/json;charset=utf-8,${encodeURIComponent(json)}`}
+      download={`${(deck.name || "deck").replace(/\s+/g, "_")}.json`}
+    >
+      Download JSON
+    </a>
+  </div>
+</div>
+</Modal>
+);
 }
 
 function ImportModal({ open, onClose, onImport }) {
-  const [text, setText] = useState("");
-  return (
-    <Modal open={open} onClose={onClose} title="Import Deck">
-      <div className="space-y-3">
-        <div className="text-sm text-gray-400">
-          Paste deck JSON exported from this app (or adapt from another builder).
-        </div>
-        <textarea
-          className="w-full h-64 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
-          placeholder='{"name":"My Deck","entries":{...},"total":60}'
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <div className="flex items-center justify-end gap-2">
-          <button
-            className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
-            onClick={() => {
-              try {
-                const obj = JSON.parse(text);
-                onImport(obj);
-                onClose();
-              } catch {
-                alert("Invalid JSON");
-              }
-            }}
-          >
-            Import
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
+const [text, setText] = useState("");
+return (
+<Modal open={open} onClose={onClose} title="Import Deck">
+<div className="space-y-3">
+  <div className="text-sm text-gray-400">
+    Paste deck JSON exported from this app (or adapt from another builder).
+  </div>
+  <textarea
+    className="w-full h-64 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
+    placeholder='{"name":"My Deck","entries":{...},"total":60}'
+    value={text}
+    onChange={(e) => setText(e.target.value)}
+  />
+  <div className="flex items-center justify-end gap-2">
+    <button
+      className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
+      onClick={() => {
+        try {
+          const obj = JSON.parse(text);
+          onImport(obj);
+          onClose();
+        } catch {
+          alert("Invalid JSON");
+        }
+      }}
+    >
+      Import
+    </button>
+  </div>
+</div>
+</Modal>
+);
 }
 
 // Printable view -------------------------------------------------------------
 
 function PrintableSheet({ deck, onClose }) {
-  const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
-  return (
-    <Modal open={true} onClose={onClose} title="Printable Deck Sheet">
-      <div className="space-y-4">
-        <div className="text-xl font-semibold">{deck.name}</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {entries.map((e) => (
-            <div key={deckKey(e.card)} className="flex items-center gap-2">
-              <div className="w-14 h-20 bg-gray-800 rounded-md overflow-hidden border border-gray-700">
-                <img src={e.card._rawImage || FALLBACK_IMG} alt={e.card.name} className="w-full h-full object-cover" />
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold">{e.card.name}</div>
-                <div className="text-xs text-gray-400">
-                  {e.card.set} • #{e.card.number} • Cost {getCost(e.card)}
-                </div>
-              </div>
-              <div className="text-lg font-bold w-8 text-right">{e.count}×</div>
-            </div>
-          ))}
+const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
+return (
+<Modal open={true} onClose={onClose} title="Printable Deck Sheet">
+<div className="space-y-4">
+  <div className="text-xl font-semibold">{deck.name}</div>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    {entries.map((e) => (
+      <div key={deckKey(e.card)} className="flex items-center gap-2">
+        <div className="w-14 h-20 bg-gray-800 rounded-md overflow-hidden border border-gray-700">
+          <img src={e.card._rawImage || FALLBACK_IMG} alt={e.card.name} className="w-full h-full object-cover" />
         </div>
+        <div className="flex-1">
+          <div className="font-semibold">{e.card.name}</div>
+          <div className="text-xs text-gray-400">
+            {e.card.set} • #{e.card.number} • Cost {getCost(e.card)}
+          </div>
+        </div>
+        <div className="text-lg font-bold w-8 text-right">{e.count}×</div>
       </div>
-    </Modal>
-  );
+    ))}
+  </div>
+</div>
+</Modal>
+);
 }
 
 // Root App -------------------------------------------------------------------
 
 export default function App() {
-  const { addToast } = useToasts();
-  const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
-  const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
-  const [allCards, setAllCards] = useState([]);
-  const [shownCards, setShownCards] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [inspectCard, setInspectCard] = useState(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [printOpen, setPrintOpen] = useState(false);
+const { addToast } = useToasts();
+const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
+const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
+const [allCards, setAllCards] = useState([]);
+const [shownCards, setShownCards] = useState([]);
+const [loading, setLoading] = useState(true);
+const [inspectCard, setInspectCard] = useState(null);
+const [exportOpen, setExportOpen] = useState(false);
+const [importOpen, setImportOpen] = useState(false);
+const [printOpen, setPrintOpen] = useState(false);
 
-  // Load all cards once
-  useEffect(() => {
-    let abort = new AbortController();
-    (async () => {
-      setLoading(true);
-      const cached = loadLS(LS_KEYS.CACHE_CARDS, []);
-      if (cached?.length) {
-        setAllCards(cached);
-        setLoading(false);
-      }
-      try {
-        const data = await fetchAllCards({ signal: abort.signal });
-        setAllCards(data);
-        saveLS(LS_KEYS.CACHE_CARDS, data);
-      } catch (e) {
-        addToast("Failed to load cards; working from cache if available", "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => abort.abort();
-  }, [addToast]);
+// Load all cards once
+useEffect(() => {
+let abort = new AbortController();
+(async () => {
+setLoading(true);
+const cached = loadLS(LS_KEYS.CACHE_CARDS, []);
+if (cached?.length) {
+  setAllCards(cached);
+  setLoading(false);
+}
+try {
+  const data = await fetchAllCards({ signal: abort.signal });
+  setAllCards(data);
+  saveLS(LS_KEYS.CACHE_CARDS, data);
+} catch (e) {
+  addToast("Failed to load cards; working from cache if available", "error");
+} finally {
+  setLoading(false);
+}
+})();
+return () => abort.abort();
+}, [addToast]);
 
-  
 // Apply filters (always local; cards always visible, then filtered)
-  useEffect(() => {
-    const run = debounce(() => {
-      const list = applyFilters(allCards, filters);
-      setShownCards(list);
-    }, 50);
-    run();
-  }, [allCards, filters]);
+useEffect(() => {
+const run = debounce(() => {
+// Always show cards, only filter if there are active filters
+const hasActiveFilters = filters.text?.trim() || 
+                       filters.inks?.size || 
+                       filters.rarities?.size || 
+                       filters.types?.size || 
+                       filters.sets?.size || 
+                       filters.costMin > 0 || 
+                       filters.costMax < 10 || 
+                       filters.showInkablesOnly;
+
+if (hasActiveFilters) {
+  const list = applyFilters(allCards, filters);
+  setShownCards(list);
+} else {
+  // No active filters - show all cards
+  setShownCards(allCards);
+}
+}, 50);
+run();
+}, [allCards, filters]);
+
 const deckValid =
-    deck.total >= DECK_RULES.MIN_SIZE && deck.total <= DECK_RULES.MAX_SIZE;
+deck.total >= DECK_RULES.MIN_SIZE && deck.total <= DECK_RULES.MAX_SIZE;
 
-  function handleAdd(card) {
-    deckDispatch({ type: "ADD", card, count: 1 });
-  }
-  function handleSetCount(card, count) {
-    deckDispatch({ type: "SET_COUNT", card, count });
-  }
-  function handleRemove(card) {
-    deckDispatch({ type: "REMOVE", card });
-  }
+function handleAdd(card) {
+deckDispatch({ type: "ADD", card, count: 1 });
+}
+function handleSetCount(card, count) {
+deckDispatch({ type: "SET_COUNT", card, count });
+}
+function handleRemove(card) {
+deckDispatch({ type: "REMOVE", card });
+}
 
-  function handleExport() {
-    setExportOpen(true);
-  }
-  function handleImport() {
-    setImportOpen(true);
-  }
-  function handleDoImport(obj) {
-    deckDispatch({ type: "IMPORT_STATE", deck: obj });
-    addToast("Deck imported", "success");
-  }
-  function handleResetDeck() {
-    if (confirm("Start a new deck? This will clear the current deck.")) {
-      deckDispatch({ type: "RESET" });
-      addToast("New deck started", "success");
-    }
-  }
-  function handlePrint() {
-    setPrintOpen(true);
-  }
+function handleExport() {
+setExportOpen(true);
+}
+function handleImport() {
+setImportOpen(true);
+}
+function handleDoImport(obj) {
+deckDispatch({ type: "IMPORT_STATE", deck: obj });
+addToast("Deck imported", "success");
+}
+function handleResetDeck() {
+if (confirm("Start a new deck? This will clear the current deck.")) {
+deckDispatch({ type: "RESET" });
+addToast("New deck started", "success");
+}
+}
+function handlePrint() {
+setPrintOpen(true);
+}
 
-  // Keyboard shortcuts (basic)
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "f" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        filterDispatch({ type: "TOGGLE_PANEL" });
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+// Keyboard shortcuts (basic)
+useEffect(() => {
+const onKey = (e) => {
+if (e.key === "f" && (e.ctrlKey || e.metaKey)) {
+  e.preventDefault();
+  filterDispatch({ type: "TOGGLE_PANEL" });
+}
+};
+window.addEventListener("keydown", onKey);
+return () => window.removeEventListener("keydown", onKey);
+}, []);
 
-  return (
-    <ToastProvider>
-      <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
-        <TopBar
-          deckName={deck.name}
-          onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
-          onResetDeck={handleResetDeck}
-          onExport={handleExport}
-          onImport={handleImport}
-          onPrint={handlePrint}
-        />
+return (
+<ToastProvider>
+<div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
+  <TopBar
+    deckName={deck.name}
+    onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
+    onResetDeck={handleResetDeck}
+    onExport={handleExport}
+    onImport={handleImport}
+    onPrint={handlePrint}
+  />
 
-        {filters.showFilterPanel && (
-          <FilterPanel
-            state={filters}
-            dispatch={filterDispatch}
-            onDone={() => filterDispatch({ type: "TOGGLE_PANEL" })}
-          />
-        )}
+  {filters.showFilterPanel && (
+    <FilterPanel
+      state={filters}
+      dispatch={filterDispatch}
+      onDone={() => filterDispatch({ type: "TOGGLE_PANEL" })}
+    />
+  )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px]">
-          <div>
-            {loading ? (
-              <div className="p-6 text-center text-gray-400">Loading cards…</div>
-            ) : shownCards.length ? (
-              <CardGrid
-                cards={shownCards}
-                onAdd={handleAdd}
-                onInspect={(c) => setInspectCard(c)}
-              />
-            ) : (
-              <div className="p-6 text-center text-gray-400">No cards match your filters.</div>
-            )}
-          </div>
-          <div className="border-l border-gray-800 min-h-[60vh]">
-            <DeckPanel
-              deck={deck}
-              onSetCount={handleSetCount}
-              onRemove={handleRemove}
-              onExport={() => setExportOpen(true)}
-              onImport={() => setImportOpen(true)}
-            />
-            <DeckStats deck={deck} />
-            <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
-              {deckValid
-                ? "Deck is valid."
-                : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
-            </div>
-          </div>
-        </div>
-
-        <InspectCardModal
-          open={!!inspectCard}
-          card={inspectCard}
-          onClose={() => setInspectCard(null)}
+  <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px]">
+    <div>
+      {loading ? (
+        <div className="p-6 text-center text-gray-400">Loading cards…</div>
+      ) : shownCards.length ? (
+        <CardGrid
+          cards={shownCards}
           onAdd={handleAdd}
+          onInspect={(c) => setInspectCard(c)}
         />
-        <ExportModal open={exportOpen} deck={deck} onClose={() => setExportOpen(false)} />
-        <ImportModal
-          open={importOpen}
-          onClose={() => setImportOpen(false)}
-          onImport={handleDoImport}
-        />
-        {printOpen && <PrintableSheet deck={deck} onClose={() => setPrintOpen(false)} />}
+      ) : (
+        <div className="p-6 text-center text-gray-400">No cards match your filters.</div>
+      )}
+    </div>
+    <div className="border-l border-gray-800 min-h-[60vh]">
+      <DeckPanel
+        deck={deck}
+        onSetCount={handleSetCount}
+        onRemove={handleRemove}
+        onExport={() => setExportOpen(true)}
+        onImport={() => setImportOpen(true)}
+      />
+      <DeckStats deck={deck} />
+      <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
+        {deckValid
+          ? "Deck is valid."
+          : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
       </div>
-    </ToastProvider>
-  );
+    </div>
+  </div>
+
+  <InspectCardModal
+    open={!!inspectCard}
+    card={inspectCard}
+    onClose={() => setInspectCard(null)}
+    onAdd={handleAdd}
+  />
+  <ExportModal open={exportOpen} deck={deck} onClose={() => setExportOpen(false)} />
+  <ImportModal
+    open={importOpen}
+    onClose={() => setImportOpen(false)}
+    onImport={handleDoImport}
+  />
+  {printOpen && <PrintableSheet deck={deck} onClose={() => setPrintOpen(false)} />}
+</div>
+</ToastProvider>
+);
 }
 
 // -----------------------------------------------------------------------------
@@ -1536,83 +1552,84 @@ const deckValid =
 // -----------------------------------------------------------------------------
 
 function applyFilters(cards, filters) {
-  let list = cards.slice();
+let list = cards.slice();
 
-  if (filters.text) {
-    const q = filters.text.toLowerCase();
-    list = list.filter((c) => {
-      return (
-        c.name?.toLowerCase().includes(q) ||
-        c.text?.toLowerCase().includes(q) ||
-        c.type?.toLowerCase().includes(q) ||
-        c.rarity?.toLowerCase().includes(q) ||
-        c.set?.toLowerCase().includes(q)
-      );
-    });
-  }
+// Only apply text filter if there's actual search text
+if (filters.text && filters.text.trim()) {
+const q = filters.text.toLowerCase().trim();
+list = list.filter((c) => {
+return (
+  c.name?.toLowerCase().includes(q) ||
+  c.text?.toLowerCase().includes(q) ||
+  c.type?.toLowerCase().includes(q) ||
+  c.rarity?.toLowerCase().includes(q) ||
+  c.set?.toLowerCase().includes(q)
+);
+});
+}
 
-  if (filters.inks?.size) {
-    list = list.filter((c) => {
-      const inks = new Set(getInks(c));
-      for (const i of filters.inks) {
-        if (inks.has(i)) return true;
-      }
-      return false;
-    });
-  }
+if (filters.inks?.size) {
+list = list.filter((c) => {
+const inks = new Set(getInks(c));
+for (const i of filters.inks) {
+  if (inks.has(i)) return true;
+}
+return false;
+});
+}
 
-  if (filters.rarities?.size) {
-    list = list.filter((c) => filters.rarities.has(c.rarity));
-  }
+if (filters.rarities?.size) {
+list = list.filter((c) => filters.rarities.has(c.rarity));
+}
 
-  if (filters.types?.size) {
-    list = list.filter((c) => filters.types.has(c.type));
-  }
+if (filters.types?.size) {
+list = list.filter((c) => filters.types.has(c.type));
+}
 
-  if (filters.sets?.size) {
-    list = list.filter((c) => filters.sets.has(c.set) || filters.sets.has(c.set?.code));
-  }
+if (filters.sets?.size) {
+list = list.filter((c) => filters.sets.has(c.set) || filters.sets.has(c.set?.code));
+}
 
-  list = list.filter((c) => {
-    const cost = getCost(c);
-    return cost >= filters.costMin && cost <= filters.costMax;
-  });
+list = list.filter((c) => {
+const cost = getCost(c);
+return cost >= filters.costMin && cost <= filters.costMax;
+});
 
-  if (filters.showInkablesOnly) {
-    list = list.filter((c) => {
-      // Heuristic: card has "inkable" boolean || inkable in text
-      if (typeof c._raw?.inkable === "boolean") return c._raw.inkable;
-      if (typeof c.inkable === "boolean") return c.inkable;
-      return /inkable/i.test(c.text || "");
-    });
-  }
+if (filters.showInkablesOnly) {
+list = list.filter((c) => {
+// Heuristic: card has "inkable" boolean || inkable in text
+if (typeof c._raw?.inkable === "boolean") return c._raw.inkable;
+if (typeof c.inkable === "boolean") return c.inkable;
+return /inkable/i.test(c.text || "");
+});
+}
 
-  list.sort((a, b) => {
-    const dir = filters.sortDir === "desc" ? -1 : 1;
-    switch (filters.sortBy) {
-      case "cost":
-        return (getCost(a) - getCost(b)) * dir;
-      case "set": {
-        const sa = `${a.set}-${a.number}`;
-        const sb = `${b.set}-${b.number}`;
-        return sa.localeCompare(sb) * dir;
-      }
-      case "rarity":
-        return (rarityWeight(a.rarity) - rarityWeight(b.rarity)) * dir;
-      case "name":
-      default:
-        return a.name.localeCompare(b.name) * dir;
-    }
-  });
+list.sort((a, b) => {
+const dir = filters.sortDir === "desc" ? -1 : 1;
+switch (filters.sortBy) {
+case "cost":
+  return (getCost(a) - getCost(b)) * dir;
+case "set": {
+  const sa = `${a.set}-${a.number}`;
+  const sb = `${b.set}-${b.number}`;
+  return sa.localeCompare(sb) * dir;
+}
+case "rarity":
+  return (rarityWeight(a.rarity) - rarityWeight(b.rarity)) * dir;
+case "name":
+default:
+  return a.name.localeCompare(b.name) * dir;
+}
+});
 
-  return list;
+return list;
 }
 
 function rarityWeight(r) {
-  const idx = RARITIES.findIndex((x) => x.toLowerCase() === (r || "").toLowerCase());
-  return idx === -1 ? 999 : idx;
+const idx = RARITIES.findIndex((x) => x.toLowerCase() === (r || "").toLowerCase());
+return idx === -1 ? 999 : idx;
 }
 
 // -----------------------------------------------------------------------------
 // End of file
-// -----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------- 
