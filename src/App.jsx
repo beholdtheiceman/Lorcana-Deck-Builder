@@ -19,6 +19,7 @@ import {
  *  - Normalizes records for UI
  * ========================================================================== */
 const LORCAST_BASE = "https://api.lorcast.com/v0";
+const LORCAST_HOST = (()=>{ try{ return LORCAST_HOST }catch{ return "lorcast.api" } })();
 
 /** Build Lorcast search string (q=) */
 function buildLorcastQ({
@@ -188,6 +189,22 @@ function useUrlSync(filters, setters){
     const qs = sp.toString(); const url = qs ? `?${qs}` : window.location.pathname;
     window.history.replaceState({}, "", url);
   },[q,textSearch,keywords,archetype,colors,types,cost,rarity,setName,format,pagesize,orderby,sortdirection]);
+}
+
+
+function ErrorBoundary({ children }){
+  const [err,setErr] = React.useState(null);
+  if (err) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1d] text-white p-4">
+        <h1 className="text-xl font-semibold mb-3">Lorcana Deck Builder</h1>
+        <div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">
+          App error: {String(err)}
+        </div>
+      </div>
+    );
+  }
+  return React.createElement(React.Fragment, { children }, children);
 }
 
 /** ==========================================================================
@@ -427,7 +444,7 @@ useEffect(()=>{
       <div className="p-4 border-b border-white/10 flex items-center gap-3">
         <h1 className="text-xl font-semibold">Lorcana Deck Builder</h1>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:inline text-xs text-white/60">Data: {new URL(LORCAST_BASE).host}</span>
+          <span className="hidden sm:inline text-xs text-white/60">Data: {LORCAST_HOST}</span>
           <button className="sm:hidden px-3 py-2 rounded-md border border-white/10 bg-white/5" onClick={()=>setDeckOpen(true)}>
             Open Deck ({totalDeckCards})
           </button>
