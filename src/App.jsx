@@ -1383,49 +1383,59 @@ const [printOpen, setPrintOpen] = useState(false);
 
 // Load all cards once
 useEffect(() => {
-let abort = new AbortController();
-(async () => {
-setLoading(true);
-const cached = loadLS(LS_KEYS.CACHE_CARDS, []);
-if (cached?.length) {
-  setAllCards(cached);
-  setLoading(false);
-}
-try {
-  const data = await fetchAllCards({ signal: abort.signal });
-  setAllCards(data);
-  saveLS(LS_KEYS.CACHE_CARDS, data);
-} catch (e) {
-  addToast("Failed to load cards; working from cache if available", "error");
-} finally {
-  setLoading(false);
-}
-})();
-return () => abort.abort();
+  let abort = new AbortController();
+  (async () => {
+    setLoading(true);
+    const cached = loadLS(LS_KEYS.CACHE_CARDS, []);
+    console.log('Debug - cached cards length:', cached.length);
+    if (cached?.length) {
+      setAllCards(cached);
+      setLoading(false);
+    }
+    try {
+      const data = await fetchAllCards({ signal: abort.signal });
+      console.log('Debug - fetched cards length:', data.length);
+      setAllCards(data);
+      saveLS(LS_KEYS.CACHE_CARDS, data);
+    } catch (e) {
+      console.error('Debug - fetch error:', e);
+      addToast("Failed to load cards; working from cache if available", "error");
+    } finally {
+      setLoading(false);
+    }
+  })();
+  return () => abort.abort();
 }, [addToast]);
 
 // Apply filters (always local; cards always visible, then filtered)
 useEffect(() => {
-const run = debounce(() => {
-// Always show cards, only filter if there are active filters
-const hasActiveFilters = filters.text?.trim() || 
-                       filters.inks?.size || 
-                       filters.rarities?.size || 
-                       filters.types?.size || 
-                       filters.sets?.size || 
-                       filters.costMin > 0 || 
-                       filters.costMax < 10 || 
-                       filters.showInkablesOnly;
-
-if (hasActiveFilters) {
-  const list = applyFilters(allCards, filters);
-  setShownCards(list);
-} else {
-  // No active filters - show all cards
-  setShownCards(allCards);
-}
-}, 50);
-run();
+  const run = debounce(() => {
+    console.log('Debug - allCards length:', allCards.length);
+    console.log('Debug - filters:', filters);
+    
+    // Always show cards, only filter if there are active filters
+    const hasActiveFilters = filters.text?.trim() || 
+                           filters.inks?.size || 
+                           filters.rarities?.size || 
+                           filters.types?.size || 
+                           filters.sets?.size || 
+                           filters.costMin > 0 || 
+                           filters.costMax !== 10 || 
+                           filters.showInkablesOnly;
+    
+    console.log('Debug - hasActiveFilters:', hasActiveFilters);
+    
+    if (hasActiveFilters) {
+      const list = applyFilters(allCards, filters);
+      console.log('Debug - filtered list length:', list.length);
+      setShownCards(list);
+    } else {
+      // No active filters - show all cards
+      console.log('Debug - showing all cards, length:', allCards.length);
+      setShownCards(allCards);
+    }
+  }, 50);
+  run();
 }, [allCards, filters]);
 
 const deckValid =
