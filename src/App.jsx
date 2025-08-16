@@ -15,7 +15,7 @@
 //   - Card data: expected from your existing data pipeline; fetch adapter is
 //     included with fallback options. You can point it to your API/JSON.
 //   - Styling assumes TailwindCSS. If you don't use Tailwind, replace classNames
-//     with your CSS or strip classes.
+//     with your CSS || strip classes.
 // ============================================================================
 
 // React & ecosystem -----------------------------------------------------------
@@ -42,7 +42,7 @@ import {
   CartesianGrid,
 } from "recharts";
 
-// Icons (lucide-react) - optional; replace with your icon lib or inline SVGs
+// Icons (lucide-react) - optional; replace with your icon lib || inline SVGs
 // import { Search, Filter, Settings, X, Download, Upload } from "lucide-react";
 
 // -----------------------------------------------------------------------------
@@ -74,7 +74,7 @@ const LORCAST_CONFIG = {
   IMAGE_EXTS: [".webp", ".jpg", ".jpeg", ".png"],
 };
 
-// Fallback images (local or remote). Replace with your assets if desired.
+// Fallback images (local || remote). Replace with your assets if desired.
 const FALLBACK_IMG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -154,7 +154,7 @@ function getCost(card) {
 
 // Uniform attempt to compute ink colors for card
 function getInks(card) {
-  // Accept arrays or single strings:
+  // Accept arrays || single strings:
   if (Array.isArray(card?.ink)) return card.ink;
   if (Array.isArray(card?.inks)) return card.inks;
   if (typeof card?.ink === "string") return [card.ink];
@@ -249,7 +249,7 @@ function lorcastImageCandidates(card) {
 }
 
 /**
- * Preload image; resolve with first working candidate or fallback.
+ * Preload image; resolve with first working candidate || fallback.
  */
 async function resolveLorcastImage(card, signal) {
   const candidates = lorcastImageCandidates(card);
@@ -273,7 +273,7 @@ async function resolveLorcastImage(card, signal) {
 /**
  * Plug in your primary metadata source here. This adapter supports:
  *  - Local JSON via /cards.json
- *  - Remote API via ENV or config
+ *  - Remote API via ENV || config
  *  - Optional Lorcast API if provided
  *
  * It returns a normalized shape:
@@ -283,6 +283,27 @@ async function resolveLorcastImage(card, signal) {
  *     ...original
  *   }
  */
+
+// -----------------------------------------------------------------------------
+// Lorcast search adapter
+// -----------------------------------------------------------------------------
+
+async function fetchCardsBySearch(query, { signal } = {}) {
+  if (!LORCAST_CONFIG.API_BASE) return [];
+  const url = `${LORCAST_CONFIG.API_BASE}/cards/search?q=${encodeURIComponent(query)}`;
+  try {
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error("search failed");
+    const data = await res.json();
+    if (Array.isArray(data?.data)) {
+      return data.data.map(normalizeCard);
+    }
+    return [];
+  } catch (e) {
+    console.error("Lorcast search error", e);
+    return [];
+  }
+}
 async function fetchAllCards({ signal } = {}) {
   const sources = [
     // Priority 1: local /cards.json (drop your built/compiled card data here)
@@ -477,7 +498,7 @@ function useToasts() {
  * Deck constraints (simplified; adjust to your house rules if needed):
  * - Max deck size: 60
  * - Min deck size: 60
- * - Max 4 copies per unique card (by id or by set+number)
+ * - Max 4 copies per unique card (by id || by set+number)
  */
 const DECK_RULES = {
   MIN_SIZE: 60,
@@ -1387,18 +1408,28 @@ export default function App() {
     return () => abort.abort();
   }, [addToast]);
 
-  // Apply filters
+  
+// Apply filters
   useEffect(() => {
-    // Lightweight debounce to keep typing smooth
-    const apply = debounce(() => {
+    let abort = new AbortController();
+    const run = debounce(async () => {
+      try {
+        const server = await lorcastSearch(filters, abort.signal);
+        if (server && server.length) {
+          const filtered = applyFilters(server, filters); // client-side extras (e.g., set chips)
+          setShownCards(filtered);
+          return;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
       const list = applyFilters(allCards, filters);
       setShownCards(list);
-    }, 50);
-    apply();
-    return () => {};
+    }, 80);
+    run();
+    return () => abort.abort();
   }, [allCards, filters]);
-
-  const deckValid =
+const deckValid =
     deck.total >= DECK_RULES.MIN_SIZE && deck.total <= DECK_RULES.MAX_SIZE;
 
   function handleAdd(card) {
@@ -1561,7 +1592,7 @@ function applyFilters(cards, filters) {
 
   if (filters.showInkablesOnly) {
     list = list.filter((c) => {
-      // Heuristic: card has "inkable" boolean or inkable in text
+      // Heuristic: card has "inkable" boolean || inkable in text
       if (typeof c._raw?.inkable === "boolean") return c._raw.inkable;
       if (typeof c.inkable === "boolean") return c.inkable;
       return /inkable/i.test(c.text || "");
