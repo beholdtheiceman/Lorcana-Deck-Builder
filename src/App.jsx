@@ -210,7 +210,7 @@ function ErrorBoundary({ children }){
 /** ==========================================================================
  *  MAIN APP
  * ========================================================================== */
-export default function App(){
+function AppInner(){
   // Filters
   const [q,setQ]=useState(""); const [textSearch,setTextSearch]=useState("");
   const [keywords,setKeywords]=useState([]); const [archetype,setArchetype]=useState("");
@@ -805,5 +805,14 @@ function DeckPanel({
 
       <canvas ref={canvasRef} className="hidden" />
     </div>
+  );
+}
+
+/** Root wrapper to catch render errors */
+export default function Root(){
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
