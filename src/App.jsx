@@ -1,6 +1,6 @@
 // app.jsx
 // ============================================================================
-// Lorcana Deck Builder - Monolithic App File (~1500 lines).
+// Lorcana Deck Builder - Monolithic App File (~1500 lines)
 // Target: Restore "full" single-file app with all features and use Lorcast for images
 // Author: ChatGPT (GPT-5 Thinking)
 // Notes:
