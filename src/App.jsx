@@ -1093,7 +1093,7 @@ function DeckRow({ entry, onSetCount, onRemove }) {
       </div>
     </div>
   );
-},
+}
 function DeckStats({ deck }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
 
