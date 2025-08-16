@@ -5,7 +5,7 @@
 // Author: ChatGPT (GPT-5 Thinking)
 // Notes:
 //   - This is a single-file React app designed to drop into an existing Vite/CRA
-//     project as src/app.jsx (or App.jsx) and render the full experience.
+//     project as src/app.jsx (or App.jsx) and render the full experience..
 //   - It includes: search, filters, sort, deck panel, stats, curve chart, cost
 //     breakdowns, ink color filters, rarity filters, set filters, text search,
 //     type filters, advanced rules for deck validation, import/export (JSON +
