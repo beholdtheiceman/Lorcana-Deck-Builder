@@ -13,45 +13,62 @@ import {
 } from "recharts";
 
 /** ==========================================================================
- *  LORCAST-ONLY DATA PROVIDER
- *  - Hard-coded default base with optional runtime override (?lorcast=... or Set API button)
- *  - Tries common endpoints (/cards, /api/cards, /cards/search)
- *  - Normalizes card fields to a consistent shape used by the UI
+ *  LORCAST (PINNED) DATA PROVIDER
+ *  - Uses Lorcast's public API base: https://api.lorcast.com/v0
+ *  - Single endpoint: /cards/search?q=...
+ *  - Normalizes records for UI
  * ========================================================================== */
-const LORCAST_FIXED = "https://lorcast.vercel.app";
-const QS_LORCAST =
-  typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search).get("lorcast") || ""
-    : "";
-if (typeof window !== "undefined" && QS_LORCAST) {
-  try { localStorage.setItem("lorcast_base", QS_LORCAST); } catch {}
-}
-const LORCAST_OVERRIDE =
-  (typeof window !== "undefined" && localStorage.getItem("lorcast_base")) || "";
-const LORCAST_BASE = LORCAST_OVERRIDE || LORCAST_FIXED;
+const LORCAST_BASE = "https://api.lorcast.com/v0";
 
-function buildLorcastQuery({
-  q, colors, types, cost, set, rarity, text, keywords = [], archetype = "",
-  page = 1, pagesize = 24, orderby = "Color,Set_Num,Name", sortdirection = "ASC",
+/** Build Lorcast search string (q=) */
+function buildLorcastQ({
+  q, colors = [], types = [], cost = "Any", setName = "", rarity = "",
+  textSearch = "", keywords = [], archetype = "", format = "Infinity",
 }) {
-  const params = new URLSearchParams();
-  if (q) params.set("name", q);
-  if (text) params.set("text", text);
-  if (keywords.length) params.set("keywords", keywords.join(","));
-  if (archetype) params.set("archetype", archetype);
-  if (colors?.length) params.set("color", colors.join(","));
-  if (types?.length) params.set("type", types.join(",")); // includes "Song"
-  if (cost && cost !== "Any") params.set(cost === "9+" ? "minCost" : "cost", cost === "9+" ? "9" : String(cost));
-  if (set) params.set("set", set);
-  if (rarity) params.set("rarity", rarity);
-  params.set("page", String(page));
-  params.set("pageSize", String(pagesize));
-  params.set("sort", orderby.split(",").map(k => k.trim().toLowerCase().replace("set_num","setnumber")).join(","));
-  params.set("dir", (sortdirection || "ASC").toUpperCase());
-  return params;
+  const parts = [];
+
+  // Name
+  if (q) parts.push(`name:${quote(q)}`);
+
+  // Text in rules
+  if (textSearch) parts.push(`text:${quote(textSearch)}`);
+
+  // Keywords: require all
+  for (const kw of keywords) parts.push(`text:${quote(kw)}`);
+
+  // Archetype: search inside rules/name text
+  if (archetype) parts.push(`${quote(archetype)}`);
+
+  // Ink colors (OR within, AND across? We'll OR within multiple colors)
+  if (colors.length) parts.push(`color:${quote(colors.join("|"))}`);
+
+  // Types (OR)
+  if (types.length) parts.push(`type:${quote(types.join("|"))}`);
+
+  // Cost
+  if (cost && cost !== "Any") {
+    if (cost === "9+") parts.push(`cost>=9`);
+    else parts.push(`cost:${cost}`);
+  }
+
+  // Set exact name if provided
+  if (setName) parts.push(`set:${quote(setName)}`);
+
+  // Rarity
+  if (rarity) parts.push(`rarity:${quote(rarity)}`);
+
+  // Format (client-side filter for Standard Core to hide sets 1–4)
+  // We don't add to query; handled after fetch.
+
+  // Join with spaces (Lorcast treats spaces as AND)
+  const search = parts.join(" ").trim();
+  return search || "*";
 }
 
-function normalizeLorcastCard(x) {
+function quote(v){ return /[\s:"]/g.test(String(v)) ? `"${String(v).replace(/"/g, '\\"')}"` : String(v); }
+
+/** Normalize Lorcast card fields to the shape our UI expects */
+function normalizeCard(x) {
   const Name = x.Name ?? x.name ?? x.cardName ?? x.title ?? "";
   const Color = x.Color ?? x.color ?? x.ink ?? x.inkColor ?? "";
   const Cost = x.Cost ?? x.cost ?? x.inkCost ?? x.playCost ?? "";
@@ -59,28 +76,21 @@ function normalizeLorcastCard(x) {
   const Rarity = x.Rarity ?? x.rarity ?? "";
   const Set = x.Set ?? x.setName ?? x.set ?? "";
   const Set_Num = x.Set_Num ?? x.setNumber ?? x.number ?? x.collectorNumber ?? "";
-  const Image = x.Image ?? x.image ?? x.imageUrl ?? (x.images && (x.images.large || x.images.normal || x.images.small)) ?? "";
+  const Image = x.Image ?? x.image ?? x.imageUrl ?? (x.image_uris?.large || x.image_uris?.normal || x.images?.large || x.images?.normal || "") ?? "";
   const Rules = x.Rules ?? x.text ?? x.oracleText ?? x.rules ?? "";
   const Traits = x.Traits ?? x.traits ?? "";
   const Subtypes = x.Subtypes ?? x.subtypes ?? "";
   return { ...x, Name, Color, Cost, Type, Rarity, Set, Set_Num, Image, Rules, Traits, Subtypes };
 }
 
-async function fetchFromLorcast(query) {
-  const base = (LORCAST_BASE || "").replace(/\/+$/, "");
-  const endpoints = ["/cards", "/api/cards", "/cards/search"];
-  let lastErr;
-  for (const path of endpoints) {
-    const url = `${base}${path}?${query.toString()}`;
-    try {
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) { lastErr = new Error(`Lorcast ${res.status} on ${path}`); continue; }
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.results || []);
-      return list.map(normalizeLorcastCard);
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr || new Error("Lorcast request failed");
+/** Fetch from Lorcast: /cards/search?q=... */
+async function searchLorcast(q) {
+  const url = `${LORCAST_BASE.replace(/\/+$/, "")}/cards/search?q=${encodeURIComponent(q)}&unique=cards`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`Lorcast ${res.status}`);
+  const data = await res.json();
+  const list = Array.isArray(data) ? data : (data.results || []);
+  return list.map(normalizeCard);
 }
 
 /** ==========================================================================
@@ -108,7 +118,7 @@ function proxyImageUrl(src) {
   return `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg&il`;
 }
 const INKS = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
-const TYPES = ["Character","Action","Song","Item","Location"];
+const TYPES = ["Character","Song","Item","Location","Action"];
 const COSTS = ["Any","0","1","2","3","4","5","6","7","8","9+"];
 const RARITIES = ["Common","Uncommon","Rare","Super Rare","Legendary","Fabled"];
 const SETS = [
@@ -196,7 +206,7 @@ export default function App(){
   const [cards,setCards]=useState([]); const [loading,setLoading]=useState(false);
   const [err,setErr]=useState(""); const [page,setPage]=useState(1);
   const [pagesize,setPagesize]=useState(24); const [orderby,setOrderby]=useState("Color,Set_Num,Name");
-  const [sortdirection,setSortdirection]=useState("ASC"); const [hasMore,setHasMore]=useState(true);
+  const [sortdirection,setSortdirection]=useState("ASC"); const [hasMore,setHasMore]=useState(false);
 
   // Deck
   const [deck,setDeck]=useState({}); const [lastAddedKey,setLastAddedKey]=useState("");
@@ -251,16 +261,12 @@ export default function App(){
     return ()=>window.removeEventListener("keydown", onKey);
   },[lastAddedKey,push]);
 
-  /** Fetch (Lorcast-only) */
+  /** Fetch (Lorcast pinned) */
   async function fetchCards(filters){
-    const key = { provider:"lorcast", base:LORCAST_BASE||"(unset)", ...filters };
+    const key = { provider:"lorcast-pinned", ...filters };
     const cached = getCached(key); if (cached) return cached;
-    const data = await fetchFromLorcast(buildLorcastQuery({
-      q:filters.q, colors:filters.colors, types:filters.types, cost:filters.cost,
-      set:filters.setName||undefined, rarity:filters.rarity||undefined, text:filters.textSearch||undefined,
-      keywords:filters.keywords||[], archetype:filters.archetype||"",
-      page:filters.page, pagesize:filters.pagesize, orderby:filters.orderby, sortdirection:filters.sortdirection,
-    }));
+    const qstr = buildLorcastQ(filters);
+    const data = await searchLorcast(qstr);
     setCached(key,data); return data;
   }
 
@@ -273,49 +279,82 @@ export default function App(){
     if(rarity && String(c.Rarity||"").toLowerCase()!==rarity.toLowerCase()) return false;
     if(setName && String(c.Set||"").toLowerCase()!==setName.toLowerCase()) return false;
     if(textSearch && !blob.includes(textSearch.toLowerCase())) return false;
+    if(colors.length && !colors.includes(String(c.Color||""))) return false;
+    if(types.length && !types.includes(String(c.Type||""))) return false;
+    if(cost!=="Any"){ const cc=Number(c.Cost||0); if(cost==="9+") { if(cc<9) return false; } else if(cc!==Number(cost)) return false; }
+    if (q && !String(c.Name||"").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   }
 
   // Debounced initial fetch / refetch
-  const [hasFetchedOnce,setHasFetchedOnce]=useState(false);
-  useEffect(()=>{
-    clearTimeout(debounceRef.current);
-    setLoading(TrueFix(false)); // intentionally force boolean to avoid terser issues
-  },[]);
-
-  function TrueFix(v){ return v; } // tiny helper to keep boolean type
-
+  const debounceRef = useRef(0);
   useEffect(()=>{
     clearTimeout(debounceRef.current);
     setLoading(true); setErr("");
     debounceRef.current = setTimeout(async ()=>{
       try{
-        const first = await fetchCards({ q,textSearch,keywords,archetype,colors,types,cost,rarity,setName,page:1,pagesize,orderby,sortdirection });
+        const first = await fetchCards({ q,textSearch,keywords,archetype,colors,types,cost,rarity,setName,format });
         const filtered = first.filter(passesFormat).filter(passesClient);
-        setCards(filtered); setPage(1); setHasMore(first.length===pagesize); setHasFetchedOnce(true);
-      }catch(e){ setErr(e?.message||"Failed to load cards"); setCards([]); setHasMore(false); }
+        // Sort client-side (since Lorcast /search doesn't give custom sorts)
+        filtered.sort(sorter(orderby, sortdirection));
+        setCards(filtered.slice(0, pagesize));
+        setPage(1);
+        setHasMore(filtered.length > pagesize);
+      }catch(e){ setErr(e?.message||"Failed to fetch"); setCards([]); setHasMore(false); }
       finally{ setLoading(false); }
-    },250);
+    }, 250);
     return ()=>clearTimeout(debounceRef.current);
   },[q,textSearch,keywords.join("|"),archetype,colors.join("|"),types.join("|"),cost,rarity,setName,format,pagesize,orderby,sortdirection]);
 
-  // Infinite scroll
+  // Load more (client side, since API doesn't paginate)
   useEffect(()=>{
     if(!sentinelRef.current) return;
     const io = new IntersectionObserver(async ([ent])=>{
-      if(!ent.isIntersecting || loading || !hasMore || !hasFetchedOnce) return;
+      if(!ent.isIntersecting || loading || !hasMore) return;
       try{
         setLoading(true);
-        const next = page+1;
-        const data = await fetchCards({ q,textSearch,keywords,archetype,colors,types,cost,rarity,setName,page:next,pagesize,orderby,sortdirection });
-        const filtered = data.filter(passesFormat).filter(passesClient);
-        setCards(prev=>[...prev,...filtered]); setPage(next); setHasMore(data.length===pagesize);
-      }catch(e){ setErr(e?.message||"Failed to load more"); setHasMore(false); }
+        const start = page * pagesize;
+        const next = cards.slice(0, start + pagesize);
+        // Since we already hold filtered+sorted in cards state, just slice more
+        setCards(prev => {
+          const all = prev.__all || prev; // safety
+          const arr = (prev.__all || prev).slice(0, start + pagesize);
+          arr.__all = all;
+          return arr;
+        });
+        setPage(p => p+1);
+        setHasMore(cards.__all ? cards.__all.length > start + pagesize : false);
+      }catch(e){ /* ignore */ }
       finally{ setLoading(false); }
     },{ rootMargin:"600px 0px" });
     io.observe(sentinelRef.current);
     return ()=>io.disconnect();
-  },[page,loading,hasMore,hasFetchedOnce,q,textSearch,keywords.join("|"),archetype,colors.join("|"),types.join("|"),cost,rarity,setName,format,pagesize,orderby,sortdirection]);
+  },[page,loading,hasMore,cards,pagesize]);
+
+  // Sorting helper
+  function sorter(order, dir){
+    const asc = (a,b)=>a<b?-1:a>b?1:0;
+    const desc = (a,b)=>-asc(a,b);
+    return (a,b)=>{
+      let r=0;
+      if (order==="Name") r = asc(String(a.Name||""), String(b.Name||""));
+      else if (order==="Cost,Name"){
+        const ca=Number(a.Cost||0), cb=Number(b.Cost||0);
+        r = ca===cb ? asc(String(a.Name||""),String(b.Name||"")) : (ca - cb);
+      } else if (order==="Set_Num,Name"){
+        const sa=Number(a.Set_Num||0), sb=Number(b.Set_Num||0);
+        r = sa===sb ? asc(String(a.Name||""),String(b.Name||"")) : (sa - sb);
+      } else { // Color,Set_Num,Name
+        const ia=String(a.Color||""), ib=String(b.Color||"");
+        r = ia===ib ? 0 : asc(ia,ib);
+        if (r===0){
+          const sa=Number(a.Set_Num||0), sb=Number(b.Set_Num||0);
+          r = sa===sb ? asc(String(a.Name||""),String(b.Name||"")) : (sa - sb);
+        }
+      }
+      return dir==="DESC"? -r : r;
+    };
+  }
 
   // Deck helpers
   function addToDeck(card,inc=1){ const key=cardKey(card); setDeck(prev=>{ const ex=prev[key]; const n=Math.max(0,(ex?.__count||0)+inc); if(n===0){ const cp={...prev}; delete cp[key]; return cp;} return {...prev,[key]:{...card,__count:n}}; }); setLastAddedKey(key); }
@@ -335,16 +374,13 @@ export default function App(){
     return issues;
   },[deck,totalDeckCards]);
 
-  // Sorting for UI render
-  const sorted = useMemo(()=>{
-    const copy = cards.slice();
-    copy.sort((a,b)=>{
-      const ia=String(a.Color||""), ib=String(b.Color||""); if(ia!==ib) return ia.localeCompare(ib);
-      const sa=Number(a.Set_Num??0), sb=Number(b.Set_Num??0); if(sa!==sb) return sa-sb;
-      return String(a.Name||"").localeCompare(String(b.Name||""));
-    });
-    return copy;
-  },[cards]);
+  // Sorted render list (and stash full filtered list in __all for "load more")
+  const displayCards = useMemo(()=>{
+    const sortedAll = cards.slice().sort(sorter(orderby, sortdirection));
+    const first = sortedAll.slice(0, pagesize);
+    first.__all = sortedAll; // store complete set for infinite "slice"
+    return first;
+  },[cards,orderby,sortdirection,pagesize]);
 
   // Export helpers
   function triggerDownload(url, filename){ const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL?.(url),2000); }
@@ -394,10 +430,6 @@ export default function App(){
         <h1 className="text-xl font-semibold">Lorcana Deck Builder</h1>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden sm:inline text-xs text-white/60">Data: {new URL(LORCAST_BASE).host}</span>
-          <button className="px-3 py-2 rounded-md border border-white/10 bg-white/5 hover:bg-white/10"
-            onClick={()=>{ const v=prompt("Lorcast Base URL (e.g. https://api.your-lorcast.com):", LORCAST_BASE||""); if(v!==null){ try{ localStorage.setItem("lorcast_base", v.trim()); }catch{} window.location.reload(); } }}>
-            Set API
-          </button>
           <button className="sm:hidden px-3 py-2 rounded-md border border-white/10 bg-white/5" onClick={()=>setDeckOpen(true)}>
             Open Deck ({totalDeckCards})
           </button>
@@ -431,8 +463,8 @@ export default function App(){
           {err && (<div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">{err}</div>)}
 
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-            {sorted.map((c)=>(
-              <button key={`${c.Set_ID}-${c.Name}-${c.Image}-${c.Set_Num}`}
+            {(displayCards.__all || displayCards).map((c, idx)=>(
+              <button key={`${c.Set_ID}-${c.Name}-${c.Image}-${c.Set_Num}-${idx}`}
                 className="bg-[#0f1320] rounded-lg overflow-hidden border border-white/10 text-left hover:border-white/20 transition"
                 title="Click to add to deck"
                 onClick={()=>{ addToDeck(c,1); push(`Added ${c.Name}`,"success"); }}
@@ -453,7 +485,7 @@ export default function App(){
 
           <div ref={sentinelRef} className="h-8" />
           {loading && <div className="text-white/60 mt-2">Loading…</div>}
-          {!loading && !sorted.length && <div className="text-white/60 mt-2">0 results</div>}
+          {!loading && !(displayCards.__all || displayCards).length && <div className="text-white/60 mt-2">0 results</div>}
         </div>
 
         {/* Deck panel (desktop) */}
@@ -478,7 +510,7 @@ export default function App(){
       {/* Mobile bottom sheet */}
       {deckOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60" onClick={()=>setDeckOpen(FalseFix(false))} />
+          <div className="absolute inset-0 bg-black/60" onClick={()=>setDeckOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 max-h-[85%] bg-[#0b1120] border-t border-white/10 rounded-t-2xl p-3 overflow-auto">
             <div className="flex items-center mb-2">
               <h2 className="text-lg font-semibold">Your Deck ({totalDeckCards})</h2>
@@ -618,7 +650,7 @@ export default function App(){
                 <div className="md:w-1/2 p-4">
                   <div className="flex items-start gap-2">
                     <h4 className="text-lg font-semibold">{modalCard.Name}</h4>
-                    <button className="ml-auto px-2 py-1 rounded-md bg-white/10 hover:bg-white/20" onClick={()=>setModalCard(null)}>✕</button>
+                    <button className="ml-auto px-2 py-1 rounded-md bg:white/10 hover:bg-white/20" onClick={()=>setModalCard(null)}>✕</button>
                   </div>
                   <div className="text-sm text-white/70 mt-1">{modalCard.Color ?? "—"} · Cost {modalCard.Cost ?? "—"} · {modalCard.Rarity ?? "—"}</div>
                   <div className="text-sm text-white/60 mt-3 whitespace-pre-wrap">{modalCard.Rules || "—"}</div>
@@ -642,6 +674,10 @@ export default function App(){
 /** ==========================================================================
  *  SMALL COMPONENTS
  * ========================================================================== */
+function toggleSel(list, setList, value){
+  setList(list.includes(value) ? list.filter(v=>v!==value) : [...list, value]);
+}
+
 function KeywordInput({ values, setValues }){
   const [input,setInput]=useState("");
   function add(val){ const v=val.trim(); if(!v) return; if(values.includes(v)) return; setValues([...values,v]); setInput(""); }
