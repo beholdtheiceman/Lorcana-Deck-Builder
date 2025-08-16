@@ -1168,23 +1168,18 @@ function DeckStats({ deck }) {
       <ChartCard title="Types">
         <div className="w-full h-56">
           <ResponsiveContainer width="100%" height="100%">
-          // ... existing code from previous message ...
-
-<ChartCard title="Types">
-  <div className="w-full h-56">
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={typeCounts}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="type" />
-        <YAxis allowDecimals={false} />
-        <Tooltip />
-        <Bar dataKey="count" />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-</ChartCard>
-</div>
-);
+            <BarChart data={typeCounts}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="type" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartCard>
+    </div>
+  );
 }
 
 function StatCard({ title, value, subtitle }) {
