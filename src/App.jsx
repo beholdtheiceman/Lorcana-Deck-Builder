@@ -1409,25 +1409,13 @@ export default function App() {
   }, [addToast]);
 
   
-// Apply filters
+// Apply filters (always local; cards always visible, then filtered)
   useEffect(() => {
-    let abort = new AbortController();
-    const run = debounce(async () => {
-      try {
-        const server = await lorcastSearch(filters, abort.signal);
-        if (server && server.length) {
-          const filtered = applyFilters(server, filters); // client-side extras (e.g., set chips)
-          setShownCards(filtered);
-          return;
-        }
-      } catch (e) {
-        console.warn(e);
-      }
+    const run = debounce(() => {
       const list = applyFilters(allCards, filters);
       setShownCards(list);
-    }, 80);
+    }, 50);
     run();
-    return () => abort.abort();
   }, [allCards, filters]);
 const deckValid =
     deck.total >= DECK_RULES.MIN_SIZE && deck.total <= DECK_RULES.MAX_SIZE;
