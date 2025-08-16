@@ -285,10 +285,8 @@ export default function App(){
     if (q && !String(c.Name||"").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   }
-
   // Debounced initial fetch / refetch
-  const debounceRef = useRef(0);
-  useEffect(()=>{
+useEffect(()=>{
     clearTimeout(debounceRef.current);
     setLoading(true); setErr("");
     debounceRef.current = setTimeout(async ()=>{
