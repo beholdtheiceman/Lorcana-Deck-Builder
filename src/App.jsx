@@ -478,7 +478,7 @@ useEffect(()=>{
           {err && (<div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">{err}</div>)}
 
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-            {(displayCards.__all || displayCards).map((c, idx)=>(
+            {(((displayCards && displayCards.__all) ? displayCards.__all : displayCards) || []).map((c, idx)=>(
               <button key={`${c.Set_ID}-${c.Name}-${c.Image}-${c.Set_Num}-${idx}`}
                 className="bg-[#0f1320] rounded-lg overflow-hidden border border-white/10 text-left hover:border-white/20 transition"
                 title="Click to add to deck"
