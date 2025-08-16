@@ -54,34 +54,16 @@ const APP_VERSION = "1.0.1-lorcast-monolith+api";
 // Lorcast configuration: tweak if your endpoints/CDN differ.
 // We intentionally implement a robust resolver that tries multiple URL shapes
 // commonly used by Lorcast mirrors/CDNs. You can tailor this as needed.
-const LORCAST_CONFIG = {
-  // Example API base for metadata. If you already have your own card API,
-  // keep that and only use the image resolver below.
-  // Leaving this as null means "don't fetch cards from Lorcast; only resolve images."
-  API_BASE: "https://api.lorcast.com/v0",
-
-  // Common image base paths seen in community projects:
-  IMAGE_BASES: [
-    // Primary guess (adjust to match your known working URLs)
-    "https://media.lorcast.com/images/cards/",
-    "https://cdn.lorcast.com/images/cards/",
-    "https://static.lorcast.com/cards/",
-    // Generic backup pattern
-    "https://lorcast-media.sfo3.cdn.digitaloceanspaces.com/cards/",
-  ],
-
-  // File extensions we'll try in order
-  IMAGE_EXTS: [".webp", ".jpg", ".jpeg", ".png"],
-};
 
 // Fallback images (local || remote). Replace with your assets if desired.
+// Simple fallback for when Lorcast API has no image
 const FALLBACK_IMG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="420">
       <rect width="100%" height="100%" fill="#111"/>
       <text x="50%" y="50%" fill="#999" font-family="Arial" font-size="16" text-anchor="middle">
-        Image unavailable
+        No image available
       </text>
     </svg>`
   );
@@ -95,17 +77,17 @@ const RARITIES = ["Common", "Uncommon", "Rare", "Super Rare", "Legendary", "Fabl
 // Card types (simplified). Adjust to your schema.
 const CARD_TYPES = ["Character", "Action", "Item", "Location", "Song", "Floodborn", "Shift"];
 
-// Sets (simplified); replace with your canonical list as needed
+// Sets (official Lorcana set names)
 const SETS = [
   { code: "TFC", name: "The First Chapter" },
   { code: "ROC", name: "Rise of the Floodborn" },
   { code: "IAT", name: "Into the Inklands" },
   { code: "URS", name: "Ursula's Return" },
-  { code: "ITI", name: "Into the Inklands (Intl Variant)" },
-  { code: "ST6", name: "Set 6" },
-  { code: "ST7", name: "Set 7" },
-  { code: "ST8", name: "Set 8" },
-  { code: "ST9", name: "Set 9" }, // Ensure Set 9 is visible to your filters
+  { code: "SSK", name: "Shimmering Skies" },
+  { code: "AZS", name: "Azurite Sea" },
+  { code: "ARI", name: "Archazia's Island" },
+  { code: "ROJ", name: "Reign of Jafar" },
+  { code: "FAB", name: "Fabled" },
 ];
 
 // -----------------------------------------------------------------------------
@@ -182,89 +164,6 @@ function safeSlug(...parts) {
  * We try combinations based on set code/number/name, then different extensions.
  * Your data model may vary; adjust accessors to match your fields.
  */
-function lorcastImageCandidates(card) {
-  const setCode = (card?.set || card?.setCode || card?.set_code || "").toString();
-  const number = (card?.number || card?.collector_number || card?.no || "").toString();
-  const slug = safeSlug(card?.name || card?.title || "", setCode, number);
-
-  const dirs = [
-    // Most common: /{setCode}/{number}
-    `${setCode}/${number}`,
-    // Alternate: /${slug}
-    `${slug}`,
-    // Some mirrors flatten under set only:
-    `${setCode}`,
-  ].filter(Boolean);
-
-  const names = [
-    `${number}`, // 126
-    `${slug}`, // mulan-elite-archer-st9-126
-    safeSlug(card?.name || "", number), // mulan-elite-archer-126
-  ].filter(Boolean);
-
-  const bases = LORCAST_CONFIG.IMAGE_BASES;
-  const exts = LORCAST_CONFIG.IMAGE_EXTS;
-
-  const candidates = [];
-
-  // If card provides a direct Lorcast URL, try that first
-  const direct = card?.image_lorcast || card?.lorcast_image || card?.imageLorcast;
-  if (direct) {
-    exts.forEach((ext) => {
-      candidates.push(direct);
-      if (!/\.(png|jpg|jpeg|webp)$/i.test(direct)) {
-        candidates.push(`${direct}${ext}`);
-      }
-    });
-  }
-
-  // Build combinations: base + dir + name + ext
-  for (const base of bases) {
-    for (const dir of dirs) {
-      for (const nm of names) {
-        for (const ext of exts) {
-          const url = `${base}${dir}/${nm}${ext}`;
-          candidates.push(url);
-        }
-      }
-    }
-  }
-
-  // Some CDNs prefer lowercase set codes; try lower
-  if (setCode) {
-    const lowerDirs = dirs.map((d) => d.toLowerCase());
-    for (const base of bases) {
-      for (const dir of lowerDirs) {
-        for (const nm of names) {
-          for (const ext of exts) {
-            const url = `${base}${dir}/${nm}${ext}`;
-            candidates.push(url);
-          }
-        }
-      }
-    }
-  }
-
-  return Array.from(new Set(candidates)); // dedupe
-}
-
-/**
- * Preload image; resolve with first working candidate || fallback.
- */
-async function resolveLorcastImage(card, signal) {
-  const candidates = lorcastImageCandidates(card);
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { method: "HEAD", signal });
-      if (res.ok && res.headers.get("content-type")?.startsWith("image")) {
-        return url;
-      }
-    } catch (e) {
-      // ignore, try next
-    }
-  }
-  return FALLBACK_IMG;
-}
 
 // -----------------------------------------------------------------------------
 // Data Fetch Adapter
@@ -381,23 +280,10 @@ function normalizeCard(raw) {
     raw.abilities ||
     "";
 
-  // Prefer Lorcast-provided AVIF URIs; fall back to any known fields
-  const apiImg =
-    raw.image_uris?.digital?.normal ||
-    raw.image_uris?.digital?.small ||
-    raw.image_uris?.digital?.large ||
-    null;
-
-  const rawImage =
-    apiImg ||
-    raw.image ||
-    raw.image_url ||
-    raw.picture ||
-    raw.art ||
-    raw.imageUrl ||
-    raw.images?.large ||
-    raw.images?.png ||
-    null;
+  // Only use Lorcast API images
+  const lorcastImage = raw.image_uris?.digital?.normal || 
+                      raw.image_uris?.digital?.small || 
+                      raw.image_uris?.digital?.large || null;
 
   // Prefer explicit cost field names
   const cost =
@@ -414,8 +300,8 @@ function normalizeCard(raw) {
     type,
     rarity,
     text,
-    _rawImage: rawImage,
-    _imageFromAPI: apiImg || null,
+    _rawImage: lorcastImage,  // Only Lorcast images
+    _imageFromAPI: lorcastImage,  // Same as raw image
     _raw: raw,
   };
 }
@@ -591,7 +477,7 @@ const initialFilterState = () => {
       showInkablesOnly: false,
       sortBy: "name",
       sortDir: "asc",
-      showFilterPanel: true,
+      showFilterPanel: false,  // Changed from true to false
     }) || {}
   );
 };
@@ -716,6 +602,13 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint }
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+          onClick={() => filterDispatch({ type: "TOGGLE_PANEL" })}
+          title="Toggle filters (Ctrl+F)"
+        >
+          Filters
+        </button>
         <button
           className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
           onClick={onResetDeck}
@@ -938,11 +831,20 @@ function useCardImage(card) {
         setSrc(cached);
         return;
       }
-      const found = card._imageFromAPI || await resolveLorcastImage(card, abort.signal).catch(() => null);
-      const finalSrc = found || card._rawImage || FALLBACK_IMG;
-      if (mounted) {
-        setSrc(finalSrc);
-        put(deckKey(card), finalSrc);
+      
+      // Only use Lorcast API images
+      const lorcastImage = card._imageFromAPI;
+      if (lorcastImage) {
+        if (mounted) {
+          setSrc(lorcastImage);
+          put(deckKey(card), lorcastImage);
+        }
+      } else {
+        // No Lorcast image available
+        if (mounted) {
+          setSrc(FALLBACK_IMG);
+          put(deckKey(card), FALLBACK_IMG);
+        }
       }
     })();
 
@@ -1487,13 +1389,14 @@ return (
 <ToastProvider>
 <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
   <TopBar
-    deckName={deck.name}
-    onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
-    onResetDeck={handleResetDeck}
-    onExport={handleExport}
-    onImport={handleImport}
-    onPrint={handlePrint}
-  />
+  deckName={deck.name}
+  onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
+  onResetDeck={handleResetDeck}
+  onExport={handleExport}
+  onImport={handleImport}
+  onPrint={handlePrint}
+  onToggleFilters={() => filterDispatch({ type: "TOGGLE_PANEL" })}
+/>
 
   {filters.showFilterPanel && (
     <FilterPanel
