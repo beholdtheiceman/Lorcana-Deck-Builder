@@ -12,21 +12,33 @@ import {
   Cell,
 } from "recharts";
 
-/** =========================
- *  Data fetcher (matches MAIN provider: lorcana-api.com)
- * ========================= */
-const API_BASE = "https://lorcana-api.com";
 
-/**
- * Build query for lorcana-api.com/cards
- * (We keep it minimal to mirror your main branch;
- * keywords/archetype/format are applied client-side.)
- */
-function buildCardsQuery({
+/** =========================
+ *  Lorcast-only data provider (runtime base via ?lorcast= or Set API)
+ * ========================= */
+const QS_LORCAST =
+  typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("lorcast") || ""
+    : "";
+
+if (typeof window !== "undefined" && QS_LORCAST) {
+  try { localStorage.setItem("lorcast_base", QS_LORCAST); } catch {}
+}
+
+const LORCAST_BASE =
+  (typeof window !== "undefined" && localStorage.getItem("lorcast_base")) || "";
+
+/** Build Lorcast query */
+function buildLorcastQuery({
   q,
-  color,
-  type,
+  colors,
+  types,
   cost,
+  set,
+  rarity,
+  text,
+  keywords = [],
+  archetype = "",
   page = 1,
   pagesize = 24,
   orderby = "Color,Set_Num,Name",
@@ -34,52 +46,60 @@ function buildCardsQuery({
 }) {
   const params = new URLSearchParams();
   if (q) params.set("name", q);
-  if (color) params.set("ink", color);
-  if (type) params.set("type", type);
-  if (cost && cost !== "Any") {
-    params.set("cost", cost === "9+" ? "9+" : String(cost));
-  }
+  if (text) params.set("text", text);
+  if (keywords.length) params.set("keywords", keywords.join(","));
+  if (archetype) params.set("archetype", archetype);
+  if (colors?.length) params.set("color", colors.join(","));
+  if (types?.length) params.set("type", types.join(",")); // includes "Song"
+  if (cost && cost !== "Any")
+    params.set(cost === "9+" ? "minCost" : "cost", cost === "9+" ? "9" : String(cost));
+  if (set) params.set("set", set);
+  if (rarity) params.set("rarity", rarity);
   params.set("page", String(page));
-  params.set("pagesize", String(pagesize));
-  params.set("orderby", orderby);
-  params.set("sortdirection", sortdirection);
+  params.set("pageSize", String(pagesize));
+  params.set(
+    "sort",
+    orderby
+      .split(",")
+      .map((k) => k.trim().toLowerCase().replace("set_num", "setnumber"))
+      .join(",")
+  );
+  params.set("dir", (sortdirection || "ASC").toUpperCase());
   return params;
 }
 
-async function fetchCardsRaw(filters) {
-  const params = buildCardsQuery(filters);
-  const url = `${API_BASE.replace(/\/+$/, "")}/cards?${params.toString()}`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`lorcana-api ${res.status}`);
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
+function normalizeLorcastCard(x) {
+  const Name = x.Name ?? x.name ?? x.cardName ?? x.title ?? "";
+  const Color = x.Color ?? x.color ?? x.ink ?? x.inkColor ?? "";
+  const Cost = x.Cost ?? x.cost ?? x.inkCost ?? x.playCost ?? "";
+  const Type = x.Type ?? x.type ?? x.cardType ?? "";
+  const Rarity = x.Rarity ?? x.rarity ?? "";
+  const Set = x.Set ?? x.setName ?? x.set ?? "";
+  const Set_Num = x.Set_Num ?? x.setNumber ?? x.number ?? x.collectorNumber ?? "";
+  const Image =
+    x.Image ?? x.image ?? x.imageUrl ?? (x.images && (x.images.large || x.images.normal || x.images.small)) ?? "";
+  const Rules = x.Rules ?? x.text ?? x.oracleText ?? x.rules ?? "";
+  return { ...x, Name, Color, Cost, Type, Rarity, Set, Set_Num, Image, Rules };
 }
 
-/** =========================
- *  Shared helpers
- * ========================= */
-const cache = new Map();
-const cacheKeyFor = (q) => JSON.stringify(q);
-const getCached = (q) => {
-  const k = cacheKeyFor(q);
-  if (cache.has(k)) return cache.get(k);
-  try {
-    const s = sessionStorage.getItem(`lorcana.cache.${k}`);
-    if (s) {
-      const parsed = JSON.parse(s);
-      cache.set(k, parsed);
-      return parsed;
-    }
-  } catch {}
-  return null;
-};
-const setCached = (q, v) => {
-  const k = cacheKeyFor(q);
-  cache.set(k, v);
-  try {
-    sessionStorage.setItem(`lorcana.cache.${k}`, JSON.stringify(v));
-  } catch {}
-};
+async function fetchFromLorcast(query) {
+  if (!LORCAST_BASE) return [];
+  const base = LORCAST_BASE.replace(/\/+$/, "");
+  const endpoints = ["/cards", "/api/cards", "/cards/search"];
+  let lastErr;
+  for (const path of endpoints) {
+    const url = `${base}${path}?${query.toString()}`;
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) { lastErr = new Error(`Lorcast ${res.status} on ${path}`); continue; }
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.results || []);
+      return list.map(normalizeLorcastCard);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("Lorcast request failed");
+}
+
 function proxyImageUrl(src) {
   if (!src) return "";
   try {
@@ -456,19 +476,24 @@ export default function App() {
    *  Fetch
    * ========================= */
   async function fetchCards(filters) {
-    const key = { provider: "lorcana-api.com", ...filters };
+    const key = { provider: "lorcast", base: LORCAST_BASE || "(unset)", ...filters };
     const cached = getCached(key);
     if (cached) return cached;
-    const data = await fetchCardsRaw({
+    const data = await fetchFromLorcast(buildLorcastQuery({
       q: filters.q,
-      color: filters.colors?.[0] || "", // API supports single ink param; we send first if multi-selected
-      type: filters.types?.[0] || "",
+      colors: filters.colors,
+      types: filters.types,
       cost: filters.cost,
+      set: filters.setName || undefined,
+      rarity: filters.rarity || undefined,
+      text: filters.textSearch || undefined,
+      keywords: filters.keywords || [],
+      archetype: filters.archetype || "",
       page: filters.page,
       pagesize: filters.pagesize,
       orderby: filters.orderby,
       sortdirection: filters.sortdirection,
-    });
+    }));
     setCached(key, data);
     return data;
   }
@@ -853,7 +878,7 @@ export default function App() {
         <h1 className="text-xl font-semibold">Lorcana Deck Builder</h1>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden sm:inline text-xs text-white/60">
-            Data: lorcana-api.com
+            Data: "${LORCAST_BASE ? new URL(LORCAST_BASE).host : 'Lorcast'}"
           </span>
           {/* Mobile deck toggle */}
           <button
@@ -861,6 +886,19 @@ export default function App() {
             onClick={() => setDeckOpen(true)}
           >
             Open Deck ({totalDeckCards})
+          </button>
+        
+          <button
+            className="px-3 py-2 rounded-md border border-white/10 bg-white/5 hover:bg-white/10"
+            onClick={() => {
+              const v = prompt("Lorcast Base URL (e.g. https://api.your-lorcast.com):", LORCAST_BASE || "");
+              if (v !== null) {
+                try { localStorage.setItem("lorcast_base", v.trim()); } catch {}
+                window.location.reload();
+              }
+            }}
+          >
+            Set API
           </button>
         </div>
       </div>
@@ -932,7 +970,13 @@ export default function App() {
           </div>
 
           {/* Results grid */}
-          {err && (
+          {!LORCAST_BASE && (
+        <div className="mb-3 px-3 py-2 text-sm rounded-md bg-amber-600/20 border border-amber-500/40 text-amber-200">
+          No Lorcast URL set. Click <b>Set API</b> (top-right) or open with <code>?lorcast=https://your-lorcast.example.com</code>.
+        </div>
+      )}
+
+      {err && LORCAST_BASE && (
             <div className="mb-3 px-3 py-2 text-sm rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-200">
               {err}
             </div>
