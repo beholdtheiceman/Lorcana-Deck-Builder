@@ -9,7 +9,7 @@ import {
 } from "recharts";
 
 /* ===========================
-   Config
+   Config.
    =========================== */
 
 // Switch here if you want to try a different source later
