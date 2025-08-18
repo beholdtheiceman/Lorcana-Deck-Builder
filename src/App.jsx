@@ -481,6 +481,64 @@ function getInks(card) {
   return result;
 }
 
+// Normalize inks from either Lorcast (card.inks array) or lorcana-api (Color string)
+function getCardInks(card) {
+  if (Array.isArray(card.inks) && card.inks.length) {
+    return new Set(card.inks.map(s => s.trim()));
+  }
+  if (typeof card.Color === "string" && card.Color.length) {
+    return new Set(card.Color.split(",").map(s => s.trim()));
+  }
+  return new Set(); // fallback
+}
+
+// selectedInks is a Set<string> from your UI
+function matchesInkFilter(card, selectedInks) {
+  const selCount = selectedInks.size;
+  if (selCount === 0) return true;
+
+  const inks = getCardInks(card);
+  const cardCount = inks.size;
+
+  // 1 ink selected: include mono or dual that contain it
+  if (selCount === 1) {
+    const [only] = [...selectedInks];
+    return inks.has(only);
+  }
+
+  // 2 inks selected:
+  // - include mono cards that match either of the two
+  // - include dual ONLY if exactly those two inks
+  if (selCount === 2) {
+    if (cardCount === 1) {
+      // mono: match either selected ink
+      const [a, b] = [...selectedInks];
+      return inks.has(a) || inks.has(b);
+    }
+    if (cardCount === 2) {
+      // dual: must match both selected inks exactly
+      for (const ink of selectedInks) {
+        if (!inks.has(ink)) return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // 3+ inks selected (Lorcana is mono/dual): fall back to mono that match any selected ink
+  // (Duals can't match exactly, so only allow if both inks ⊆ selected set — optional)
+  if (cardCount === 1) {
+    for (const ink of selectedInks) if (inks.has(ink)) return true;
+    return false;
+  }
+  if (cardCount === 2) {
+    // Optional: allow duals only if both inks are within the selected set
+    for (const ink of inks) if (!selectedInks.has(ink)) return false;
+    return true;
+  }
+  return false;
+}
+
 // Try to format a code+number (e.g., set code and card number) into a consistent slug
 function safeSlug(...parts) {
   return parts
@@ -5400,42 +5458,10 @@ function applyFilters(cards, filters) {
     }
     
     console.log('[Filter Debug] Ink filter active:', Array.from(filters.inks));
-    console.log('[Filter Debug] Sample card inks:', list.slice(0, 3).map(c => ({ name: c.name, inks: c.inks, _rawInk: c._raw?.ink, _rawInks: c._raw?.inks })));
+    console.log('[Filter Debug] Using improved dual-ink filtering logic');
     
-    list = list.filter((c) => {
-      // Try multiple sources for ink data based on Lorcast structure
-      let cardInks = [];
-      
-      // First try the normalized inks field
-      if (Array.isArray(c.inks) && c.inks.length > 0) {
-        cardInks = c.inks;
-      }
-      // Then try the raw data from Lorcast API
-      else if (Array.isArray(c._raw?.inks) && c._raw.inks.length > 0) {
-        cardInks = c._raw.inks;
-      }
-      else if (c._raw?.ink) {
-        cardInks = Array.isArray(c._raw.ink) ? c._raw.ink : [c._raw.ink];
-      }
-      // Fallback to any other ink fields
-      else if (c.ink) {
-        cardInks = Array.isArray(c.ink) ? c.ink : [c.ink];
-      }
-      
-      console.log(`[Filter Debug] Card "${c.name}" has inks:`, cardInks);
-      
-      // Check if any of the card's inks match the filter
-      for (const filterInk of filters.inks) {
-        if (cardInks.some(cardInk => 
-          cardInk.toLowerCase() === filterInk.toLowerCase() ||
-          cardInk.toLowerCase().includes(filterInk.toLowerCase())
-        )) {
-          console.log(`[Filter Debug] Card "${c.name}" matches ink filter "${filterInk}"`);
-          return true;
-        }
-      }
-      return false;
-    });
+    // Use the new improved ink filtering logic
+    list = list.filter(card => matchesInkFilter(card, filters.inks));
     
     console.log('[Filter Debug] After ink filtering, cards remaining:', list.length);
   }
