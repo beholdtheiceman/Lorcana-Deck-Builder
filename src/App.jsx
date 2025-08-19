@@ -1,4 +1,3 @@
-
 // React & ecosystem -----------------------------------------------------------
 import React, {
   useCallback,
@@ -1687,6 +1686,8 @@ function normalizeCard(raw) {
 
 const LS_KEYS = {
   DECK: "lorcana.deck.v1",
+  DECKS: "lorcana.decks.v2", // New: Multiple decks storage
+  CURRENT_DECK_ID: "lorcana.currentDeckId.v2", // New: Current deck ID
   FILTERS: "lorcana.filters.v1",
   CACHE_IMG: "lorcana.imageCache.v1",
   CACHE_CARDS: "lorcana.cardsCache.v1",
@@ -1760,7 +1761,7 @@ function useToasts() {
 }
 
 // -----------------------------------------------------------------------------
-// Deck state
+// Enhanced Deck Management
 // -----------------------------------------------------------------------------
 
 /**
@@ -1780,27 +1781,286 @@ function deckKey(card) {
   return card?.id || `${card?.set}-${card?.number}`;
 }
 
+// Generate unique deck ID
+function generateDeckId() {
+  return `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Enhanced deck structure
+function createNewDeck(name = "Untitled Deck") {
+  return {
+    id: generateDeckId(),
+    name: name.trim() || "Untitled Deck",
+    entries: {},
+    total: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    description: "",
+    tags: [],
+    format: "Lorcana", // Standard, Limited, etc.
+    notes: ""
+  };
+}
+
+// Load all decks from storage
+function loadAllDecks() {
+  try {
+    const decks = loadLS(LS_KEYS.DECKS, {});
+    const currentDeckId = loadLS(LS_KEYS.CURRENT_DECK_ID, null);
+    
+    // If no decks exist, create a default one
+    if (Object.keys(decks).length === 0) {
+      const defaultDeck = createNewDeck("My First Deck");
+      decks[defaultDeck.id] = defaultDeck;
+      saveLS(LS_KEYS.DECKS, decks);
+      saveLS(LS_KEYS.CURRENT_DECK_ID, defaultDeck.id);
+      return { decks, currentDeckId: defaultDeck.id };
+    }
+    
+    return { decks, currentDeckId };
+  } catch (error) {
+    console.error('[loadAllDecks] Error loading decks:', error);
+    const defaultDeck = createNewDeck("My First Deck");
+    const decks = { [defaultDeck.id]: defaultDeck };
+    saveLS(LS_KEYS.DECKS, decks);
+    saveLS(LS_KEYS.CURRENT_DECK_ID, defaultDeck.id);
+    return { decks, currentDeckId: defaultDeck.id };
+  }
+}
+
+// Save all decks to storage
+function saveAllDecks(decks) {
+  try {
+    saveLS(LS_KEYS.DECKS, decks);
+    console.log('[saveAllDecks] Saved decks to localStorage');
+  } catch (error) {
+    console.error('[saveAllDecks] Error saving decks:', error);
+  }
+}
+
+// Save current deck ID
+function saveCurrentDeckId(deckId) {
+  try {
+    saveLS(LS_KEYS.CURRENT_DECK_ID, deckId);
+  } catch (error) {
+    console.error('[saveCurrentDeckId] Error saving current deck ID:', error);
+  }
+}
+
+// Get deck by ID
+function getDeckById(decks, deckId) {
+  return decks[deckId] || null;
+}
+
+// Update deck metadata
+function updateDeckMetadata(decks, deckId, updates) {
+  if (!decks[deckId]) return decks;
+  
+  const updatedDecks = { ...decks };
+  updatedDecks[deckId] = {
+    ...updatedDecks[deckId],
+    ...updates,
+    updatedAt: Date.now()
+  };
+  
+  saveAllDecks(updatedDecks);
+  return updatedDecks;
+}
+
+// Delete deck
+function deleteDeck(decks, deckId) {
+  if (!decks[deckId]) return decks;
+  
+  const updatedDecks = { ...decks };
+  delete updatedDecks[deckId];
+  
+  saveAllDecks(updatedDecks);
+  return updatedDecks;
+}
+
+// Duplicate deck
+function duplicateDeck(decks, deckId, newName = null) {
+  const originalDeck = decks[deckId];
+  if (!originalDeck) return decks;
+  
+  const newDeck = {
+    ...originalDeck,
+    id: generateDeckId(),
+    name: newName || `${originalDeck.name} (Copy)`,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  
+  const updatedDecks = { ...decks, [newDeck.id]: newDeck };
+  saveAllDecks(updatedDecks);
+  return updatedDecks;
+}
+
+// Export deck to various formats
+function exportDeck(deck, format = 'json') {
+  switch (format) {
+    case 'json':
+      return JSON.stringify(deck, null, 2);
+    case 'txt':
+      return generateTextExport(deck);
+    case 'csv':
+      return generateCSVExport(deck);
+    default:
+      return JSON.stringify(deck, null, 2);
+  }
+}
+
+// Generate text export
+function generateTextExport(deck) {
+  const lines = [
+    `${deck.name}`,
+    `Format: ${deck.format}`,
+    `Created: ${new Date(deck.createdAt).toLocaleDateString()}`,
+    `Updated: ${new Date(deck.updatedAt).toLocaleDateString()}`,
+    `Total Cards: ${deck.total}`,
+    '',
+    'Cards:',
+    ''
+  ];
+  
+  // Group by cost
+  const entries = Object.values(deck.entries).filter(e => e.count > 0);
+  const groupedByCost = groupBy(entries, (e) => getCost(e.card));
+  
+  Object.keys(groupedByCost)
+    .sort((a, b) => parseInt(a) - parseInt(b))
+    .forEach(cost => {
+      lines.push(`Cost ${cost}:`);
+      groupedByCost[cost].forEach(entry => {
+        const card = entry.card;
+        lines.push(`  ${entry.count}x ${card.name} (${card.set} #${card.number})`);
+      });
+      lines.push('');
+    });
+  
+  return lines.join('\n');
+}
+
+// Generate CSV export
+function generateCSVExport(deck) {
+  const lines = ['Name,Set,Number,Cost,Type,Rarity,Count'];
+  
+  const entries = Object.values(deck.entries).filter(e => e.count > 0);
+  entries.forEach(entry => {
+    const card = entry.card;
+    lines.push(`"${card.name}","${card.set}","${card.number}","${getCost(card)}","${card.type}","${card.rarity}","${entry.count}"`);
+  });
+  
+  return lines.join('\n');
+}
+
+// Import deck from various formats
+function importDeck(data, format = 'json') {
+  try {
+    let deck;
+    
+    switch (format) {
+      case 'json':
+        deck = typeof data === 'string' ? JSON.parse(data) : data;
+        break;
+      case 'txt':
+        deck = parseTextImport(data);
+        break;
+      case 'csv':
+        deck = parseCSVImport(data);
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
+    }
+    
+    // Validate and normalize deck structure
+    if (!deck.entries || typeof deck.entries !== 'object') {
+      throw new Error('Invalid deck structure: missing entries');
+    }
+    
+    // Ensure deck has required fields
+    const normalizedDeck = {
+      id: generateDeckId(),
+      name: deck.name || "Imported Deck",
+      entries: deck.entries,
+      total: Object.values(deck.entries).reduce((sum, entry) => sum + (entry.count || 0), 0),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      description: deck.description || "",
+      tags: deck.tags || [],
+      format: deck.format || "Lorcana",
+      notes: deck.notes || ""
+    };
+    
+    return normalizedDeck;
+  } catch (error) {
+    console.error('[importDeck] Error importing deck:', error);
+    throw error;
+  }
+}
+
+// Parse text import (basic implementation)
+function parseTextImport(text) {
+  // This is a basic parser - you can enhance it based on your needs
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+  const deck = { entries: {} };
+  
+  lines.forEach(line => {
+    // Look for card lines like "2x Card Name (Set #123)"
+    const match = line.match(/^(\d+)x\s+(.+?)\s+\((.+?)\s+#(\d+)\)$/);
+    if (match) {
+      const [, count, name, set, number] = match;
+      const card = { name, set, number };
+      const key = deckKey(card);
+      deck.entries[key] = { card, count: parseInt(count) };
+    }
+  });
+  
+  return deck;
+}
+
+// Parse CSV import (basic implementation)
+function parseCSVImport(csv) {
+  const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
+  const deck = { entries: {} };
+  
+  // Skip header line
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    const columns = line.split(',').map(col => col.replace(/^"|"$/g, ''));
+    
+    if (columns.length >= 7) {
+      const [name, set, number, cost, type, rarity, count] = columns;
+      const card = { name, set, number, cost: parseInt(cost), type, rarity };
+      const key = deckKey(card);
+      deck.entries[key] = { card, count: parseInt(count) };
+    }
+  }
+  
+  return deck;
+}
+
 const initialDeckState = () => {
-  const saved = loadLS(LS_KEYS.DECK, null);
-  return saved || { entries: {}, total: 0, name: "Untitled Deck" };
+  const { decks, currentDeckId } = loadAllDecks();
+  return decks[currentDeckId] || createNewDeck("Untitled Deck");
 };
 
 function deckReducer(state, action) {
   switch (action.type) {
     case "SET_NAME": {
       const name = action.name || "Untitled Deck";
-      const next = { ...state, name };
-      saveLS(LS_KEYS.DECK, next);
+      const next = { ...state, name, updatedAt: Date.now() };
+      saveDeckToStorage(next);
       return next;
     }
     case "RESET": {
-      const next = { entries: {}, total: 0, name: "Untitled Deck" };
-      saveLS(LS_KEYS.DECK, next);
+      const next = createNewDeck("Untitled Deck");
+      saveDeckToStorage(next);
       return next;
     }
     case "IMPORT_STATE": {
-      const next = action.deck || { entries: {}, total: 0, name: "Imported Deck" };
-      saveLS(LS_KEYS.DECK, next);
+      const next = action.deck || createNewDeck("Imported Deck");
+      saveDeckToStorage(next);
       return next;
     }
     case "ADD": {
@@ -1815,8 +2075,8 @@ function deckReducer(state, action) {
       };
       const newTotal =
         Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0) || 0;
-      const next = { ...state, entries: nextEntries, total: newTotal };
-      saveLS(LS_KEYS.DECK, next);
+      const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
+      saveDeckToStorage(next);
       return next;
     }
     case "SET_COUNT": {
@@ -1825,7 +2085,8 @@ function deckReducer(state, action) {
       const nextEntries = { ...state.entries };
       nextEntries[key] = { card, count: clamp(count, 0, DECK_RULES.MAX_COPIES) };
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
-      const next = { ...state, entries: nextEntries, total: newTotal };
+      const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
+      saveDeckToStorage(next);
       return next;
     }
     case "REMOVE": {
@@ -1834,12 +2095,32 @@ function deckReducer(state, action) {
       const nextEntries = { ...state.entries };
       delete nextEntries[key];
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
-      const next = { ...state, entries: nextEntries, total: newTotal };
-      saveLS(LS_KEYS.DECK, next);
+      const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
+      saveDeckToStorage(next);
       return next;
+    }
+    case "UPDATE_METADATA": {
+      const next = { ...state, ...action.updates, updatedAt: Date.now() };
+      saveDeckToStorage(next);
+      return next;
+    }
+    case "SWITCH_DECK": {
+      return action.deck || state;
     }
     default:
       return state;
+  }
+}
+
+// Helper function to save deck to storage
+function saveDeckToStorage(deck) {
+  try {
+    const { decks } = loadAllDecks();
+    const updatedDecks = { ...decks, [deck.id]: deck };
+    saveAllDecks(updatedDecks);
+    console.log(`[saveDeckToStorage] Saved deck "${deck.name}" to storage`);
+  } catch (error) {
+    console.error('[saveDeckToStorage] Error saving deck:', error);
   }
 }
 
@@ -2150,7 +2431,7 @@ function useImageCache() {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange }) {
+function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager }) {
   return (
     <div className="flex items-center justify-between gap-4 p-3 bg-gray-900/70 border-b border-gray-800 sticky top-0 z-40 backdrop-blur">
       <div className="flex items-center gap-2">
@@ -2183,8 +2464,15 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
           Filters
         </button>
         <button
+          className="px-3 py-1.5 rounded-xl bg-blue-900 border border-blue-700 hover:bg-blue-800"
+          onClick={onDeckManager}
+          title="Manage decks"
+        >
+          Decks
+        </button>
+        <button
           className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
-          onClick={onResetDeck}
+          onClick={onNewDeck}
           title="Start fresh deck"
         >
           New
@@ -2196,7 +2484,6 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
         >
           Import
         </button>
-
       </div>
     </div>
   );
@@ -2689,6 +2976,240 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
             -
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Deck Manager Component
+// -----------------------------------------------------------------------------
+
+function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onExportDeck, onImportDeck }) {
+  const [selectedDeckId, setSelectedDeckId] = useState(currentDeckId);
+  const [showNewDeckForm, setShowNewDeckForm] = useState(false);
+  const [newDeckName, setNewDeckName] = useState("");
+  const [exportFormat, setExportFormat] = useState("json");
+  const [importFormat, setImportFormat] = useState("json");
+  const [importData, setImportData] = useState("");
+
+  if (!isOpen) return null;
+
+  const currentDeck = decks[currentDeckId];
+  const selectedDeck = decks[selectedDeckId];
+
+  const handleNewDeck = () => {
+    if (newDeckName.trim()) {
+      onNewDeck(newDeckName.trim());
+      setNewDeckName("");
+      setShowNewDeckForm(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!selectedDeck) return;
+    
+    const exportData = exportDeck(selectedDeck, exportFormat);
+    const blob = new Blob([exportData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${exportFormat}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    if (!importData.trim()) return;
+    
+    try {
+      const importedDeck = importDeck(importData, importFormat);
+      onImportDeck(importedDeck);
+      setImportData("");
+      onClose();
+    } catch (error) {
+      alert(`Import failed: ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-xl border border-gray-700 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h2 className="text-xl font-semibold">Deck Manager</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex h-96">
+          {/* Left side - Deck list */}
+          <div className="w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Your Decks</h3>
+              <button
+                onClick={() => setShowNewDeckForm(true)}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+              >
+                + New
+              </button>
+            </div>
+
+            {showNewDeckForm && (
+              <div className="mb-4 p-3 bg-gray-800 rounded border border-gray-600">
+                <input
+                  type="text"
+                  placeholder="Deck name"
+                  value={newDeckName}
+                  onChange={(e) => setNewDeckName(e.target.value)}
+                  className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm mb-2"
+                  onKeyPress={(e) => e.key === 'Enter' && handleNewDeck()}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleNewDeck}
+                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs"
+                  >
+                    Create
+                  </button>
+                  <button
+                    onClick={() => setShowNewDeckForm(false)}
+                    className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {Object.values(decks).map((deck) => (
+                <div
+                  key={deck.id}
+                  className={`p-3 rounded border cursor-pointer transition ${
+                    deck.id === selectedDeckId
+                      ? 'border-emerald-500 bg-emerald-900/20'
+                      : 'border-gray-600 hover:border-gray-500'
+                  }`}
+                  onClick={() => setSelectedDeckId(deck.id)}
+                >
+                  <div className="font-medium">{deck.name}</div>
+                  <div className="text-sm text-gray-400">
+                    {deck.total} cards • {new Date(deck.updatedAt).toLocaleDateString()}
+                  </div>
+                  {deck.id === currentDeckId && (
+                    <div className="text-xs text-emerald-400 mt-1">Current</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right side - Deck details and actions */}
+          <div className="flex-1 p-4 overflow-y-auto">
+            {selectedDeck ? (
+              <div>
+                <h3 className="font-semibold mb-4">{selectedDeck.name}</h3>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Cards:</span> {selectedDeck.total}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Created:</span> {new Date(selectedDeck.createdAt).toLocaleDateString()}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Updated:</span> {new Date(selectedDeck.updatedAt).toLocaleDateString()}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Format:</span> {selectedDeck.format}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => onSwitchDeck(selectedDeck)}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+                  >
+                    Switch to This Deck
+                  </button>
+                  
+                  <button
+                    onClick={() => onDuplicateDeck(selectedDeck.id)}
+                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded"
+                  >
+                    Duplicate Deck
+                  </button>
+
+                  <div className="border-t border-gray-700 pt-3">
+                    <h4 className="font-medium mb-2">Export</h4>
+                    <div className="flex gap-2 mb-2">
+                      <select
+                        value={exportFormat}
+                        onChange={(e) => setExportFormat(e.target.value)}
+                        className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                      >
+                        <option value="json">JSON</option>
+                        <option value="txt">Text</option>
+                        <option value="csv">CSV</option>
+                      </select>
+                      <button
+                        onClick={handleExport}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                      >
+                        Export
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-700 pt-3">
+                    <h4 className="font-medium mb-2">Import</h4>
+                    <div className="space-y-2">
+                      <select
+                        value={importFormat}
+                        onChange={(e) => setImportFormat(e.target.value)}
+                        className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                      >
+                        <option value="json">JSON</option>
+                        <option value="txt">Text</option>
+                        <option value="csv">CSV</option>
+                      </select>
+                      <textarea
+                        placeholder="Paste deck data here..."
+                        value={importData}
+                        onChange={(e) => setImportData(e.target.value)}
+                        className="w-full h-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm resize-none"
+                      />
+                      <button
+                        onClick={handleImport}
+                        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                      >
+                        Import
+                      </button>
+                    </div>
+                  </div>
+
+                  {selectedDeck.id !== currentDeckId && (
+                    <button
+                      onClick={() => onDeleteDeck(selectedDeck.id)}
+                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
+                    >
+                      Delete Deck
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 py-8">
+                Select a deck to view details
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -4523,6 +5044,11 @@ const [printOpen, setPrintOpen] = useState(false);
 const [deckPresentationOpen, setDeckPresentationOpen] = useState(false);
 const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
+// Enhanced deck management state
+const [decks, setDecks] = useState({});
+const [currentDeckId, setCurrentDeckId] = useState(null);
+const [showDeckManager, setShowDeckManager] = useState(false);
+
 // Add batch image loader
 const { loadImagesInBatch } = useBatchImageLoader();
 const [imageLoadProgress, setImageLoadProgress] = useState({ loaded: 0, failed: 0 });
@@ -4989,8 +5515,10 @@ function handleDoImport(obj) {
 
 function handleResetDeck() {
   if (confirm("Start a new deck? This will clear the current deck.")) {
-    deckDispatch({ type: "RESET" });
-    addToast("New deck started", "success");
+    // Create a new deck with a unique name
+    const timestamp = new Date().toLocaleString();
+    const newDeckName = `Deck ${timestamp}`;
+    handleNewDeck(newDeckName);
   }
 }
 
@@ -4999,60 +5527,91 @@ function handlePrint() {
 }
 
 function handleSaveDeck() {
-  // Save deck for later editing
-  const savedDecks = JSON.parse(localStorage.getItem('savedLorcanaDecks') || '[]');
-  
-  // Create a saveable deck object with full card data
-  const saveableDeck = {
-    id: Date.now().toString(),
-    name: deck.name,
-    savedAt: new Date().toISOString(),
-    entries: Object.values(deck.entries || {}).filter(e => e.count > 0).map(e => ({
-      card: {
-        name: e.card.name,
-        set: e.card.set,
-        number: e.card.number,
-        type: e.card.type,
-        inks: e.card.inks,
-        rarity: e.card.rarity,
-        cost: getCost(e.card),
-        image_url: e.card.image_url || e.card._imageFromAPI,
-        // Include other essential card properties
-        classifications: e.card.classifications,
-        abilities: e.card.abilities,
-        text: e.card.text,
-        lore: e.card.lore,
-        willpower: e.card.willpower,
-        strength: e.card.strength,
-        // Include raw data for API compatibility
-        _raw: e.card._raw
-      },
-      count: e.count
-    }))
-  };
-
-  // Check if deck with same name already exists
-  const existingIndex = savedDecks.findIndex(d => d.name === deck.name);
-  if (existingIndex !== -1) {
-    // Update existing deck
-    savedDecks[existingIndex] = saveableDeck;
-  } else {
-    // Add new deck
-    savedDecks.push(saveableDeck);
-  }
-
-  // Save to localStorage
-  localStorage.setItem('savedLorcanaDecks', JSON.stringify(savedDecks));
-
-  // Show success message
-  addToast(`Deck "${deck.name}" saved successfully!`, "success");
+  // The deck is automatically saved with every change in the new system
+  // This function now just shows a confirmation message
+  addToast(`Deck "${deck.name}" is automatically saved`, "success");
 }
 
 function handleDeckPresentation() {
   setDeckPresentationOpen(true);
 }
 
+// Enhanced deck management functions
+function handleNewDeck(name = "Untitled Deck") {
+  const newDeck = createNewDeck(name);
+  const updatedDecks = { ...decks, [newDeck.id]: newDeck };
+  setDecks(updatedDecks);
+  setCurrentDeckId(newDeck.id);
+  deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+  saveCurrentDeckId(newDeck.id);
+  addToast(`Created new deck: "${name}"`, "success");
+}
 
+function handleSwitchDeck(deckToSwitch) {
+  setCurrentDeckId(deckToSwitch.id);
+  deckDispatch({ type: "SWITCH_DECK", deck: deckToSwitch });
+  saveCurrentDeckId(deckToSwitch.id);
+  addToast(`Switched to deck: "${deckToSwitch.name}"`, "success");
+}
+
+function handleDeleteDeck(deckId) {
+  if (deckId === currentDeckId) {
+    addToast("Cannot delete the current deck", "error");
+    return;
+  }
+  
+  const deckToDelete = decks[deckId];
+  const updatedDecks = deleteDeck(decks, deckId);
+  setDecks(updatedDecks);
+  
+  if (Object.keys(updatedDecks).length === 0) {
+    // If no decks left, create a default one
+    const defaultDeck = createNewDeck("My First Deck");
+    const newDecks = { [defaultDeck.id]: defaultDeck };
+    setDecks(newDecks);
+    setCurrentDeckId(defaultDeck.id);
+    deckDispatch({ type: "SWITCH_DECK", deck: defaultDeck });
+    saveCurrentDeckId(defaultDeck.id);
+  }
+  
+  addToast(`Deleted deck: "${deckToDelete.name}"`, "success");
+}
+
+function handleDuplicateDeck(deckId) {
+  const originalDeck = decks[deckId];
+  const updatedDecks = duplicateDeck(decks, deckId);
+  setDecks(updatedDecks);
+  
+  // Find the new deck (it will have a different ID)
+  const newDeck = Object.values(updatedDecks).find(d => 
+    d.name === `${originalDeck.name} (Copy)` && d.id !== deckId
+  );
+  
+  if (newDeck) {
+    addToast(`Duplicated deck: "${originalDeck.name}"`, "success");
+  }
+}
+
+function handleImportDeck(importedDeck) {
+  const updatedDecks = { ...decks, [importedDeck.id]: importedDeck };
+  setDecks(updatedDecks);
+  setCurrentDeckId(importedDeck.id);
+  deckDispatch({ type: "SWITCH_DECK", deck: importedDeck });
+  saveCurrentDeckId(importedDeck.id);
+  addToast(`Imported deck: "${importedDeck.name}"`, "success");
+}
+
+// Initialize deck management system
+useEffect(() => {
+  const { decks: loadedDecks, currentDeckId: loadedCurrentDeckId } = loadAllDecks();
+  setDecks(loadedDecks);
+  setCurrentDeckId(loadedCurrentDeckId);
+  
+  // If we have a current deck ID, switch to it
+  if (loadedCurrentDeckId && loadedDecks[loadedCurrentDeckId]) {
+    deckDispatch({ type: "SWITCH_DECK", deck: loadedDecks[loadedCurrentDeckId] });
+  }
+}, []);
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
@@ -5085,6 +5644,8 @@ useEffect(() => {
         onToggleFilters={() => filterDispatch({ type: "TOGGLE_PANEL" })}
         searchText={filters.text}
         onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
+        onNewDeck={handleNewDeck}
+        onDeckManager={() => setShowDeckManager(true)}
       />
 
       {/* Essential Quick Filters */}
@@ -5386,8 +5947,22 @@ useEffect(() => {
         onClose={() => setImportOpen(false)}
         onImport={handleDoImport}
       />
-              {printOpen && <PrintableSheet key={`print-sheet-${Date.now()}`} deck={deck} onClose={() => setPrintOpen(false)} />}
-        {deckPresentationOpen && <DeckPresentationPopup key={`deck-presentation-${Date.now()}`} deck={deck} onClose={() => setDeckPresentationOpen(false)} />}
+      {printOpen && <PrintableSheet key={`print-sheet-${Date.now()}`} deck={deck} onClose={() => setPrintOpen(false)} />}
+      {deckPresentationOpen && <DeckPresentationPopup key={`deck-presentation-${Date.now()}`} deck={deck} onClose={() => setDeckPresentationOpen(false)} />}
+      
+      {/* Enhanced Deck Manager */}
+      <DeckManager
+        isOpen={showDeckManager}
+        onClose={() => setShowDeckManager(false)}
+        decks={decks}
+        currentDeckId={currentDeckId}
+        onSwitchDeck={handleSwitchDeck}
+        onNewDeck={handleNewDeck}
+        onDeleteDeck={handleDeleteDeck}
+        onDuplicateDeck={handleDuplicateDeck}
+        onExportDeck={handleExport}
+        onImportDeck={handleImportDeck}
+      />
       </div>
     </ImageCacheProvider>
     </ToastProvider>
