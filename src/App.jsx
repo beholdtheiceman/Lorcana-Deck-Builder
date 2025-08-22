@@ -1,4 +1,3 @@
-
 // React & ecosystem -----------------------------------------------------------
 import React, {
   useCallback,
@@ -56,6 +55,9 @@ const ABILITIES_CANON = [
 
 // Legacy ABILITIES constant for backward compatibility
 const ABILITIES = ABILITIES_CANON;
+
+// Missing constant - add fallback image
+const FALLBACK_IMG = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQyMCIgdmlld0JveD0iMCAwIDMwMCA0MjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iNDIwIiBmaWxsPSIjMmQzNzQ4Ii8+CjxyZWN0IHg9IjUiIHk9IjUiIHdpZHRoPSIyOTAiIGhlaWdodD0iNDEwIiBzdHJva2U9IiM3MTgwOTYiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIxNTAiIHk9IjIxMCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q2FyZDwvdGV4dD4KPC9zdmc+";
 
 function normalizeAbilityToken(s) {
   // "Singer 5" -> "singer", "Resist +2" -> "resist"
@@ -1178,36 +1180,9 @@ async function apiSearchCards({
     console.warn("[API] Lorcast search failed, falling back to Lorcana-API:", e);
   }
 
-  // ----- Fallback: Lorcana-API -----
-  try {
-    if (q && q.trim()) url.searchParams.set("search", q.trim());
-    console.log("[API] Fallback Lorcana-API:", url.toString());
-    const res = await fetch(url.toString(), { headers: { Accept: "application/json" }, mode: "cors" });
-    if (!res.ok) return { cards: [], total: 0 };
-    const data = await res.json();
-    const arr = Array.isArray(data) ? data : (Array.isArray(data?.cards) ? data.cards : []);
-    const total = Number(data?.total ?? arr.length);
-    const mapped = arr.map(item => {
-      const img = item.Image || item.image || item.ImageUrl || item.ImageURL ||
-                  (item.Images && (item.Images.Full || item.Images.full || item.Images.Normal));
-      const setName = item.Set_Name || item.Set || item.set_name || item.setName || "";
-      const number  = item.Number || item.number || item.Collector_Number || item.collector_number || "";
-      return {
-        id: item.ID || item.Id || item.id || `${item.Name || item.name}-${number}-${setName}`,
-        name: item.Name || item.name || "",
-        set: setName,
-        number,
-        image_url: img || "",
-        _source: "lorcana-api",
-        _raw: item,
-      };
-    }).filter(c => c.image_url);
-    console.log(`[API] Lorcana-API returned ${mapped.length}/${total}`);
-    return { cards: mapped, total };
-  } catch (e) {
-    console.warn("[API] Both sources failed:", e);
-    return { cards: [], total: 0 };
-  }
+  // Fallback disabled for now to avoid undefined URL issues.
+  // If Lorcast fails, return an empty result so the UI can handle it gracefully.
+  return { cards: [], total: 0 };
 }
 
 function buildLorcastURL(q) {
@@ -1449,7 +1424,7 @@ function normalizeLorcanaApi(c) {
     text: c.Body_Text || c.body_text || c.text || "",
     keywords: abilities, // Use the pretty abilities list
     abilities: abilities, // Use the pretty abilities list
-    _abilitiesIndex: _abilitiesIndex, // Add the normalized index for filtering
+    _abilitiesIndex: _abilitiesIndex, // Add the normalized abilities index
     image: c.image || c.imageUrl || "",
     _source: "lorcana-api",
     _raw: c,
@@ -1687,6 +1662,8 @@ function normalizeCard(raw) {
 
 const LS_KEYS = {
   DECK: "lorcana.deck.v1",
+  DECKS: "lorcana.decks.v2", // New: Multiple decks storage
+  CURRENT_DECK_ID: "lorcana.currentDeckId.v2", // New: Current deck ID
   FILTERS: "lorcana.filters.v1",
   CACHE_IMG: "lorcana.imageCache.v1",
   CACHE_CARDS: "lorcana.cardsCache.v1",
@@ -1760,7 +1737,7 @@ function useToasts() {
 }
 
 // -----------------------------------------------------------------------------
-// Deck state
+// Enhanced Deck Management
 // -----------------------------------------------------------------------------
 
 /**
@@ -1780,27 +1757,271 @@ function deckKey(card) {
   return card?.id || `${card?.set}-${card?.number}`;
 }
 
+// Generate unique deck ID
+function generateDeckId() {
+  return `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Enhanced deck structure
+function createNewDeck(name = "Untitled Deck") {
+  return {
+    id: generateDeckId(),
+    name: name.trim() || "Untitled Deck",
+    entries: {},
+    total: 0,
+    createdAt: Date.now(),
+    updatedAt: null, // Will be set when explicitly saved
+    description: "",
+    tags: [],
+    format: "Lorcana", // Standard, Limited, etc.
+    notes: ""
+  };
+}
+
+// Load all decks from storage
+function loadAllDecks() {
+  try {
+    const decks = loadLS(LS_KEYS.DECKS, {});
+    const currentDeckId = loadLS(LS_KEYS.CURRENT_DECK_ID, null);
+    
+    // Return empty decks if none exist - no default deck creation
+    return { decks, currentDeckId };
+  } catch (error) {
+    console.error('[loadAllDecks] Error loading decks:', error);
+    return { decks: {}, currentDeckId: null };
+  }
+}
+
+// Save all decks to storage
+function saveAllDecks(decks) {
+  try {
+    saveLS(LS_KEYS.DECKS, decks);
+    console.log('[saveAllDecks] Saved decks to localStorage');
+  } catch (error) {
+    console.error('[saveAllDecks] Error saving decks:', error);
+  }
+}
+
+// Save current deck ID
+function saveCurrentDeckId(deckId) {
+  try {
+    saveLS(LS_KEYS.CURRENT_DECK_ID, deckId);
+  } catch (error) {
+    console.error('[saveCurrentDeckId] Error saving current deck ID:', error);
+  }
+}
+
+// Get deck by ID
+function getDeckById(decks, deckId) {
+  return decks[deckId] || null;
+}
+
+// Update deck metadata
+function updateDeckMetadata(decks, deckId, updates) {
+  if (!decks[deckId]) return decks;
+  
+  const updatedDecks = { ...decks };
+  updatedDecks[deckId] = {
+    ...updatedDecks[deckId],
+    ...updates,
+    updatedAt: Date.now()
+  };
+  
+  saveAllDecks(updatedDecks);
+  return updatedDecks;
+}
+
+// Delete deck
+function deleteDeck(decks, deckId) {
+  if (!decks[deckId]) return decks;
+  
+  const updatedDecks = { ...decks };
+  delete updatedDecks[deckId];
+  
+  saveAllDecks(updatedDecks);
+  return updatedDecks;
+}
+
+// Duplicate deck
+function duplicateDeck(decks, deckId, newName = null) {
+  const originalDeck = decks[deckId];
+  if (!originalDeck) return decks;
+  
+  const newDeck = {
+    ...originalDeck,
+    id: generateDeckId(),
+    name: newName || `${originalDeck.name} (Copy)`,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  
+  const updatedDecks = { ...decks, [newDeck.id]: newDeck };
+  saveAllDecks(updatedDecks);
+  return updatedDecks;
+}
+
+// Export deck to various formats
+function exportDeck(deck, format = 'json') {
+  switch (format) {
+    case 'json':
+      return JSON.stringify(deck, null, 2);
+    case 'txt':
+      return generateTextExport(deck);
+    case 'csv':
+      return generateCSVExport(deck);
+    default:
+      return JSON.stringify(deck, null, 2);
+  }
+}
+
+// Generate text export
+function generateTextExport(deck) {
+  const lines = [
+    `${deck.name}`,
+    `Format: ${deck.format}`,
+    `Created: ${new Date(deck.createdAt).toLocaleDateString()}`,
+    `Updated: ${new Date(deck.updatedAt).toLocaleDateString()}`,
+    `Total Cards: ${deck.total}`,
+    '',
+    'Cards:',
+    ''
+  ];
+  
+  // Group by cost
+  const entries = Object.values(deck.entries).filter(e => e.count > 0);
+  const groupedByCost = groupBy(entries, (e) => getCost(e.card));
+  
+  Object.keys(groupedByCost)
+    .sort((a, b) => parseInt(a) - parseInt(b))
+    .forEach(cost => {
+      lines.push(`Cost ${cost}:`);
+      groupedByCost[cost].forEach(entry => {
+        const card = entry.card;
+        lines.push(`  ${entry.count}x ${card.name} (${card.set} #${card.number})`);
+      });
+      lines.push('');
+    });
+  
+  return lines.join('\n');
+}
+
+// Generate CSV export
+function generateCSVExport(deck) {
+  const lines = ['Name,Set,Number,Cost,Type,Rarity,Count'];
+  
+  const entries = Object.values(deck.entries).filter(e => e.count > 0);
+  entries.forEach(entry => {
+    const card = entry.card;
+    lines.push(`"${card.name}","${card.set}","${card.number}","${getCost(card)}","${card.type}","${card.rarity}","${entry.count}"`);
+  });
+  
+  return lines.join('\n');
+}
+
+// Import deck from various formats
+function importDeck(data, format = 'json') {
+  try {
+    let deck;
+    
+    switch (format) {
+      case 'json':
+        deck = typeof data === 'string' ? JSON.parse(data) : data;
+        break;
+      case 'txt':
+        deck = parseTextImport(data);
+        break;
+      case 'csv':
+        deck = parseCSVImport(data);
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
+    }
+    
+    // Validate and normalize deck structure
+    if (!deck.entries || typeof deck.entries !== 'object') {
+      throw new Error('Invalid deck structure: missing entries');
+    }
+    
+    // Ensure deck has required fields
+    const normalizedDeck = {
+      id: generateDeckId(),
+      name: deck.name || "Imported Deck",
+      entries: deck.entries,
+      total: Object.values(deck.entries).reduce((sum, entry) => sum + (entry.count || 0), 0),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      description: deck.description || "",
+      tags: deck.tags || [],
+      format: deck.format || "Lorcana",
+      notes: deck.notes || ""
+    };
+    
+    return normalizedDeck;
+  } catch (error) {
+    console.error('[importDeck] Error importing deck:', error);
+    throw error;
+  }
+}
+
+// Parse text import (basic implementation)
+function parseTextImport(text) {
+  // This is a basic parser - you can enhance it based on your needs
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+  const deck = { entries: {} };
+  
+  lines.forEach(line => {
+    // Look for card lines like "2x Card Name (Set #123)"
+    const match = line.match(/^(\d+)x\s+(.+?)\s+\((.+?)\s+#(\d+)\)$/);
+    if (match) {
+      const [, count, name, set, number] = match;
+      const card = { name, set, number };
+      const key = deckKey(card);
+      deck.entries[key] = { card, count: parseInt(count) };
+    }
+  });
+  
+  return deck;
+}
+
+// Parse CSV import (basic implementation)
+function parseCSVImport(csv) {
+  const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
+  const deck = { entries: {} };
+  
+  // Skip header line
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    const columns = line.split(',').map(col => col.replace(/^"|"$/g, ''));
+    
+    if (columns.length >= 7) {
+      const [name, set, number, cost, type, rarity, count] = columns;
+      const card = { name, set, number, cost: parseInt(cost), type, rarity };
+      const key = deckKey(card);
+      deck.entries[key] = { card, count: parseInt(count) };
+    }
+  }
+  
+  return deck;
+}
+
 const initialDeckState = () => {
-  const saved = loadLS(LS_KEYS.DECK, null);
-  return saved || { entries: {}, total: 0, name: "Untitled Deck" };
+  const { decks, currentDeckId } = loadAllDecks();
+  return decks[currentDeckId] || createNewDeck("Untitled Deck");
 };
 
 function deckReducer(state, action) {
   switch (action.type) {
     case "SET_NAME": {
       const name = action.name || "Untitled Deck";
-      const next = { ...state, name };
-      saveLS(LS_KEYS.DECK, next);
+      const next = { ...state, name, updatedAt: Date.now() };
       return next;
     }
     case "RESET": {
-      const next = { entries: {}, total: 0, name: "Untitled Deck" };
-      saveLS(LS_KEYS.DECK, next);
+      const next = createNewDeck("Untitled Deck");
       return next;
     }
     case "IMPORT_STATE": {
-      const next = action.deck || { entries: {}, total: 0, name: "Imported Deck" };
-      saveLS(LS_KEYS.DECK, next);
+      const next = action.deck || createNewDeck("Imported Deck");
       return next;
     }
     case "ADD": {
@@ -1815,17 +2036,19 @@ function deckReducer(state, action) {
       };
       const newTotal =
         Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0) || 0;
-      const next = { ...state, entries: nextEntries, total: newTotal };
-      saveLS(LS_KEYS.DECK, next);
+      const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
       return next;
     }
     case "SET_COUNT": {
       const { card, count } = action;
       const key = deckKey(card);
       const nextEntries = { ...state.entries };
-      nextEntries[key] = { card, count: clamp(count, 0, DECK_RULES.MAX_COPIES) };
+      nextEntries[key] = {
+        card,
+        count: clamp(count, 0, DECK_RULES.MAX_COPIES)
+      };
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
-      const next = { ...state, entries: nextEntries, total: newTotal };
+      const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
       return next;
     }
     case "REMOVE": {
@@ -1834,14 +2057,27 @@ function deckReducer(state, action) {
       const nextEntries = { ...state.entries };
       delete nextEntries[key];
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
-      const next = { ...state, entries: nextEntries, total: newTotal };
-      saveLS(LS_KEYS.DECK, next);
+      const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
       return next;
+    }
+    case "UPDATE_METADATA": {
+      const next = { ...state, ...action.updates, updatedAt: Date.now() };
+      return next;
+    }
+    case "SWITCH_DECK": {
+      console.log('[deckReducer] SWITCH_DECK action:', action);
+      console.log('[deckReducer] Current state:', state);
+      console.log('[deckReducer] New deck:', action.deck);
+      const newState = action.deck || state;
+      console.log('[deckReducer] Returning new state:', newState);
+      return newState;
     }
     default:
       return state;
   }
 }
+
+
 
 // -----------------------------------------------------------------------------
 // Filters state
@@ -1897,6 +2133,7 @@ function serializeFilterState(state) {
     sets: Array.from(state.sets || []),
     classifications: Array.from(state.classifications || []),
     abilities: Array.from(state.abilities || []),
+    selectedCosts: Array.from(state.selectedCosts || []), // Add missing selectedCosts serialization
     showFilterPanel: state.showFilterPanel || false,
     // New filters
     setNumber: state.setNumber || "",
@@ -1924,6 +2161,7 @@ function hydrateFilterState(raw) {
     sets: new Set(raw.sets || []),
     classifications: new Set(raw.classifications || []),
     abilities: new Set(raw.abilities || []),
+    selectedCosts: new Set(raw.selectedCosts || []), // Add missing selectedCosts hydration
     showFilterPanel: raw.showFilterPanel || false,
     // New filters
     setNumber: raw.setNumber || "",
@@ -1946,49 +2184,63 @@ function filterReducer(state, action) {
     case "SET_TEXT":
       return persist({ ...state, text: action.text || "" });
     case "TOGGLE_INK": {
-      const inks = new Set(state.inks);
+      // Ensure inks is a Set before operating on it
+      const currentInks = state.inks instanceof Set ? state.inks : new Set();
+      const inks = new Set(currentInks);
       if (inks.has(action.ink)) inks.delete(action.ink);
       else inks.add(action.ink);
       return persist({ ...state, inks });
     }
     case "TOGGLE_COST": {
-      const selectedCosts = new Set(state.selectedCosts);
+      // Ensure selectedCosts is a Set before operating on it
+      const currentSelectedCosts = state.selectedCosts instanceof Set ? state.selectedCosts : new Set();
+      const selectedCosts = new Set(currentSelectedCosts);
       if (selectedCosts.has(action.cost)) selectedCosts.delete(action.cost);
       else selectedCosts.add(action.cost);
       return persist({ ...state, selectedCosts });
     }
     case "TOGGLE_CLASSIFICATION": {
-  const classifications = new Set(state.classifications);
-  if (classifications.has(action.classification)) classifications.delete(action.classification);
-  else classifications.add(action.classification);
-  return persist({ ...state, classifications });
-}
-case "TOGGLE_ABILITY": {
-  // Prevent empty strings from being added to abilities
-  if (!action.ability || typeof action.ability !== 'string' || !action.ability.trim()) {
-    console.warn('[FilterReducer] Attempted to add invalid ability:', action.ability);
-    return state;
-  }
-  
-  const abilities = new Set(state.abilities);
-  if (abilities.has(action.ability)) abilities.delete(action.ability);
-  else abilities.add(action.ability);
-  return persist({ ...state, abilities });
-}
+      // Ensure classifications is a Set before operating on it
+      const currentClassifications = state.classifications instanceof Set ? state.classifications : new Set();
+      const classifications = new Set(currentClassifications);
+      if (classifications.has(action.classification)) classifications.delete(action.classification);
+      else classifications.add(action.classification);
+      return persist({ ...state, classifications });
+    }
+    case "TOGGLE_ABILITY": {
+      // Prevent empty strings from being added to abilities
+      if (!action.ability || typeof action.ability !== 'string' || !action.ability.trim()) {
+        console.warn('[FilterReducer] Attempted to add invalid ability:', action.ability);
+        return state;
+      }
+      
+      // Ensure abilities is a Set before operating on it
+      const currentAbilities = state.abilities instanceof Set ? state.abilities : new Set();
+      const abilities = new Set(currentAbilities);
+      if (abilities.has(action.ability)) abilities.delete(action.ability);
+      else abilities.add(action.ability);
+      return persist({ ...state, abilities });
+    }
     case "TOGGLE_RARITY": {
-      const rarities = new Set(state.rarities);
+      // Ensure rarities is a Set before operating on it
+      const currentRarities = state.rarities instanceof Set ? state.rarities : new Set();
+      const rarities = new Set(currentRarities);
       if (rarities.has(action.rarity)) rarities.delete(action.rarity);
       else rarities.add(action.rarity);
       return persist({ ...state, rarities });
     }
     case "TOGGLE_TYPE": {
-      const types = new Set(state.types);
+      // Ensure types is a Set before operating on it
+      const currentTypes = state.types instanceof Set ? state.types : new Set();
+      const types = new Set(currentTypes);
       if (types.has(action.cardType)) types.delete(action.cardType);
       else types.add(action.cardType);
       return persist({ ...state, types });
     }
     case "TOGGLE_SET": {
-      const sets = new Set(state.sets);
+      // Ensure sets is a Set before operating on it
+      const currentSets = state.sets instanceof Set ? state.sets : new Set();
+      const sets = new Set(currentSets);
       if (sets.has(action.setCode)) sets.delete(action.setCode);
       else sets.add(action.setCode);
       return persist({ ...state, sets });
@@ -2029,7 +2281,9 @@ case "TOGGLE_ABILITY": {
         willpowerMax: action.max !== undefined ? action.max : state.willpowerMax
       });
     case "SET_ABILITIES":
-      return persist({ ...state, abilities: action.abilities || new Set() });
+      // Ensure abilities is a Set
+      const abilities = action.abilities instanceof Set ? action.abilities : new Set(action.abilities || []);
+      return persist({ ...state, abilities });
     case "SET_STRENGTH_RANGE":
       return persist({ 
         ...state, 
@@ -2150,7 +2404,7 @@ function useImageCache() {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange }) {
+function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager }) {
   return (
     <div className="flex items-center justify-between gap-4 p-3 bg-gray-900/70 border-b border-gray-800 sticky top-0 z-40 backdrop-blur">
       <div className="flex items-center gap-2">
@@ -2183,8 +2437,15 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
           Filters
         </button>
         <button
+          className="px-3 py-1.5 rounded-xl bg-blue-900 border border-blue-700 hover:bg-blue-800"
+          onClick={onDeckManager}
+          title="Manage decks"
+        >
+          Decks
+        </button>
+        <button
           className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
-          onClick={onResetDeck}
+          onClick={onNewDeck}
           title="Start fresh deck"
         >
           New
@@ -2196,7 +2457,6 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
         >
           Import
         </button>
-
       </div>
     </div>
   );
@@ -2283,7 +2543,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               <TogglePill
                 key={i}
                 label={i === 0 ? "0" : i === 10 ? "10+" : String(i)}
-                active={state.selectedCosts.has(i)}
+                active={state.selectedCosts instanceof Set ? state.selectedCosts.has(i) : false}
                 onClick={() => dispatch({ type: "TOGGLE_COST", cost: i })}
               />
             ))}
@@ -2664,31 +2924,345 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         </div>
       )}
       
-      {/* Deck count overlay - always visible */}
-      <div className="absolute top-1 right-1 bg-black/80 backdrop-blur-sm rounded-md px-1.5 py-0.5">
-        <div className="text-xs font-medium text-white">
-          {deckCount}/4
-        </div>
-      </div>
-      
-      {/* Add/Remove buttons - always visible */}
-      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-1">
+      {/* Add/Remove buttons with card count - always visible to prevent layout shifts */}
+      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-2">
         <button
-          className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center"
+          className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center transition-colors"
           onClick={(e) => { e.stopPropagation(); onAdd(card, 1); }}
           title="Add to deck"
         >
           +
         </button>
-        {deckCount > 0 && (
+        
+        {/* Card count display */}
+        <div className="bg-black/90 backdrop-blur-sm rounded-md px-2 py-1 min-w-[2.5rem] text-center border border-gray-600/50">
+          <div className="text-xs font-bold text-white">
+            {deckCount}/4
+          </div>
+        </div>
+        
+        <button
+          className={`w-6 h-6 rounded-full border text-xs flex items-center justify-center transition-colors ${
+            deckCount > 0 
+              ? 'bg-red-900/90 border-red-700 text-red-100 hover:bg-red-800 cursor-pointer' 
+              : 'bg-gray-900/50 border-gray-600 text-gray-500 cursor-not-allowed'
+          }`}
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            if (deckCount > 0) onAdd(card, -1); 
+          }}
+          title={deckCount > 0 ? "Remove from deck" : "No cards to remove"}
+          disabled={deckCount === 0}
+        >
+          -
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Deck Manager Component
+// -----------------------------------------------------------------------------
+
+function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onExportDeck, onImportDeck }) {
+  const [selectedDeckId, setSelectedDeckId] = useState(currentDeckId);
+  const [showNewDeckForm, setShowNewDeckForm] = useState(false);
+  const [newDeckName, setNewDeckName] = useState("");
+  const [exportFormat, setExportFormat] = useState("json");
+  const [importFormat, setImportFormat] = useState("json");
+  const [importData, setImportData] = useState("");
+
+  // Only fix selectedDeckId if it's invalid - don't override user selections
+  useEffect(() => {
+    // If selectedDeckId is invalid (null, undefined, or points to a non-existent deck)
+    // AND there are decks available, then set a valid selectedDeckId.
+    if (Object.keys(decks).length > 0 && (!selectedDeckId || !decks[selectedDeckId])) {
+      // Prioritize currentDeckId if it's valid, otherwise pick the first available deck
+      const fallbackDeckId = currentDeckId && decks[currentDeckId] ? currentDeckId : Object.keys(decks)[0];
+      console.log('[DeckManager] Fixing invalid selectedDeckId. Setting to fallback:', fallbackDeckId);
+      setSelectedDeckId(fallbackDeckId);
+    }
+  }, [currentDeckId, decks, selectedDeckId]);
+
+  // Additional safety check: ensure selectedDeckId is always valid
+  useEffect(() => {
+    if (selectedDeckId && !decks[selectedDeckId] && Object.keys(decks).length > 0) {
+      console.log('[DeckManager] Safety check: selectedDeckId is invalid, fixing...');
+      const firstDeckId = Object.keys(decks)[0];
+      setSelectedDeckId(firstDeckId);
+    }
+  }, [selectedDeckId, decks]);
+
+  if (!isOpen) return null;
+
+  const currentDeck = decks[currentDeckId];
+  const selectedDeck = decks[selectedDeckId];
+  
+  // Debug logging
+  console.log('[DeckManager] Debug info:', {
+    currentDeckId,
+    selectedDeckId,
+    decksKeys: Object.keys(decks),
+    currentDeck: currentDeck?.name,
+    selectedDeck: selectedDeck?.name,
+    selectedDeckExists: !!selectedDeck
+  });
+
+  const handleNewDeck = () => {
+    if (newDeckName.trim()) {
+      onNewDeck(newDeckName.trim());
+      setNewDeckName("");
+      setShowNewDeckForm(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!selectedDeck) return;
+    
+    const exportData = exportDeck(selectedDeck, exportFormat);
+    const blob = new Blob([exportData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${exportFormat}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    if (!importData.trim()) return;
+    
+    try {
+      const importedDeck = importDeck(importData, importFormat);
+      onImportDeck(importedDeck);
+      setImportData("");
+      onClose();
+    } catch (error) {
+      alert(`Import failed: ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-xl border border-gray-700 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h2 className="text-xl font-semibold">Deck Manager</h2>
           <button
-            className="w-6 h-6 rounded-full bg-red-900/90 border border-red-700 text-red-100 text-xs hover:bg-red-800 flex items-center justify-center"
-            title="Remove from deck"
-            onClick={(e) => { e.stopPropagation(); onAdd(card, -1); }}
+            onClick={onClose}
+            className="text-gray-400 hover:text-white"
           >
-            -
+            ✕
           </button>
-        )}
+        </div>
+
+        <div className="flex h-96">
+          {/* Left side - Deck list */}
+          <div className="w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Your Decks</h3>
+              <button
+                onClick={() => setShowNewDeckForm(true)}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+              >
+                + New
+              </button>
+            </div>
+
+            {showNewDeckForm && (
+              <div className="mb-4 p-3 bg-gray-800 rounded border border-gray-600">
+                <input
+                  type="text"
+                  placeholder="Deck name"
+                  value={newDeckName}
+                  onChange={(e) => setNewDeckName(e.target.value)}
+                  className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm mb-2"
+                  onKeyPress={(e) => e.key === 'Enter' && handleNewDeck()}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleNewDeck}
+                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs"
+                  >
+                    Create
+                  </button>
+                  <button
+                    onClick={() => setShowNewDeckForm(false)}
+                    className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {Object.keys(decks).length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-4xl mb-3">📁</div>
+                  <div className="font-medium mb-2">No Saved Decks</div>
+                  <div className="text-sm">
+                    Create a deck and save it to see it here.
+                  </div>
+                </div>
+              ) : (
+                Object.values(decks).map((deck) => (
+                  <div
+                    key={deck.id}
+                    className={`p-3 rounded border cursor-pointer transition ${
+                      deck.id === selectedDeckId
+                        ? 'border-emerald-500 bg-emerald-900/20'
+                        : 'border-gray-600 hover:border-gray-500'
+                    }`}
+                    onClick={() => {
+                    console.log('[DeckManager] Deck clicked:', deck);
+                    console.log('[DeckManager] Setting selectedDeckId to:', deck.id);
+                    setSelectedDeckId(deck.id);
+                  }}
+                  >
+                    <div className="font-medium">{deck.name}</div>
+                    <div className="text-sm text-gray-400">
+                      {deck.total} cards • {new Date(deck.updatedAt).toLocaleDateString()}
+                    </div>
+                    {deck.id === currentDeckId && (
+                      <div className="text-xs text-emerald-400 mt-1">Current</div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Right side - Deck details and actions */}
+          <div className="flex-1 p-4 overflow-y-auto">
+            {Object.keys(decks).length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <div className="text-4xl mb-3">💾</div>
+                <div className="font-medium mb-2">Save Your First Deck</div>
+                <div className="text-sm mb-4">
+                  Create a deck, add some cards, and click Save to get started.
+                </div>
+                <button
+                  onClick={() => setShowNewDeckForm(true)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded"
+                >
+                  Create New Deck
+                </button>
+              </div>
+            ) : selectedDeck ? (
+              <div>
+                <h3 className="font-semibold mb-4">{selectedDeck.name}</h3>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Cards:</span> {selectedDeck.total}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Created:</span> {new Date(selectedDeck.createdAt).toLocaleDateString()}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Updated:</span> {new Date(selectedDeck.updatedAt).toLocaleDateString()}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Format:</span> {selectedDeck.format}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      console.log('[DeckManager] Switch button clicked for deck:', selectedDeck);
+                      console.log('[DeckManager] Calling onSwitchDeck with:', selectedDeck);
+                      onSwitchDeck(selectedDeck);
+                    }}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+                  >
+                    Switch to This Deck
+                  </button>
+                  
+                  <button
+                    onClick={() => onDuplicateDeck(selectedDeck.id)}
+                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded"
+                  >
+                    Duplicate Deck
+                  </button>
+
+                  <div className="border-t border-gray-700 pt-3">
+                    <h4 className="font-medium mb-2">Export</h4>
+                    <div className="flex gap-2 mb-2">
+                      <select
+                        value={exportFormat}
+                        onChange={(e) => setExportFormat(e.target.value)}
+                        className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                      >
+                        <option value="json">JSON</option>
+                        <option value="txt">Text</option>
+                        <option value="csv">CSV</option>
+                      </select>
+                      <button
+                        onClick={handleExport}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                      >
+                        Export
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-700 pt-3">
+                    <h4 className="font-medium mb-2">Import</h4>
+                    <div className="space-y-2">
+                      <select
+                        value={importFormat}
+                        onChange={(e) => setImportFormat(e.target.value)}
+                        className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                      >
+                        <option value="json">JSON</option>
+                        <option value="txt">Text</option>
+                        <option value="csv">CSV</option>
+                      </select>
+                      <textarea
+                        placeholder="Paste deck data here..."
+                        value={importData}
+                        onChange={(e) => setImportData(e.target.value)}
+                        className="w-full h-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm resize-none"
+                      />
+                      <button
+                        onClick={handleImport}
+                        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                      >
+                        Import
+                      </button>
+                    </div>
+                  </div>
+
+                  {selectedDeck.id !== currentDeckId && (
+                    <button
+                      onClick={() => onDeleteDeck(selectedDeck.id)}
+                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
+                    >
+                      Delete Deck
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : Object.keys(decks).length > 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                <div className="text-4xl mb-3">📋</div>
+                <div className="font-medium mb-2">Select a Deck</div>
+                <div className="text-sm">
+                  Choose a deck from the list to view details and manage it.
+                </div>
+                {selectedDeckId && !decks[selectedDeckId] && (
+                  <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded text-red-300 text-xs">
+                    Warning: Selected deck ID ({selectedDeckId}) not found in decks collection.
+                    This might indicate a synchronization issue.
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -3200,7 +3774,7 @@ function PrintableSheet({ deck, onClose }) {
 
 // Deck Presentation Popup ----------------------------------------------------
 
-function DeckPresentationPopup({ deck, onClose }) {
+function DeckPresentationPopup({ deck, onClose, onSave }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   
   // Lorcanito export constants and functions
@@ -3444,6 +4018,11 @@ function DeckPresentationPopup({ deck, onClose }) {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-emerald-400">{deck.name}</h1>
           <p className="text-gray-400 mt-2">A Lorcana Deck</p>
+          {deck.updatedAt && (
+            <p className="text-xs text-gray-500 mt-1">
+              Last saved: {new Date(deck.updatedAt).toLocaleString()}
+            </p>
+          )}
         </div>
         
         {/* Card Images Grid - Organized by Type and Cost */}
@@ -3951,20 +4530,18 @@ function DeckPresentationPopup({ deck, onClose }) {
         {/* Action Buttons - Always Visible */}
         <div className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 mt-6 pt-4 pb-2">
           <div className="flex justify-center gap-4 flex-wrap">
-            {/* Export Button - Downloads deck as PNG image */}
+            {/* Download Image Button */}
             <button
               onClick={() => {
-                // Trigger the image export functionality
-                if (typeof onExportLorcanito === 'function') {
-                  onExportLorcanito(deck);
-                } else {
-                  console.log('[Presentation] Export function not available');
-                }
+                // For now, copy deck to clipboard since image generation was removed
+                const deckText = `Deck: ${deck.name}\nTotal Cards: ${totalCards}\n\nCards:\n${Object.values(deck.entries || {}).filter(e => e.count > 0).map(e => `${e.count}x ${e.card.name}`).join('\n')}`;
+                navigator.clipboard.writeText(deckText);
+                alert('Deck copied to clipboard! (Image download temporarily disabled)');
               }}
-              className="px-6 py-3 bg-emerald-900 border border-emerald-700 hover:bg-emerald-800 rounded-lg font-semibold transition-colors shadow-lg"
-              title="Download deck as PNG image"
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors shadow-lg"
+              title="Copy deck to clipboard (image download temporarily disabled)"
             >
-              📥 Export Image
+              📋 Copy Deck
             </button>
 
             {/* Print Button - Opens print dialog */}
@@ -3979,29 +4556,20 @@ function DeckPresentationPopup({ deck, onClose }) {
               🖨️ Print
             </button>
 
-            {/* Save Button - Saves deck for later editing */}
+            {/* Save Button - Saves the current deck */}
             <button
               onClick={() => {
-                // Save deck to localStorage for later editing
-                const savedDecks = JSON.parse(localStorage.getItem('savedLorcanaDecks') || '[]');
-                const existingIndex = savedDecks.findIndex(d => d.name === deck.name);
-                
-                if (existingIndex >= 0) {
-                  savedDecks[existingIndex] = deck;
-                } else {
-                  savedDecks.push(deck);
+                if (onSave) {
+                  onSave();
                 }
-                
-                localStorage.setItem('savedLorcanaDecks', JSON.stringify(savedDecks));
-                
-                // Show success message
-                alert(`Deck "${deck.name}" saved successfully!`);
               }}
-              className="px-6 py-3 bg-emerald-600 border border-emerald-500 hover:bg-emerald-500 rounded-lg font-semibold transition-colors shadow-lg"
-              title="Save deck for later editing"
+              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-lg font-semibold transition-colors shadow-lg"
+              title="Save deck to storage"
             >
-              💾 Save
+              💾 Save Deck
             </button>
+
+
 
             {/* Copy Stats Button - Copies deck statistics */}
             <button
@@ -4024,865 +4592,313 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
             </button>
 
             {/* Copy for Lorcanito Button - Copies plain text decklist */}
-            <button
-              onClick={async () => {
-                try {
-                  // Generate Lorcanito-compatible text export
-                  const deckEntries = Object.values(deck.entries || {}).filter(e => e.count > 0);
-                  
-                  if (deckEntries.length === 0) {
-                    alert("No cards in deck to export!");
-                    return;
-                  }
-                  
-                  // Extract ink colors from the deck
-                  const inkColors = new Set();
-                  for (const { card } of deckEntries) {
-                    const inks = card.inks || card._raw?.inks || card._raw?.Inks || [];
-                    if (Array.isArray(inks)) {
-                      inks.forEach(ink => inkColors.add(ink));
-                    } else if (typeof inks === 'string') {
-                      inks.split(',').map(ink => ink.trim()).forEach(ink => inkColors.add(ink));
-                    }
-                  }
-                  
-                  const text = makeLorcanitoTextExport({
-                    name: deck.name,
-                    inks: Array.from(inkColors),
-                    entries: deckEntries
-                  });
-                  
-                  // Copy to clipboard
-                  if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                    alert("Deck copied to clipboard! Paste into Lorcanito.");
-                  } else {
-                    // Fallback for older browsers
-                    const textArea = document.createElement('textarea');
-                    textArea.value = text;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    alert("Deck copied to clipboard! Paste into Lorcanito.");
-                  }
-                } catch (error) {
-                  console.error('Error copying deck:', error);
-                  alert('Failed to copy deck to clipboard');
-                }
-              }}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors shadow-lg"
-              title="Copy decklist in Lorcanito format"
-            >
-              📋 Copy for Lorcanito
-            </button>
-          <button
-            onClick={() => {
-              // Helper function for drawing count badges with proper positioning
-              function drawCountBadge(ctx, x, y, w, h, count) {
-                // radius scales with card width; tweak 0.10 if you want bigger/smaller
-                const r = Math.round(w * 0.10);
-                // how much the bubble "hangs" past the edges
-                const hang = Math.round(r * 0.55);
-
-                // center of the circle (slightly inside the top-right corner)
-                const cx = x + w - (r - hang);
-                const cy = y + (r - hang);
-
-                ctx.save();
-
-                // bubble
-                ctx.shadowColor = "rgba(0,0,0,.45)";
-                ctx.shadowBlur = 8;
-                ctx.fillStyle = "rgba(0,0,0,.85)";
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.fill();
-
-                // small "tab" under the bubble (the little ribbon wedge)
-                ctx.shadowBlur = 0;
-                ctx.beginPath();
-                ctx.moveTo(cx + r * 0.15, cy + r * 0.85);
-                ctx.lineTo(cx + r * 0.15, cy + r * 1.45);
-                ctx.lineTo(cx - r * 0.9,  cy + r * 0.05);
-                ctx.closePath();
-                ctx.fill();
-
-                // number
-                ctx.fillStyle = "#fff";
-                ctx.font = `bold ${Math.round(r * 1.05)}px Arial`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(String(count), cx, cy + 0.5);
-
-                ctx.restore();
-              }
-
-                            // Helper function for grouping and sorting entries by type and cost
-              function groupAndSortEntries(entries) {
-                const order = ["Character", "Action", "Song", "Item", "Location"];
-                
-                // Normalize card types to handle Songs and other subtypes consistently
-                function normalizedType(card) {
-                  const rawType =
-                    card.type ||
-                    card._raw?.type ||
-                    card._raw?.type_line ||
-                    "";
-
-                  const sub = (card.subtypes || card._raw?.subtypes || []).map(String);
-                  const kws = (card.keywords || card._raw?.keywords || []).map(String);
-
-                  const hay = `${rawType} ${sub.join(" ")} ${kws.join(" ")}`.toLowerCase();
-
-                  // Many feeds mark Songs as Action + Song (subtype/keyword/type_line)
-                  if (hay.includes("song")) return "Song";
-                  if (hay.includes("character")) return "Character";
-                  if (hay.includes("item")) return "Item";
-                  if (hay.includes("location")) return "Location";
-                  if (hay.includes("action")) return "Action";
-                  return card.type || "Other";
-                }
-                
-                // group by normalized type
-                const buckets = new Map(order.map(t => [t, []]));
-                for (const e of entries) {
-                  const type = normalizedType(e.card);
-                  if (!buckets.has(type)) buckets.set(type, []);
-                  buckets.get(type).push(e);
-                }
-                
-                // sort each group by cost ascending, then by name
-                for (const [t, arr] of buckets) {
-                  arr.sort((a, b) =>
-                    (getCost(a.card) ?? 0) - (getCost(b.card) ?? 0) ||
-                    String(a.card.name).localeCompare(String(b.card.name))
-                  );
-                }
-                
-                // flatten in the specified order for continuous grid rendering
-                return order.flatMap(t => buckets.get(t) || []);
-              }
-
-              // Bulletproof image loading system for export
-              function candidateImageUrls(card) {
-                const raw = [
-                  card.image_url,
-                  card.image,
-                  card._raw?.image_uris?.digital?.large,
-                  card._raw?.image_uris?.large,
-                  card._raw?.image_uris?.digital?.png,   // sometimes available
-                  card._raw?.image_uris?.png,
-                  card._raw?.image_uris?.digital?.normal,
-                  card._raw?.image_uris?.normal,
-                ].filter(Boolean);
-                return [...new Set(raw)];
-              }
-
-              // Use weserv to make it CORS-safe and PNG (no AVIF issues)
-              function proxy(url) {
-                const u = encodeURIComponent(url);
-                // output=png ensures consistent decoding; add a tiny cache-buster
-                return `https://images.weserv.nl/?url=${u}&output=png&fit=inside&we=1&n=-1&cb=1`;
-              }
-
-              async function loadImageWithFallbacks(urls, { retries = 2 } = {}) {
-                const candidates = urls.map(proxy);
-                for (let i = 0; i < candidates.length; i++) {
-                  const base = candidates[i];
-                  for (let r = 0; r <= retries; r++) {
-                    const trial = r ? `${base}&_r=${Date.now()}` : base; // cache-bust on retry
-                    try {
-                      const res = await fetch(trial, { mode: "cors", cache: "no-store" });
-                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                      const blob = await res.blob();
-                      const obj = URL.createObjectURL(blob);
-                      const img = new Image();
-                      img.crossOrigin = "anonymous";
-                      img.src = obj;
-                      // decode() is more reliable than onload for some formats
-                      await img.decode();
-                      URL.revokeObjectURL(obj);
-                      return img;
-                    } catch (e) {
-                      // small backoff before trying again/next candidate
-                      await new Promise((r) => setTimeout(r, 120));
-                    }
-                  }
-                }
-                throw new Error("All image candidates failed");
-              }
-
-              // Lorcanito-compatible text export system
-              const GROUP_ORDER = ["Character", "Action", "Song", "Item", "Location"];
-
-              function groupAndSortForText(entries) {
-                try {
-                  console.log('[Lorcanito Export] groupAndSortForText called with:', entries);
-                  
-                  const buckets = new Map(GROUP_ORDER.map(t => [t, []]));
-                  for (const e of entries) {
-                    const t = e.card.type || "Character"; // default safety
-                    if (!buckets.has(t)) buckets.set(t, []);
-                    buckets.get(t).push(e);
-                  }
-                  
-                  console.log('[Lorcanito Export] Initial buckets:', Object.fromEntries(buckets));
-                  
-                  for (const [t, arr] of buckets) {
-                    arr.sort((a, b) => (getCost(a.card) ?? 0) - (getCost(b.card) ?? 0) || a.card.name.localeCompare(b.card.name));
-                  }
-                  
-                  const result = GROUP_ORDER
-                    .filter(t => buckets.get(t)?.length)
-                    .map(t => ({ section: t, entries: buckets.get(t) }));
-                  
-                  console.log('[Lorcanito Export] Final grouped result:', result);
-                  return result;
-                } catch (error) {
-                  console.error('[Lorcanito Export] Error in groupAndSortForText:', error);
-                  throw error;
-                }
-              }
-
-              function displayNameForText(card) {
-                const variant = card.title || card.version || card._raw?.version || card._raw?.Version || card.subname || null;
-                return variant ? `${card.name} — ${variant}` : card.name;
-              }
-
-              // Optional: append set + number when available to disambiguate
-              function lineForText(e, withSet = true) {
-                const c = e.card;
-                const set = c.set || c._raw?.setCode || c._raw?.set;
-                const num = c.number || c._raw?.number || c._raw?.collector_number;
-                const base = `${e.count} ${displayNameForText(c)}`;
-                return withSet && set && num ? `${base} (${set} #${num})` : base;
-              }
-
-              function makeLorcanitoTextExport({ name, inks, entries }) {
-                try {
-                  console.log('[Lorcanito Export] makeLorcanitoTextExport called with:', { name, inks, entries });
-                  
-                  const groups = groupAndSortForText(entries);
-                  console.log('[Lorcanito Export] Grouped entries:', groups);
-                  
-                  const lines = [];
-                  if (name) lines.push(`# ${name}`);
-                  if (inks?.length) lines.push(`# Inks: ${inks.join(" / ")}`);
-                  lines.push(`# Total: ${entries.reduce((s, x) => s + (x.count || 0), 0)}`, "");
-
-                  for (const { section, entries: list } of groups) {
-                    lines.push(`# ${section}s`);
-                    for (const e of list) {
-                      const line = lineForText(e, /*withSet*/ true);
-                      lines.push(line);
-                      console.log(`[Lorcanito Export] Added line: ${line}`);
-                    }
-                    lines.push("");
-                  }
-                  
-                  const result = lines.join("\n").trim() + "\n";
-                  console.log('[Lorcanito Export] Final result:', result);
-                  return result;
-                } catch (error) {
-                  console.error('[Lorcanito Export] Error in makeLorcanitoTextExport:', error);
-                  throw error;
-                }
-              }
-
-
-
-              // Generate and download deck image with enhanced quality
-              // Features:
-              // - High-resolution 2x scaling for crisp images
-              // - Larger card dimensions (120x168 vs 80x112)
-              // - Prioritized large/PNG image sources
-              // - Better footer positioning
-              // - Improved spacing and layout
-              const generateDeckImage = async () => {
-                try {
-                  // Create a canvas element
-                  const canvas = document.createElement('canvas');
-                  const ctx = canvas.getContext('2d');
-                  
-                                    // Calculate grid dimensions - increased for better quality
-                  const cardsPerRow = 10;
-                  const cardWidth = 120;  // Increased from 80 for sharper images
-                  const cardHeight = 168; // Increased from 112 for sharper images
-                  const cardSpacing = 12; // Increased from 8 for better spacing
-                  const headerHeight = 100;
-                  const footerHeight = 80; // Increased for better footer positioning
-                  
-                                     // Group and sort entries by type and cost, then flatten for continuous grid
-                   const sortedEntries = groupAndSortEntries(entries);
-                   console.log(`[Export] Sorted ${sortedEntries.length} cards by type and cost for continuous grid`);
-                   console.log(`[Export] Total cards to process: ${entries.length}`);
-                  
-                  // Calculate total dimensions for continuous grid (no section headers)
-                  const totalRows = Math.ceil(sortedEntries.length / cardsPerRow);
-                  
-                  const canvasWidth = (cardsPerRow * cardWidth) + ((cardsPerRow - 1) * cardSpacing) + 40;
-                  const canvasHeight = headerHeight + (totalRows * cardHeight) + ((totalRows - 1) * cardSpacing) + footerHeight;
-                  
-                  // Set canvas size with 2x scaling for high-resolution export
-                  // This doubles the pixel density, making text and card art much clearer
-                  // Change scale to 1 for standard resolution, 2 for high-resolution
-                  const scale = 2; // 2x scaling for crisp images
-                  canvas.width = canvasWidth * scale;
-                  canvas.height = canvasHeight * scale;
-                  
-                  // Scale the context for high-resolution drawing
-                  ctx.scale(scale, scale);
-                  
-                  // Fill background
-                  ctx.fillStyle = '#1f2937';
-                  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                  
-                  // Draw header
-                  ctx.fillStyle = '#10b981';
-                  ctx.font = 'bold 32px Arial';
-                  ctx.textAlign = 'center';
-                  ctx.fillText(deck.name, canvasWidth / 2, 40);
-                  
-                  ctx.fillStyle = '#9ca3af';
-                  ctx.font = '16px Arial';
-                  ctx.fillText('Lorcana Deck', canvasWidth / 2, 65);
-                  
-                  // Preload all images before drawing for better performance
-                  console.log(`[Export] Preloading ${sortedEntries.length} images...`);
-                  const preloaded = [];
-                  for (const { card } of sortedEntries) {
-                    try {
-                      const img = await loadImageWithFallbacks(candidateImageUrls(card));
-                      preloaded.push(img);
-                      console.log(`[Export] ✓ Preloaded image for ${card.name}`);
-                    } catch (error) {
-                      console.warn(`[Export] ✗ Failed to preload image for ${card.name}:`, error.message);
-                      preloaded.push(null);
-                    }
-                  }
-                  
-                  // Draw cards in continuous grid (no section headers)
-                  let totalProcessed = 0;
-                  for (let i = 0; i < sortedEntries.length; i++) {
-                    const { card, count } = sortedEntries[i];
-                    const row = Math.floor(i / cardsPerRow);
-                    const col = i % cardsPerRow;
-                    const x = 20 + (col * (cardWidth + cardSpacing));
-                    const y = headerHeight + 20 + (row * (cardHeight + cardSpacing));
-                    
-                    // Draw card frame first
-                    ctx.fillStyle = '#374151';
-                    ctx.fillRect(x, y, cardWidth, cardHeight);
-                    ctx.strokeStyle = '#6b7280';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(x, y, cardWidth, cardHeight);
-                    
-                    // Draw the preloaded image (or keep gray frame if failed)
-                    const img = preloaded[i];
-                    if (img) {
-                      ctx.drawImage(img, x, y, cardWidth, cardHeight);
-                      console.log(`[Export] ✓ Drew image for ${card.name}`);
-                    } else {
-                      console.log(`[Export] ✗ Using fallback gray frame for ${card.name}`);
-                    }
-                    
-                    // Draw count badge using the improved positioning helper
-                    drawCountBadge(ctx, x, y, cardWidth, cardHeight, count);
-                    
-                    totalProcessed++;
-                    
-                    // Log progress every 5 cards
-                    if (totalProcessed % 5 === 0 || totalProcessed === sortedEntries.length) {
-                      console.log(`[Export] Processed ${totalProcessed}/${sortedEntries.length} cards (${Math.round((totalProcessed / sortedEntries.length) * 100)}%)`);
-                    }
-                  }
-                  
-                  // Draw footer with better positioning
-                  ctx.fillStyle = '#6b7280';
-                  ctx.font = '16px Arial';
-                  ctx.textAlign = 'center';
-                  ctx.fillText(`Generated by Lorcana Deck Builder • ${new Date().toLocaleDateString()}`, canvasWidth / 2, canvasHeight - 40);
-                  
-                  // Convert to blob and download
-                  canvas.toBlob((blob) => {
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_deck_image.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    console.log(`[Export] Deck image downloaded successfully!`);
-                    console.log(`[Export] Final summary: Processed ${totalProcessed} cards in continuous grid`);
-                  }, 'image/png');
-                  
-                } catch (error) {
-                  console.error('Error generating deck image:', error);
-                  alert('Error generating deck image. Please try again.');
-                }
-              };
-              
-              generateDeckImage();
-            }}
-            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors shadow-lg"
-          >
-            🖼️ Download Image
-          </button>
-          <button
-            onClick={() => onExportLorcanito(deck)}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors shadow-lg"
-          >
-            📋 Copy for Lorcanito
-          </button>
-          <button
-            onClick={() => {
-              // Save deck for later editing
-              const savedDecks = JSON.parse(localStorage.getItem('savedLorcanaDecks') || '[]');
-              
-              // Create a saveable deck object with full card data
-              const saveableDeck = {
-                id: Date.now().toString(),
-                name: deck.name,
-                savedAt: new Date().toISOString(),
-                entries: entries.map(e => ({
-                  card: {
-                    name: e.card.name,
-                    set: e.card.set,
-                    number: e.card.number,
-                    type: e.card.type,
-                    inks: e.card.inks,
-                    rarity: e.card.rarity,
-                    cost: getCost(e.card),
-                    image_url: e.card.image_url || e.card._imageFromAPI,
-                    // Include other essential card properties
-                    classifications: e.card.classifications,
-                    abilities: e.card.abilities,
-                    text: e.card.text,
-                    lore: e.card.lore,
-                    willpower: e.card.willpower,
-                    strength: e.card.strength,
-                    // Include raw data for API compatibility
-                    _raw: e.card._raw
-                  },
-                  count: e.count
-                }))
-              };
-              
-              // Check if deck with same name already exists
-              const existingIndex = savedDecks.findIndex(d => d.name === deck.name);
-              if (existingIndex !== -1) {
-                // Update existing deck
-                savedDecks[existingIndex] = saveableDeck;
-              } else {
-                // Add new deck
-                savedDecks.push(saveableDeck);
-              }
-              
-              // Save to localStorage
-              localStorage.setItem('savedLorcanaDecks', JSON.stringify(savedDecks));
-              
-              // Show success message (you could add a toast here)
-              alert(`Deck "${deck.name}" saved successfully! You can load it later from the Import menu.`);
-            }}
-            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors shadow-lg"
-          >
-            💾 Save Deck
-          </button>
+              <button
+                onClick={() => onExportLorcanito(deck)}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors shadow-lg"
+                title="Copy decklist in Lorcanito format"
+              >
+                📋 Copy for Lorcanito
+              </button>
+            </div>
+          </div>
+          
+          {/* Print Header */}
+          <div className="hidden print:block text-center border-t pt-4 mt-4">
+            <p className="text-sm text-gray-400">
+              Generated by Lorcana Deck Builder • {new Date().toLocaleDateString()}
+            </p>
           </div>
         </div>
-        
-        {/* Print Header */}
-        <div className="hidden print:block text-center border-t pt-4 mt-4">
-          <p className="text-sm text-gray-400">
-            Generated by Lorcana Deck Builder • {new Date().toLocaleDateString()}
-          </p>
-        </div>
-        
-
-      </div>
-    </Modal>
-  );
-}
+      </Modal>
+    );
+  }
 
 // Root App -------------------------------------------------------------------
 
 function AppInner() {
-const { addToast } = useToasts();
-const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
-const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
-console.log('[App] Initial filters state:', filters);
-const [allCards, setAllCards] = useState([]);
-const [shownCards, setShownCards] = useState([]);
-const [loading, setLoading] = useState(true);
-const [inspectCard, setInspectCard] = useState(null);
-const [exportOpen, setExportOpen] = useState(false);
-const [importOpen, setImportOpen] = useState(false);
-const [printOpen, setPrintOpen] = useState(false);
-const [deckPresentationOpen, setDeckPresentationOpen] = useState(false);
-const [hasActiveFilters, setHasActiveFilters] = useState(false);
+  const { addToast } = useToasts();
+  const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
+  const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
+  console.log('[App] Initial filters state:', filters);
+  const [allCards, setAllCards] = useState([]);
+  const [shownCards, setShownCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inspectCard, setInspectCard] = useState(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [deckPresentationOpen, setDeckPresentationOpen] = useState(false);
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
+  const [saveConfirmationOpen, setSaveConfirmationOpen] = useState(false);
 
-// Add batch image loader
-const { loadImagesInBatch } = useBatchImageLoader();
-const [imageLoadProgress, setImageLoadProgress] = useState({ loaded: 0, failed: 0 });
+  // Enhanced deck management state
+  const [decks, setDecks] = useState({});
+  const [currentDeckId, setCurrentDeckId] = useState(null);
+  const [showDeckManager, setShowDeckManager] = useState(false);
 
-// Performance monitoring for image loading
-const [imagePerformance, setImagePerformance] = useState({
-  totalLoaded: 0,
-  totalFailed: 0,
-  averageLoadTime: 0,
-  startTime: Date.now()
-});
+  // Add batch image loader
+  const { loadImagesInBatch } = useBatchImageLoader();
+  const [imageLoadProgress, setImageLoadProgress] = useState({ loaded: 0, failed: 0 });
 
-// Track image loading performance
-const trackImagePerformance = useCallback((loadTime, success) => {
-  setImagePerformance(prev => {
-    const newTotal = prev.totalLoaded + prev.totalFailed + 1;
-    const newLoaded = prev.totalLoaded + (success ? 1 : 0);
-    const newFailed = prev.totalFailed + (success ? 0 : 1);
-    
-    // Calculate rolling average load time
-    const newAvgTime = success ? 
-      ((prev.averageLoadTime * prev.totalLoaded) + loadTime) / newLoaded : 
-      prev.averageLoadTime;
-    
-    return {
-      totalLoaded: newLoaded,
-      totalFailed: newFailed,
-      averageLoadTime: newAvgTime,
-      startTime: prev.startTime
-    };
+  // Performance monitoring for image loading
+  const [imagePerformance, setImagePerformance] = useState({
+    totalLoaded: 0,
+    totalFailed: 0,
+    averageLoadTime: 0,
+    startTime: Date.now()
   });
-}, []);
 
-// Safety check: ensure all Set properties are properly initialized
-useEffect(() => {
-  console.log('[App] Safety check useEffect triggered');
-  console.log('[App] Current filters state:', filters);
-  
-  // Check if filters object exists and has all required Set properties
-  if (!filters || typeof filters !== 'object') {
-    console.warn('Filters object is missing or invalid, resetting...');
-    filterDispatch({ type: "RESET" });
-    return;
-  }
-  
-  // Clean up any empty strings in abilities filter
-  if (filters.abilities instanceof Set && filters.abilities.has('')) {
-    console.warn('Found empty string in abilities filter, removing...');
-    const cleanAbilities = new Set(Array.from(filters.abilities).filter(a => a && a.trim()));
-    filterDispatch({ type: "SET_ABILITIES", abilities: cleanAbilities });
-    return;
-  }
-  
-  // Only fix if Sets are completely missing, not if they're empty
-  const needsFix = !(filters.inks instanceof Set) || 
-                   !(filters.rarities instanceof Set) || 
-                   !(filters.types instanceof Set) || 
-                   !(filters.sets instanceof Set) || 
-                   !(filters.classifications instanceof Set) || 
-                   !(filters.abilities instanceof Set);
-  
-  console.log('[App] Needs fix check result:', needsFix);
-  if (needsFix) {
-    console.warn('Filter Sets not properly initialized, fixing...', filters);
-    console.log('[App] Dispatching RESET action from safety check');
-    filterDispatch({ type: "RESET" });
-  }
-}, [filters, filterDispatch]);
+  // Track image loading performance
+  const trackImagePerformance = useCallback((loadTime, success) => {
+    setImagePerformance(prev => {
+      const newTotal = prev.totalLoaded + prev.totalFailed + 1;
+      const newLoaded = prev.totalLoaded + (success ? 1 : 0);
+      const newFailed = prev.totalFailed + (success ? 0 : 1);
+      
+      // Calculate rolling average load time
+      const newAvgTime = success ? 
+        ((prev.averageLoadTime * prev.totalLoaded) + loadTime) / newLoaded : 
+        prev.averageLoadTime;
+      
+      return {
+        totalLoaded: newLoaded,
+        totalFailed: newFailed,
+        averageLoadTime: newAvgTime,
+        startTime: prev.startTime
+      };
+    });
+  }, []);
 
-// Debug filter state changes
-useEffect(() => {
-  console.log('[App] Filter state changed useEffect triggered');
-  console.log('[App] Filter state changed:', filters);
-  console.log('[App] Filter state details:', {
-    text: filters.text,
-    inksSize: filters.inks?.size,
-    raritiesSize: filters.rarities?.size,
-    typesSize: filters.types?.size,
-    setsSize: filters.sets?.size,
-    classificationsSize: filters.classifications?.size,
-    abilitiesSize: filters.abilities?.size,
-    selectedCosts: filters.selectedCosts && filters.selectedCosts.size > 0 ? Array.from(filters.selectedCosts) : [],
-    setNumber: filters.setNumber,
-    franchise: filters.franchise,
-    gamemode: filters.gamemode,
-    inkable: filters.inkable,
-    loreMin: filters.loreMin,
-    loreMax: filters.loreMax,
-    willpowerMin: filters.willpowerMin,
-    willpowerMax: filters.willpowerMax,
-    strengthMin: filters.strengthMin,
-    strengthMax: filters.strengthMax,
-    showInkablesOnly: filters.showInkablesOnly,
-    showUninkablesOnly: filters.showUninkablesOnly,
-    resetTimestamp: filters._resetTimestamp
-  });
-  
-  // Check if this is a reset operation
-  if (filters.inks?.size === 0 && 
-      filters.rarities?.size === 0 && 
-      filters.types?.size === 0 && 
-      filters.sets?.size === 0 && 
-      filters.classifications?.size === 0 && 
-      filters.abilities?.size === 0 &&
-      filters.text === "" &&
-      filters.selectedCosts.size === 0 &&
-      !filters.setNumber &&
-      !filters.franchise &&
-      !filters.gamemode &&
-      filters.inkable === "" &&
-      !filters.loreMin &&
-      !filters.loreMax &&
-      !filters.willpowerMin &&
-      !filters.willpowerMax &&
-      !filters.strengthMin &&
-      !filters.strengthMax &&
-      !filters.showInkablesOnly &&
-      !filters.showUninkablesOnly) {
-    console.log('[App] Filter state appears to be reset!');
-  }
-}, [filters]);
-
-// Load all cards once with comprehensive error handling and fallbacks
-useEffect(() => {
-  let abort = new AbortController();
-  
-  // Auto-reset failed image cache on app start
-  const failedCacheReset = resetFailedImageCache();
-  if (failedCacheReset > 0) {
-    console.log(`[App] Auto-reset ${failedCacheReset} failed image cache entries on startup`);
-  }
-  
-  (async () => {
-    setLoading(true);
+  // Safety check: ensure all Set properties are properly initialized
+  useEffect(() => {
+    console.log('[App] Safety check useEffect triggered');
+    console.log('[App] Current filters state:', filters);
     
-    // Strategy 1: Try to load from cache first for instant display
-    const cached = loadLS(LS_KEYS.CACHE_CARDS, []);
-    if (cached?.length > 0) {
-      console.log(`[App] Loading ${cached.length} cards from cache for instant display`);
-      setAllCards(cached);
-      setLoading(false);
-      
-      // Validate cached data quality
-      const validCachedCards = cached.filter(card => 
-        card && typeof card === 'object' && 
-        card.name && card.set && card.number
-      );
-      
-      if (validCachedCards.length < cached.length * 0.8) {
-        console.warn('[App] Cached data quality is poor, will refresh from API');
-        addToast("Cached data quality is poor, refreshing from API", "warning");
-      } else {
-        console.log('[App] Cached data quality is good, using cache');
-        addToast(`Loaded ${validCachedCards.length} cards from cache`, "success");
-      }
+    // Check if filters object exists and has all required Set properties
+    if (!filters || typeof filters !== 'object') {
+      console.warn('Filters object is missing or invalid, resetting...');
+      filterDispatch({ type: "RESET" });
+      return;
     }
     
-    // Strategy 2: Always try to fetch fresh data from API
-    try {
-      console.log('[App] Fetching fresh data from API...');
-      console.log('[App] Fallback API Base URL:', LORCAST_BASE);
-      
-      const data = await fetchAllCards({ signal: abort.signal });
-      
-      console.log('[App] API response received:', {
-        dataType: typeof data,
-        isArray: Array.isArray(data),
-        length: data?.length,
-        sampleData: data?.[0]
-      });
-      
-      if (data && data.length > 0) {
-        console.log(`[App] Successfully fetched ${data.length} cards from API`);
-        
-        // Accept all cards without strict validation - just basic safety checks
-        const validApiCards = data.filter(card => 
-          card && typeof card === 'object' && card.name
-        );
-        
-        console.log('[App] Data validation results:', {
-          totalCards: data.length,
-          validCards: validApiCards.length,
-          invalidCards: data.length - validApiCards.length
-        });
-        
-        if (validApiCards.length > 0) {
-          // Debug: Log the structure of the first few cards
-          console.log('[App] Sample card structure from API:', validApiCards.slice(0, 3).map(card => ({
-            name: card.name,
-            set: card.set,
-            type: card.type,
-            rarity: card.rarity,
-            inks: card.inks,
-            _raw: card._raw ? {
-              set: card._raw.set,
-              set_code: card._raw.set_code,
-              set_num: card._raw.set_num,
-              Set_Num: card._raw.Set_Num,
-              setNum: card._raw.setNum,
-              SetNum: card._raw.SetNum,
-              type: card._raw.type,
-              rarity: card._raw.rarity,
-              inks: card._raw.inks,
-              ink: card._raw.ink,
-              keywords: card._raw.keywords,
-              abilities: card._raw.abilities,
-              Abilities: card._raw.Abilities,
-              text: card._raw.text
-            } : null
-          })));
-          
-          setAllCards(validApiCards);
-          saveLS(LS_KEYS.CACHE_CARDS, validApiCards);
-          
-          if (cached?.length > 0) {
-            addToast(`Refreshed: ${validApiCards.length} cards (was ${cached.length})`, "success");
-          } else {
-            addToast(`Successfully loaded ${validApiCards.length} cards`, "success");
-          }
-        } else {
-          console.error('[App] API returned cards but none passed basic validation');
-          console.error('[App] Sample invalid card:', data[0]);
-          throw new Error('API returned no valid cards after basic validation');
-        }
-      } else {
-        console.error('[App] API returned empty or invalid data');
-        console.error('[App] Data received:', data);
-        throw new Error('API returned empty or invalid data');
-      }
-      
-    } catch (e) {
-      console.error('[App] Failed to load cards from API:', e);
-      console.error('[App] Error details:', {
-        name: e.name,
-        message: e.message,
-        stack: e.stack
-      });
-      
-      // Strategy 3: If API fails and no cache, show error
-      if (!cached?.length) {
-        addToast("Failed to load cards from API and no cache available", "error");
-        setAllCards([]);
-      } else {
-        addToast("API failed, using cached data", "warning");
-        // Keep using cached data that was already set
-      }
-    } finally {
-      setLoading(false);
-    }
-  })();
-  
-  return () => abort.abort();
-}, [addToast]);
-
-// Image preloading removed for maximum performance
-// Images will now load only when they become visible to the user
-// This provides instant page load and on-demand image loading
-
-// PERFORMANCE OPTIMIZATIONS IMPLEMENTED:
-// 1. Parallel loading: Up to 6 images load simultaneously
-// 2. Progressive loading: Placeholder shown immediately, high-quality loads in background
-// 3. Reduced timeouts: 1.5s for initial load, 3s for fallback
-// 4. Smart caching: Failed loads cached to prevent retries
-// 5. Auto-batch loading: Images start loading automatically when cards are displayed
-// 6. Performance monitoring: Track load times and success rates
-// 7. Queue management: Prevents browser from being overwhelmed with concurrent requests
-
-// Apply filters (always local; cards always visible, then filtered)
-useEffect(() => {
-  console.log('[App] Apply filters useEffect triggered');
-  const run = debounce(() => {
-    console.log('[App] Debounced filter application running');
-    
-    // DEBUG: Log sample card data to see actual structure
-    if (allCards.length > 0) {
-      console.log('[DEBUG] Sample card data structure:', {
-        firstCard: allCards[0],
-        sampleCards: allCards.slice(0, 3).map(c => ({
-          name: c.name,
-          set: c.set,
-          number: c.number,
-          inks: c.inks,
-          type: c.type,
-          rarity: c.rarity,
-          cost: c.cost,
-          _raw: c._raw
-        }))
-      });
+    // Clean up any empty strings in abilities filter
+    if (filters.abilities instanceof Set && filters.abilities.has('')) {
+      console.warn('Found empty string in abilities filter, removing...');
+      const cleanAbilities = new Set(Array.from(filters.abilities).filter(a => a && a.trim()));
+      filterDispatch({ type: "SET_ABILITIES", abilities: cleanAbilities });
+      return;
     }
     
-    // Calculate hasActiveFilters inside the effect to ensure it's always current
-    const hasActiveFilters = filters.text?.trim() || 
-                           filters.inks?.size || 
-                           filters.rarities?.size || 
-                           filters.types?.size || 
-                           filters.sets?.size || 
-                           filters.classifications?.size ||
-                           filters.abilities?.size ||
-
-                           filters.setNumber ||
-                           filters.franchise ||
-                           filters.gamemode ||
-
-                           filters.loreMin ||
-                           filters.loreMax ||
-                           filters.willpowerMin ||
-                           filters.willpowerMax ||
-                           filters.strengthMin ||
-                           filters.strengthMax ||
-
-                           filters.showInkablesOnly ||
-                           filters.showUninkablesOnly;
+    // Only fix if Sets are completely missing, not if they're empty
+    const needsFix = !(filters.inks instanceof Set) || 
+                     !(filters.rarities instanceof Set) || 
+                     !(filters.types instanceof Set) || 
+                     !(filters.sets instanceof Set) || 
+                     !(filters.classifications instanceof Set) || 
+                     !(filters.abilities instanceof Set);
     
-    console.log('[Filter Debug] Applying filters:', {
+    console.log('[App] Needs fix check result:', needsFix);
+    if (needsFix) {
+      console.warn('Filter Sets not properly initialized, fixing...', filters);
+      console.log('[App] Dispatching RESET action from safety check');
+      filterDispatch({ type: "RESET" });
+    }
+    }, [filters, filterDispatch]);
+
+  // Debug filter state changes
+  useEffect(() => {
+    console.log('[App] Filter state changed useEffect triggered');
+    console.log('[App] Filter state changed:', filters);
+    console.log('[App] Filter state details:', {
       text: filters.text,
-      inks: Array.from(filters.inks || []),
-      rarities: Array.from(filters.rarities || []),
-      types: Array.from(filters.types || []),
-      sets: Array.from(filters.sets || []),
-      hasActiveFilters
+      inksSize: filters.inks?.size,
+      raritiesSize: filters.rarities?.size,
+      typesSize: filters.types?.size,
+      setsSize: filters.sets?.size,
+      classificationsSize: filters.classifications?.size,
+      abilitiesSize: filters.abilities?.size,
+      selectedCostsSize: filters.selectedCosts?.size,
+      showInkablesOnly: filters.showInkablesOnly,
+      showUninkablesOnly: filters.showUninkablesOnly,
+      sortBy: filters.sortBy,
+      sortDir: filters.sortDir
     });
-    
-    setHasActiveFilters(hasActiveFilters);
-    
-    // Always apply sorting, even without active filters
-    const list = applyFilters(allCards, filters);
-    
-    // Force consistent sorting for the main grid (Ink → Set → Card #)
-    const sortedList = [...list].sort(cardComparator);
-    console.log('[Filter Debug] Applied consistent sorting to', sortedList.length, 'cards');
-    
-    // Debug: log first few cards to verify normalized fields
-    if (sortedList.length > 0) {
-      console.log('[Sort Debug] First 3 cards after sorting:');
-      sortedList.slice(0, 3).forEach((card, i) => {
-        console.log(`[Sort Debug] Card ${i + 1}: "${card.name}" - inks: [${card.inks}], setCode: "${card.setCode}", setName: "${card.setName}", setNum: ${card.setNum}, number: "${card.number}"`);
-      });
-    }
-    
-    // Check for duplicate cards
-    const cardIds = new Set();
-    const duplicates = [];
-    sortedList.forEach(card => {
-      const cardId = deckKey(card);
-      if (cardIds.has(cardId)) {
-        duplicates.push(cardId);
-      } else {
-        cardIds.add(cardId);
+  }, [filters]);
+
+  // Load all cards on mount
+  useEffect(() => {
+    const loadCards = async () => {
+      try {
+        console.log('[App] Loading all cards...');
+        const cards = await fetchAllCards();
+        console.log('[App] Loaded cards:', cards.length);
+        setAllCards(cards);
+        setLoading(false);
+      } catch (error) {
+        console.error('[App] Error loading cards:', error);
+        setLoading(false);
       }
-    });
+    };
     
-    if (duplicates.length > 0) {
-      console.warn(`[Filter Debug] Found ${duplicates.length} duplicate cards:`, duplicates.slice(0, 5));
+    loadCards();
+  }, []);
+
+  // Apply filters to cards
+  useEffect(() => {
+    if (allCards.length === 0) return;
+    
+    console.log('[App] Applying filters to cards...');
+    const filtered = applyFilters(allCards, filters);
+    console.log('[App] Filtered cards:', filtered.length);
+    setShownCards(filtered);
+    
+    // Check if there are active filters
+    const hasFilters = filters.text || 
+                      (filters.inks && filters.inks.size > 0) ||
+                      (filters.rarities && filters.rarities.size > 0) ||
+                      (filters.types && filters.types.size > 0) ||
+                      (filters.sets && filters.sets.size > 0) ||
+                      (filters.classifications && filters.classifications.size > 0) ||
+                      (filters.abilities && filters.abilities.size > 0) ||
+                      (filters.selectedCosts instanceof Set && filters.selectedCosts.size > 0) ||
+                      filters.showInkablesOnly ||
+                      filters.showUninkablesOnly ||
+                      filters.loreMin || filters.loreMax ||
+                      filters.willpowerMin || filters.willpowerMax ||
+                      filters.strengthMin || filters.strengthMax;
+    
+    setHasActiveFilters(hasFilters);
+  }, [allCards, filters]);
+
+  // Enhanced deck management initialization
+  useEffect(() => {
+    console.log('[App] Initializing enhanced deck management...');
+    
+    // Load all decks from storage
+    const allDecks = loadAllDecks();
+    console.log('[App] Loaded decks:', Object.keys(allDecks).length);
+    setDecks(allDecks);
+    
+    // Load current deck ID
+    const currentId = localStorage.getItem(LS_KEYS.CURRENT_DECK_ID);
+    if (currentId && allDecks[currentId]) {
+      console.log('[App] Loading current deck:', currentId);
+      setCurrentDeckId(currentId);
+      deckDispatch({ type: "SWITCH_DECK", deck: allDecks[currentId] });
+    } else if (Object.keys(allDecks).length > 0) {
+      // If no current deck but we have decks, use the first one
+      const firstDeckId = Object.keys(allDecks)[0];
+      console.log('[App] No current deck, using first available:', firstDeckId);
+      setCurrentDeckId(firstDeckId);
+      deckDispatch({ type: "SWITCH_DECK", deck: allDecks[firstDeckId] });
+      saveCurrentDeckId(firstDeckId);
+    } else {
+      // Create a default deck if none exist
+      console.log('[App] No decks found, creating default deck');
+      const defaultDeck = createNewDeck("My First Deck");
+      const newDecks = { [defaultDeck.id]: defaultDeck };
+      setDecks(newDecks);
+      setCurrentDeckId(defaultDeck.id);
+      deckDispatch({ type: "SWITCH_DECK", deck: defaultDeck });
+      saveCurrentDeckId(defaultDeck.id);
+      saveAllDecks(newDecks);
     }
+  }, []);
+
+  // Ensure current deck stays in sync with decks state
+  useEffect(() => {
+    if (currentDeckId && decks[currentDeckId] && deck?.id === currentDeckId) {
+      // Check if the deck in decks state is different from current deck
+      const deckInCollection = decks[currentDeckId];
+      if (JSON.stringify(deckInCollection) !== JSON.stringify(deck)) {
+        console.log('[App] Deck in collection differs from current deck, updating...');
+        // Only update if the difference is significant (not just timestamp changes)
+        const deckWithoutTimestamp = { ...deck, updatedAt: deckInCollection.updatedAt };
+        if (JSON.stringify(deckWithoutTimestamp) !== JSON.stringify(deckInCollection)) {
+          deckDispatch({ type: "SWITCH_DECK", deck: deckInCollection });
+        }
+      }
+    }
+  }, [decks, currentDeckId]); // Removed 'deck' dependency to prevent interference
+
+  // Monitor currentDeckId changes for debugging
+  useEffect(() => {
+    console.log('[App] currentDeckId changed to:', currentDeckId);
+    console.log('[App] Current deck state:', deck);
+    console.log('[App] Decks collection:', decks);
+  }, [currentDeckId, deck, decks]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 's':
+            e.preventDefault();
+            handleSaveDeck();
+            break;
+          case 'n':
+            e.preventDefault();
+            handleNewDeck();
+            break;
+          case 'o':
+            e.preventDefault();
+            handleImport();
+            break;
+          case 'e':
+            e.preventDefault();
+            handleExport();
+            break;
+          case 'p':
+            e.preventDefault();
+            handlePrint();
+            break;
+        }
+      }
+    };
     
-    console.log('[Filter Debug] Processed cards:', sortedList.length, 'from', allCards.length, 'unique:', cardIds.size);
-    setShownCards(sortedList);
-  }, 50);
-  run();
-}, [allCards, filters]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Debug: expose useful functions to window for testing
+  useEffect(() => {
+    window.checkCardFields = (card) => {
+      console.log('Card fields:', {
+        name: card.name,
+        type: card.type,
+        rarity: card.rarity,
+        set: card.set,
+        number: card.number,
+        text: card.text,
+        inks: card.inks,
+        cost: getCost(card),
+        _raw: card._raw
+      });
+    };
+    
+    window.getCurrentCards = () => {
+      console.log('Current cards:', {
+        allCards: allCards.length,
+        shownCards: shownCards.length,
+        deck: deck,
+        filters: filters
+      });
+    };
+    
+    return () => {
+      delete window.checkCardFields;
+      delete window.getCurrentCards;
+    };
+    }, [shownCards]);
+
+  // Define all handler functions before the return statement
+  
+
+  console.log('[App] Rendering with ImageCacheProvider wrapper');
+
+
+
 
 // Simplified card display - no progressive loading to prevent duplicates
 useEffect(() => {
@@ -4989,8 +5005,10 @@ function handleDoImport(obj) {
 
 function handleResetDeck() {
   if (confirm("Start a new deck? This will clear the current deck.")) {
-    deckDispatch({ type: "RESET" });
-    addToast("New deck started", "success");
+    // Create a new deck with a unique name
+    const timestamp = new Date().toLocaleString();
+    const newDeckName = `Deck ${timestamp}`;
+    handleNewDeck(newDeckName);
   }
 }
 
@@ -4999,60 +5017,152 @@ function handlePrint() {
 }
 
 function handleSaveDeck() {
-  // Save deck for later editing
-  const savedDecks = JSON.parse(localStorage.getItem('savedLorcanaDecks') || '[]');
-  
-  // Create a saveable deck object with full card data
-  const saveableDeck = {
-    id: Date.now().toString(),
-    name: deck.name,
-    savedAt: new Date().toISOString(),
-    entries: Object.values(deck.entries || {}).filter(e => e.count > 0).map(e => ({
-      card: {
-        name: e.card.name,
-        set: e.card.set,
-        number: e.card.number,
-        type: e.card.type,
-        inks: e.card.inks,
-        rarity: e.card.rarity,
-        cost: getCost(e.card),
-        image_url: e.card.image_url || e.card._imageFromAPI,
-        // Include other essential card properties
-        classifications: e.card.classifications,
-        abilities: e.card.abilities,
-        text: e.card.text,
-        lore: e.card.lore,
-        willpower: e.card.willpower,
-        strength: e.card.strength,
-        // Include raw data for API compatibility
-        _raw: e.card._raw
-      },
-      count: e.count
-    }))
-  };
-
-  // Check if deck with same name already exists
-  const existingIndex = savedDecks.findIndex(d => d.name === deck.name);
-  if (existingIndex !== -1) {
-    // Update existing deck
-    savedDecks[existingIndex] = saveableDeck;
-  } else {
-    // Add new deck
-    savedDecks.push(saveableDeck);
+  try {
+    // Ensure the current deck is saved to the decks collection
+    if (deck && currentDeckId) {
+      console.log('[handleSaveDeck] Saving deck:', deck);
+      console.log('[handleSaveDeck] Current decks state:', decks);
+      
+      // Update the deck's timestamp and ensure it has the correct ID
+      const updatedDeck = { ...deck, id: currentDeckId, updatedAt: Date.now() };
+      const updatedDecks = { ...decks, [currentDeckId]: updatedDeck };
+      
+      console.log('[handleSaveDeck] Updated deck:', updatedDeck);
+      console.log('[handleSaveDeck] Updated deck ID:', updatedDeck.id);
+      console.log('[handleSaveDeck] Updated decks state:', updatedDecks);
+      
+      // Update the decks state and ensure it's immediately available
+      setDecks(updatedDecks);
+      
+      // Save to localStorage
+      saveAllDecks(updatedDecks);
+      
+      // Don't call deckDispatch here - let the useEffect handle synchronization
+      // This prevents interference with the deck switching logic
+      
+      // Show save confirmation popup
+      setSaveConfirmationOpen(true);
+      
+      addToast(`Deck "${deck.name}" saved successfully! It will now appear in your deck list.`, "success");
+    } else {
+      addToast("No deck to save", "error");
+    }
+  } catch (error) {
+    console.error("Error saving deck:", error);
+    addToast("Failed to save deck", "error");
   }
-
-  // Save to localStorage
-  localStorage.setItem('savedLorcanaDecks', JSON.stringify(savedDecks));
-
-  // Show success message
-  addToast(`Deck "${deck.name}" saved successfully!`, "success");
 }
 
 function handleDeckPresentation() {
   setDeckPresentationOpen(true);
 }
 
+// Enhanced deck management functions
+function handleNewDeck(name = "Untitled Deck") {
+  const newDeck = createNewDeck(name);
+  // Don't add to decks collection until explicitly saved
+  setCurrentDeckId(newDeck.id);
+  deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+  saveCurrentDeckId(newDeck.id);
+  addToast(`Created new deck: "${name}". Click Save to persist it.`, "success");
+}
 
+function handleSwitchDeck(deckToSwitch) {
+  console.log('[handleSwitchDeck] Switching to deck:', deckToSwitch);
+  console.log('[handleSwitchDeck] Current decks state:', decks);
+  console.log('[handleSwitchDeck] Deck to switch exists in decks:', decks[deckToSwitch.id]);
+  console.log('[handleSwitchDeck] Current deck before switch:', deck);
+  console.log('[handleSwitchDeck] Current currentDeckId before switch:', currentDeckId);
+  
+  setCurrentDeckId(deckToSwitch.id);
+  deckDispatch({ type: "SWITCH_DECK", deck: deckToSwitch });
+  
+  console.log('[handleSwitchDeck] After switch - new currentDeckId:', deckToSwitch.id);
+  console.log('[handleSwitchDeck] Switch operation completed');
+  
+  addToast(`Switched to deck: "${deckToSwitch.name}"`, "success");
+}
+
+function handleDeleteDeck(deckId) {
+  if (deckId === currentDeckId) {
+    addToast("Cannot delete the current deck", "error");
+    return;
+  }
+  
+  const deckToDelete = decks[deckId];
+  const updatedDecks = deleteDeck(decks, deckId);
+  setDecks(updatedDecks);
+  
+  if (Object.keys(updatedDecks).length === 0) {
+    // If no decks left, create a default one
+    const defaultDeck = createNewDeck("My First Deck");
+    const newDecks = { [defaultDeck.id]: defaultDeck };
+    setDecks(newDecks);
+    setCurrentDeckId(defaultDeck.id);
+    deckDispatch({ type: "SWITCH_DECK", deck: defaultDeck });
+    saveCurrentDeckId(defaultDeck.id);
+  }
+  
+  addToast(`Deleted deck: "${deckToDelete.name}"`, "success");
+}
+
+function handleDuplicateDeck(deckId) {
+  const originalDeck = decks[deckId];
+  const updatedDecks = duplicateDeck(decks, deckId);
+  setDecks(updatedDecks);
+  
+  // Find the new deck (it will have a different ID)
+  const newDeck = Object.values(updatedDecks).find(d => 
+    d.name === `${originalDeck.name} (Copy)` && d.id !== deckId
+  );
+  
+  if (newDeck) {
+    addToast(`Duplicated deck: "${originalDeck.name}"`, "success");
+  }
+}
+
+function handleImportDeck(importedDeck) {
+  const updatedDecks = { ...decks, [importedDeck.id]: importedDeck };
+  setDecks(updatedDecks);
+  setCurrentDeckId(importedDeck.id);
+  deckDispatch({ type: "SWITCH_DECK", deck: importedDeck });
+  saveCurrentDeckId(importedDeck.id);
+  addToast(`Imported deck: "${importedDeck.name}"`, "success");
+}
+
+// Initialize deck management system - only load decks that were explicitly saved
+useEffect(() => {
+  const { decks: loadedDecks, currentDeckId: loadedCurrentDeckId } = loadAllDecks();
+  
+  console.log('[App] Initialization - loadedDecks:', loadedDecks);
+  console.log('[App] Initialization - loadedCurrentDeckId:', loadedCurrentDeckId);
+  
+  // Only load decks that have been explicitly saved (have a valid updatedAt timestamp)
+  const savedDecks = {};
+  Object.entries(loadedDecks).forEach(([id, deck]) => {
+    console.log('[App] Processing deck:', { id, deckId: deck.id, deckName: deck.name, hasId: !!deck.id });
+    if (deck.updatedAt && deck.updatedAt > 0) {
+      // Ensure the deck has the correct ID
+      const deckWithId = { ...deck, id: id };
+      savedDecks[id] = deckWithId;
+      console.log('[App] Added deck to savedDecks:', { id, deckId: deckWithId.id, deckName: deckWithId.name });
+    }
+  });
+  
+  console.log('[App] Final savedDecks:', savedDecks);
+  setDecks(savedDecks);
+  
+  // Only set current deck if it was explicitly saved
+  if (loadedCurrentDeckId && savedDecks[loadedCurrentDeckId]) {
+    setCurrentDeckId(loadedCurrentDeckId);
+    deckDispatch({ type: "SWITCH_DECK", deck: savedDecks[loadedCurrentDeckId] });
+  } else {
+    // Create a new empty deck if no saved deck exists - but don't add it to decks collection
+    const newDeck = createNewDeck("Untitled Deck");
+    setCurrentDeckId(newDeck.id);
+    deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+  }
+}, []);
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
@@ -5066,333 +5176,521 @@ useEffect(() => {
   return () => window.removeEventListener("keydown", onKey);
 }, []);
 
+// hasActiveFilters helper is defined later in the component
+
+  // Define handler functions
+  function handleAdd(card, count = 1) {
+    if (count > 0) {
+      deckDispatch({ type: "ADD", card, count });
+    } else if (count < 0) {
+      const currentCount = deck.entries[deckKey(card)]?.count || 0;
+      const newCount = Math.max(0, currentCount + count);
+      if (newCount === 0) {
+        deckDispatch({ type: "REMOVE", card });
+      } else {
+        deckDispatch({ type: "SET_COUNT", card, count: newCount });
+      }
+    }
+  }
+
+  function handleSetCount(card, count) {
+    deckDispatch({ type: "SET_COUNT", card, count });
+  }
+
+  function handleRemove(card) {
+    deckDispatch({ type: "REMOVE", card });
+  }
+
+  function handleExport() {
+    setExportOpen(true);
+  }
+
+  function handleImport() {
+    setImportOpen(true);
+  }
+
+  function handleDoImport(obj) {
+    deckDispatch({ type: "IMPORT_STATE", deck: obj });
+    addToast("Deck imported", "success");
+  }
+
+  function handleResetDeck() {
+    if (confirm("Start a new deck? This will clear the current deck.")) {
+      const timestamp = new Date().toLocaleString();
+      const newDeckName = `Deck ${timestamp}`;
+      handleNewDeck(newDeckName);
+    }
+  }
+
+  function handlePrint() {
+    setPrintOpen(true);
+  }
+
+
+
+
+
   console.log('[App] Rendering with ImageCacheProvider wrapper');
+  
   return (
     <ToastProvider>
       <ImageCacheProvider>
-        <ContextDebugger />
-        <div key={`app-container-${filters._resetTimestamp || Date.now()}`} className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
+        <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
+          {/* Top Bar */}
           <TopBar
-        key={`topbar-${filters._resetTimestamp || Date.now()}`}
-        deckName={deck.name}
-        onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
-        onResetDeck={handleResetDeck}
-        onExport={handleExport}
-        onImport={handleImport}
-        onPrint={handlePrint}
-        onDeckPresentation={handleDeckPresentation}
-        onSaveDeck={handleSaveDeck}
-        onToggleFilters={() => filterDispatch({ type: "TOGGLE_PANEL" })}
-        searchText={filters.text}
-        onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
-      />
+            key={`topbar-${filters?._resetTimestamp ?? "init"}`}
+            deckName={deck?.name ?? "Untitled Deck"}
+            onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
+            onResetDeck={handleResetDeck}
+            onExport={handleExport}
+            onImport={handleImport}
+            onPrint={handlePrint}
+            onDeckPresentation={handleDeckPresentation}
+            onSaveDeck={handleSaveDeck}
+            onToggleFilters={() => filterDispatch({ type: "TOGGLE_PANEL" })}
+            searchText={filters?.text || ""}
+            onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
+            onNewDeck={handleNewDeck}
+            onDeckManager={() => setShowDeckManager(true)}
+          />
 
-      {/* Essential Quick Filters */}
-      <div className="p-4 bg-gray-900/30 border-b border-gray-800">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="text-gray-300 font-medium">Quick Filters:</div>
-          
-          {/* Safety check - ensure filter state is properly initialized */}
-          {(!filters || typeof filters !== 'object') && (
-            <div className="text-red-400 text-sm">
-              Filter state not initialized properly
-            </div>
-          )}
-          
-          {/* Inkable/Uninkable Checkboxes */}
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input
-                type="checkbox"
-                checked={filters?.showInkablesOnly || false}
-                onChange={(e) => {
-                  filterDispatch({ type: 'SET_SHOW_INKABLES', value: e.target.checked });
-                }}
-                className="w-4 h-4 text-emerald-600 bg-gray-700 border-gray-600 rounded focus:ring-emerald-500 focus:ring-2"
-              />
-              <span>Inkable Only</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input
-                type="checkbox"
-                checked={filters?.showUninkablesOnly || false}
-                onChange={(e) => {
-                  filterDispatch({ type: 'SET_SHOW_UNINKABLES', value: e.target.checked });
-                }}
-                className="w-4 h-4 text-orange-600 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
-              />
-              <span>Uninkable Only</span>
-            </label>
-          </div>
+          {/* Essential Quick Filters */}
+          <div className="p-4 bg-gray-900/30 border-b border-gray-800">
+  <div className="flex flex-wrap items-center gap-4">
+    <div className="text-gray-300 font-medium">Quick Filters:</div>
 
-          {/* Card Cost Range - No 0 cost */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-300">Cost:</span>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(cost => (
-                <button
-                  key={cost}
-                  onClick={() => {
-                    if (!(filters?.selectedCosts instanceof Set)) {
-                      console.warn('selectedCosts is not a Set, resetting filters');
-                      filterDispatch({ type: 'RESET' });
-                      return;
-                    }
-                    filterDispatch({ type: 'TOGGLE_COST', cost: cost });
-                  }}
-                  className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
-                    (filters?.selectedCosts instanceof Set && filters.selectedCosts.has(cost))
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  {cost}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Ink Colors */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-300">Inks:</span>
-            <div className="flex gap-1">
-              {['Amber', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Steel'].map(ink => (
-                <button
-                  key={ink}
-                  onClick={() => {
-                    if (!(filters?.inks instanceof Set)) {
-                      console.warn('inks is not a Set, resetting filters');
-                      filterDispatch({ type: 'RESET' });
-                      return;
-                    }
-                    filterDispatch({ type: 'TOGGLE_INK', ink: ink });
-                  }}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    (filters?.inks instanceof Set && filters.inks.has(ink))
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-700'
-                  }`}
-                >
-                  {ink}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Clear Filters Button */}
-          <button
-            onClick={() => {
-              console.log('[Quick Filters] Clearing all filters');
-              filterDispatch({ type: 'RESET' });
-            }}
-            className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm text-white transition-colors"
-          >
-            Clear All
-          </button>
-        </div>
+    {/* Safety check */}
+    {(!filters || typeof filters !== "object") && (
+      <div className="text-red-400 text-sm">
+        Filter state not initialized properly
       </div>
+    )}
 
-      {/* Floating Filter Button - Always Accessible */}
-      <div className="fixed bottom-6 right-6 z-50">
+    {/* Inkable/Uninkable */}
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-2 text-sm text-gray-300">
+        <input
+          type="checkbox"
+          checked={!!filters?.showInkablesOnly}
+          onChange={(e) =>
+            filterDispatch({ type: "SET_SHOW_INKABLES", value: e.target.checked })
+          }
+          className="w-4 h-4 text-emerald-600 bg-gray-700 border-gray-600 rounded focus:ring-emerald-500 focus:ring-2"
+        />
+        <span>Inkable Only</span>
+      </label>
+      <label className="flex items-center gap-2 text-sm text-gray-300">
+        <input
+          type="checkbox"
+          checked={!!filters?.showUninkablesOnly}
+          onChange={(e) =>
+            filterDispatch({ type: "SET_SHOW_UNINKABLES", value: e.target.checked })
+          }
+          className="w-4 h-4 text-orange-600 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+        />
+        <span>Uninkable Only</span>
+      </label>
+    </div>
+
+    {/* Cost buttons (1–10) */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-gray-300">Cost:</span>
+      <div className="flex gap-1">
+        {[1,2,3,4,5,6,7,8,9,10].map((cost) => (
+          <button
+            key={cost}
+            onClick={() => {
+              if (!(filters?.selectedCosts instanceof Set)) {
+                console.warn("selectedCosts is not a Set, resetting filters");
+                filterDispatch({ type: "RESET" });
+                return;
+              }
+              filterDispatch({ type: "TOGGLE_COST", cost });
+            }}
+            className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
+              (filters?.selectedCosts instanceof Set && filters.selectedCosts.has(cost))
+                ? "bg-emerald-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+          >
+            {cost}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Ink colors */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-gray-300">Inks:</span>
+      <div className="flex gap-1">
+        {["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"].map((ink) => (
+          <button
+            key={ink}
+            onClick={() => {
+              if (!(filters?.inks instanceof Set)) {
+                console.warn("inks is not a Set, resetting filters");
+                filterDispatch({ type: "RESET" });
+                return;
+              }
+              filterDispatch({ type: "TOGGLE_INK", ink });
+            }}
+            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              (filters?.inks instanceof Set && filters.inks.has(ink))
+                ? "bg-emerald-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            {ink}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Clear Filters */}
+    <button
+      onClick={() => {
+        console.log("[Quick Filters] Clearing all filters");
+        filterDispatch({ type: "RESET" });
+      }}
+      className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm text-white transition-colors"
+    >
+      Clear All
+    </button>
+  </div>
+</div>
+
+{/* Floating Filter Button */}
+<div className="fixed bottom-6 right-6 z-50">
+  <button
+    onClick={() => filterDispatch({ type: "TOGGLE_PANEL" })}
+    className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 rounded-full shadow-lg border-2 border-emerald-500 text-white font-bold text-lg transition-all hover:scale-110"
+    title="Toggle Advanced Filters (Ctrl+F)"
+  >
+    🔍
+  </button>
+</div>
+
+{/* Advanced Filter Panel */}
+{filters?.showFilterPanel && (
+  <FilterPanel
+    key={`filter-panel-${filters._resetTimestamp ?? "init"}`}
+    state={filters}
+    dispatch={filterDispatch}
+    onDone={() => filterDispatch({ type: "TOGGLE_PANEL" })}
+    onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
+  />
+)}
+
+{/* Active Filters */}
+{Boolean(
+  (filters?.text && filters.text.trim()) ||
+  (filters?.inks instanceof Set && filters.inks.size) ||
+  (filters?.rarities instanceof Set && filters.rarities.size) ||
+  (filters?.types instanceof Set && filters.types.size) ||
+  (filters?.sets instanceof Set && filters.sets.size) ||
+  (filters?.classifications instanceof Set && filters.classifications.size) ||
+  (filters?.abilities instanceof Set && filters.abilities.size) ||
+  (filters?.selectedCosts instanceof Set && filters.selectedCosts.size) ||
+  filters?.setNumber || filters?.franchise || filters?.gamemode ||
+  filters?.showInkablesOnly || filters?.showUninkablesOnly ||
+  filters?.loreMin || filters?.loreMax ||
+  filters?.willpowerMin || filters?.willpowerMax ||
+  filters?.strengthMin || filters?.strengthMax
+) && (
+  <div
+    key={`active-filters-${filters._resetTimestamp ?? "init"}`}
+    className="p-3 bg-gray-900/50 border-b border-gray-800"
+  >
+    <div className="text-sm text-gray-300 mb-2">Active Filters:</div>
+    <div className="flex flex-wrap gap-2">
+      {(filters?.inks instanceof Set && filters.inks.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-amber-600/20 border border-amber-500/40 text-amber-200 text-xs">
+          Ink: {Array.from(filters.inks).join(", ")}
+        </span>
+      )}
+      {(filters?.rarities instanceof Set && filters.rarities.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-200 text-xs">
+          Rarity: {Array.from(filters.rarities).join(", ")}
+        </span>
+      )}
+      {(filters?.types instanceof Set && filters.types.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-200 text-xs">
+          Type: {Array.from(filters.types).join(", ")}
+        </span>
+      )}
+      {(filters?.sets instanceof Set && filters.sets.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 text-xs">
+          Set: {Array.from(filters.sets).map((code) => {
+            const setObj = Array.isArray(SETS) ? SETS.find((s) => s.code === code) : null;
+            return setObj ? setObj.name : code;
+          }).join(", ")}
+        </span>
+      )}
+      {(filters?.classifications instanceof Set && filters.classifications.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-teal-600/20 border border-teal-500/40 text-teal-200 text-xs">
+          Classifications: {Array.from(filters.classifications).join(", ")}
+        </span>
+      )}
+      {(filters?.abilities instanceof Set && filters.abilities.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-gray-600/20 border border-gray-500/40 text-gray-200 text-xs">
+          Abilities: {Array.from(filters.abilities).join(", ")}
+        </span>
+      )}
+      {filters?.setNumber && (
+        <span className="px-2 py-1 rounded-full bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 text-xs">
+          Set #: {filters.setNumber}
+        </span>
+      )}
+      {filters?.franchise && (
+        <span className="px-2 py-1 rounded-full bg-pink-600/20 border border-pink-500/40 text-pink-200 text-xs">
+          Franchise: {filters.franchise}
+        </span>
+      )}
+      {filters?.gamemode && (
+        <span className="px-2 py-1 rounded-full bg-cyan-600/20 border border-cyan-500/40 text-cyan-200 text-xs">
+          Gamemode: {filters.gamemode}
+        </span>
+      )}
+      {filters?.inkable && filters.inkable !== "Any" && (
+        <span className="px-2 py-1 rounded-full bg-yellow-600/20 border border-yellow-500/40 text-yellow-200 text-xs">
+          {filters.inkable}
+        </span>
+      )}
+      {(filters?.loreMin || filters?.loreMax) && (
+        <span className="px-2 py-1 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-200 text-xs">
+          Lore: {filters.loreMin || "0"}–{filters.loreMax || "∞"}
+        </span>
+      )}
+      {(filters?.willpowerMin || filters?.willpowerMax) && (
+        <span className="px-2 py-1 rounded-full bg-red-600/20 border border-red-500/40 text-red-200 text-xs">
+          Willpower: {filters.willpowerMin || "0"}–{filters.willpowerMax || "∞"}
+        </span>
+      )}
+      {(filters?.strengthMin || filters?.strengthMax) && (
+        <span className="px-2 py-1 rounded-full bg-red-600/20 border border-red-500/40 text-red-200 text-xs">
+          Strength: {filters.strengthMin || "0"}–{filters.strengthMax || "∞"}
+        </span>
+      )}
+      {(filters?.selectedCosts instanceof Set && filters.selectedCosts.size > 0) && (
+        <span className="px-2 py-1 rounded-full bg-green-600/20 border border-green-500/40 text-green-200 text-xs">
+          Cost: {Array.from(filters.selectedCosts).sort((a,b) => a-b).map((c) => c === 10 ? "10+" : c).join(", ")}
+        </span>
+      )}
+      {!!filters?.showInkablesOnly && (
+        <span className="px-2 py-1 rounded-full bg-yellow-600/20 border border-yellow-500/40 text-yellow-200 text-xs">
+          Inkable Only
+        </span>
+      )}
+      {!!filters?.showUninkablesOnly && (
+        <span className="px-2 py-1 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-200 text-xs">
+          Uninkable Only
+        </span>
+      )}
+    </div>
+  </div>
+)}
+
+{/* Main content grid */}
+<div key={`main-content-${filters?._resetTimestamp ?? "init"}`} className="grid grid-cols-1 lg:grid-cols-[1fr_380px]">
+  <div>
+    {loading ? (
+      <div className="p-6 text-center text-gray-400">
+        <div className="flex items-center justify-center gap-3">
+          <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+          <span>Loading cards from API...</span>
+        </div>
+        <div className="text-sm text-gray-500 mt-2">This may take a few moments for the first load</div>
+      </div>
+    ) : shownCards?.length ? (
+      <CardGrid
+        cards={shownCards}
+        onAdd={handleAdd}
+        onInspect={(c) => setInspectCard(c)}
+        deck={deck}
+      />
+    ) : (
+      <div className="p-6 text-center text-gray-400">
+        {allCards?.length ? (
+          <>
+            <div className="text-lg mb-2">No cards match your filters</div>
+            <div className="text-sm text-gray-500">Try adjusting your search criteria or filters</div>
+          </>
+        ) : (
+          <>
+            <div className="text-lg mb-2">No cards loaded</div>
+            <div className="text-sm text-gray-500 mb-4">This could be due to API issues or network problems</div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white"
+            >
+              Retry Loading
+            </button>
+          </>
+        )}
+      </div>
+    )}
+  </div>
+
+  {/* Deck column */}
+  <div className="border-l border-gray-800 min-h-[60vh]">
+    <DeckPanel
+      deck={deck}
+      onSetCount={handleSetCount}
+      onRemove={handleRemove}
+      onExport={() => setExportOpen(true)}
+      onImport={() => setImportOpen(true)}
+      onDeckPresentation={handleDeckPresentation}
+    />
+    <DeckStats deck={deck} />
+    <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
+      {deckValid
+        ? "Deck is valid."
+        : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
+    </div>
+            </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex">
+          {/* Left Panel - Card Grid */}
+          <div className="flex-1 p-4">
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="text-2xl text-gray-400">Loading cards...</div>
+              </div>
+            ) : (
+              <>
+                <CardGrid
+                  cards={shownCards}
+                  onAdd={handleAdd}
+                  onInspect={setInspectCard}
+                  deck={deck}
+                />
+
+                {hasActiveFilters && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={() => filterDispatch({ type: "RESET" })}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-sm"
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right Panel - Deck */}
+          <div className="w-96 bg-gray-900/50 border-l border-gray-800 p-4">
+            <DeckPanel
+              deck={deck}
+              onSetCount={handleSetCount}
+              onRemove={handleRemove}
+              onExport={handleExport}
+              onImport={handleImport}
+              onDeckPresentation={handleDeckPresentation}
+            />
+            <DeckStats deck={deck} />
+            <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
+              {deckValid
+                ? "Deck is valid."
+                : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
+            </div>
+          </div>
+        </div>
+
+        {/* Modals */}
+        <>
+          <InspectCardModal
+    key={`inspect-modal-${filters?._resetTimestamp ?? "init"}`}
+    open={!!inspectCard}
+    card={inspectCard}
+    onClose={() => setInspectCard(null)}
+    onAdd={handleAdd}
+  />
+
+  <ExportModal
+    key={`export-modal-${filters?._resetTimestamp ?? "init"}`}
+    open={exportOpen}
+    deck={deck}
+    onClose={() => setExportOpen(false)}
+  />
+
+  <ImportModal
+    key={`import-modal-${filters?._resetTimestamp ?? "init"}`}
+    open={importOpen}
+    onClose={() => setImportOpen(false)}
+    onImport={handleDoImport}
+  />
+
+  {printOpen && (
+    <PrintableSheet
+    key={`print-sheet-${filters?._resetTimestamp ?? "init"}`}
+    deck={deck}
+    onClose={() => setPrintOpen(false)}
+  />
+)}
+
+{deckPresentationOpen && (
+            <DeckPresentationPopup
+            key={`deck-presentation-${filters?._resetTimestamp ?? "init"}`}
+            deck={deck}
+            onClose={() => setDeckPresentationOpen(false)}
+            onSave={handleSaveDeck}
+          />
+)}
+
+{/* Save Confirmation Modal */}
+{saveConfirmationOpen && (
+  <Modal
+    open={saveConfirmationOpen}
+    onClose={() => setSaveConfirmationOpen(false)}
+    title="Deck Saved Successfully!"
+    size="md"
+  >
+    <div className="text-center space-y-4">
+      <div className="text-6xl mb-4">✅</div>
+      <h3 className="text-xl font-semibold text-green-400">
+        Your deck "{deck?.name}" has been saved!
+      </h3>
+      <p className="text-gray-300">
+        The deck is now safely stored and will appear in your deck list. 
+        You can access it anytime from the Deck Manager.
+      </p>
+      <div className="pt-4">
         <button
-          onClick={() => filterDispatch({ type: "TOGGLE_PANEL" })}
-          className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 rounded-full shadow-lg border-2 border-emerald-500 text-white font-bold text-lg transition-all hover:scale-110"
-          title="Toggle Advanced Filters (Ctrl+F)"
+          onClick={() => setSaveConfirmationOpen(false)}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
         >
-          🔍
+          Continue
         </button>
       </div>
+    </div>
+  </Modal>
+)}
 
-      {filters.showFilterPanel && (
-        <FilterPanel
-          key={`filter-panel-${filters._resetTimestamp || Date.now()}`}
-          state={filters}
-          dispatch={filterDispatch}
-          onDone={() => filterDispatch({ type: "TOGGLE_PANEL" })}
-          onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
-        />
-      )}
-
-      {/* Active Filters Display */}
-      {hasActiveFilters && (
-        <div key={`active-filters-${filters._resetTimestamp || Date.now()}`} className="p-3 bg-gray-900/50 border-b border-gray-800">
-          <div className="text-sm text-gray-300 mb-2">Active Filters:</div>
-          <div className="flex flex-wrap gap-2">
-            {filters.inks.size > 0 && (
-              <span className="px-2 py-1 rounded-full bg-amber-600/20 border border-amber-500/40 text-amber-200 text-xs">
-                Ink: {Array.from(filters.inks).join(", ")}
-              </span>
-            )}
-            {filters.rarities.size > 0 && (
-              <span className="px-2 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-200 text-xs">
-                Rarity: {Array.from(filters.rarities).join(", ")}
-              </span>
-            )}
-            {filters.types.size > 0 && (
-              <span className="px-2 py-1 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-200 text-xs">
-                Type: {Array.from(filters.types).join(", ")}
-              </span>
-            )}
-            {filters.sets.size > 0 && (
-              <span className="px-2 py-1 rounded-full bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 text-xs">
-                Set: {Array.from(filters.sets).map(setCode => {
-                  const setObj = SETS.find(s => s.code === setCode);
-                  return setObj ? setObj.name : setCode;
-                }).join(", ")}
-              </span>
-            )}
-            {filters.classifications.size > 0 && (
-              <span className="px-2 py-1 rounded-full bg-teal-600/20 border border-teal-500/40 text-teal-200 text-xs">
-                Classifications: {Array.from(filters.classifications).join(", ")}
-              </span>
-            )}
-            {filters.abilities.size > 0 && (
-              <span className="px-2 py-1 rounded-full bg-gray-600/20 border border-gray-500/40 text-gray-200 text-xs">
-                Abilities: {Array.from(filters.abilities).join(", ")}
-              </span>
-            )}
-            {filters.setNumber && (
-              <span className="px-2 py-1 rounded-full bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 text-xs">
-                Set #: {filters.setNumber}
-              </span>
-            )}
-            {filters.franchise && (
-              <span className="px-2 py-1 rounded-full bg-pink-600/20 border border-pink-500/40 text-pink-200 text-xs">
-                Franchise: {filters.franchise}
-              </span>
-            )}
-            {filters.gamemode && (
-              <span className="px-2 py-1 rounded-full bg-cyan-600/20 border border-cyan-500/40 text-cyan-200 text-xs">
-                Gamemode: {filters.gamemode}
-              </span>
-            )}
-            {filters.inkable && filters.inkable !== "Any" && (
-              <span className="px-2 py-1 rounded-full bg-yellow-600/20 border border-yellow-500/40 text-yellow-200 text-xs">
-                {filters.inkable}
-              </span>
-            )}
-            {(filters.loreMin || filters.loreMax) && (
-              <span className="px-2 py-1 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-200 text-xs">
-                Lore: {filters.loreMin || "0"}-{filters.loreMax || "∞"}
-              </span>
-            )}
-            {(filters.willpowerMin || filters.willpowerMax) && (
-              <span className="px-2 py-1 rounded-full bg-red-600/20 border border-red-500/40 text-red-200 text-xs">
-                Willpower: {filters.willpowerMin || "0"}-{filters.willpowerMax || "∞"}
-              </span>
-            )}
-            {(filters.strengthMin || filters.strengthMax) && (
-              <span className="px-2 py-1 rounded-full bg-red-600/20 border border-red-500/40 text-red-200 text-xs">
-                Strength: {filters.strengthMin || "0"}-{filters.strengthMax || "∞"}
-              </span>
-            )}
-
-            {filters.selectedCosts && filters.selectedCosts.size > 0 ? (
-              <span className="px-2 py-1 rounded-full bg-green-600/20 border border-green-500/40 text-green-200 text-xs">
-                Cost: {Array.from(filters.selectedCosts).sort((a, b) => a - b).map(cost => cost === 10 ? "10+" : cost).join(", ")}
-              </span>
-            ) : null}
-            {filters.showInkablesOnly && (
-              <span className="px-2 py-1 rounded-full bg-yellow-600/20 border border-yellow-500/40 text-yellow-200 text-xs">
-                Inkable Only
-              </span>
-            )}
-            {filters.showUninkablesOnly && (
-              <span className="px-2 py-1 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-200 text-xs">
-                Uninkable Only
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-
-
-
-      <div key={`main-content-${filters._resetTimestamp || Date.now()}`} className="grid grid-cols-1 lg:grid-cols-[1fr_380px]">
-        <div>
-          {loading ? (
-            <div className="p-6 text-center text-gray-400">
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-                <span>Loading cards from API...</span>
-              </div>
-              <div className="text-sm text-gray-500 mt-2">
-                This may take a few moments for the first load
-              </div>
-            </div>
-          ) : shownCards && shownCards.length > 0 ? (
-            <CardGrid
-              cards={shownCards}
-              onAdd={handleAdd}
-              onInspect={(c) => setInspectCard(c)}
-              deck={deck}
-            />
-          ) : (
-            <div className="p-6 text-center text-gray-400">
-              {allCards && allCards.length > 0 ? (
-                <div>
-                  <div className="text-lg mb-2">No cards match your filters</div>
-                  <div className="text-sm text-gray-500">
-                    Try adjusting your search criteria or filters
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="text-lg mb-2">No cards loaded</div>
-                  <div className="text-sm text-gray-500 mb-4">
-                    This could be due to API issues or network problems
-                  </div>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white"
-                  >
-                    Retry Loading
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="border-l border-gray-800 min-h-[60vh]">
-          <DeckPanel
-            deck={deck}
-            onSetCount={handleSetCount}
-            onRemove={handleRemove}
-            onExport={() => setExportOpen(true)}
-            onImport={() => setImportOpen(true)}
-            onDeckPresentation={handleDeckPresentation}
-          />
-          <DeckStats deck={deck} />
-          <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
-            {deckValid
-              ? "Deck is valid."
-              : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
-          </div>
-        </div>
-      </div>
-
-      <InspectCardModal
-        key={`inspect-modal-${filters._resetTimestamp || Date.now()}`}
-        open={!!inspectCard}
-        card={inspectCard}
-        onClose={() => setInspectCard(null)}
-        onAdd={handleAdd}
-      />
-      <ExportModal key={`export-modal-${filters._resetTimestamp || Date.now()}`} open={exportOpen} deck={deck} onClose={() => setExportOpen(false)} />
-      <ImportModal
-        key={`import-modal-${filters._resetTimestamp || Date.now()}`}
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImport={handleDoImport}
-      />
-              {printOpen && <PrintableSheet key={`print-sheet-${Date.now()}`} deck={deck} onClose={() => setPrintOpen(false)} />}
-        {deckPresentationOpen && <DeckPresentationPopup key={`deck-presentation-${Date.now()}`} deck={deck} onClose={() => setDeckPresentationOpen(false)} />}
+{/* Enhanced Deck Manager */}
+<DeckManager
+  isOpen={showDeckManager}
+  onClose={() => setShowDeckManager(false)}
+  decks={decks}
+  currentDeckId={currentDeckId}
+  onSwitchDeck={handleSwitchDeck}
+  onNewDeck={handleNewDeck}
+  onDeleteDeck={handleDeleteDeck}
+  onDuplicateDeck={handleDuplicateDeck}
+  onExportDeck={(deckId) => {
+    const deckToExport = decks[deckId];
+    if (deckToExport) exportDeck(deckToExport, "json");
+  }}
+  onImportDeck={handleImportDeck}
+/>
+        </>
       </div>
     </ImageCacheProvider>
-    </ToastProvider>
-  );
-}
+  </ToastProvider>
+);
 
 // -----------------------------------------------------------------------------
 // Filtering + Sorting
@@ -5611,6 +5909,11 @@ function applyFilters(cards, filters) {
       const cost = getCost(c);
       // Handle 10+ cost cards (cost 10 and above)
       const normalizedCost = cost >= 10 ? 10 : cost;
+      // Add safety check before calling .has()
+      if (!(filters.selectedCosts instanceof Set)) {
+        console.warn('selectedCosts is still not a Set after conversion, skipping cost filter');
+        return true;
+      }
       return filters.selectedCosts.has(normalizedCost);
     });
   }
@@ -6056,6 +6359,12 @@ function useBatchImageLoader() {
 // -----------------------------------------------------------------------------
 // End of file
 // -----------------------------------------------------------------------------
+
+
+
+
+
+} // Close AppInner function
 
 // --- Wrapper to ensure ImageCache is available everywhere ---
 export default function App(props) {
