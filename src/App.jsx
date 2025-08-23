@@ -5578,8 +5578,9 @@ function AppInner() {
     const loadCards = async () => {
       try {
         console.log('[App] Loading all cards...');
+        console.log('[App] About to call fetchAllCards()...');
         const cards = await fetchAllCards();
-        console.log('[App] Loaded cards:', cards.length);
+        console.log('[App] fetchAllCards() returned:', cards?.length || 0, 'cards');
         
         // Debug: Check what cards we actually got
         const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
