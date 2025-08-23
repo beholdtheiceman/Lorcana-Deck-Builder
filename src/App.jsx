@@ -2130,30 +2130,48 @@ function findCardByName(cardName) {
       return found;
     }
     
-    // Try to match the main part of the name (before any dash or parentheses)
-    const mainName = cleanSearch.split(/[-–—()]/)[0].trim();
-    if (mainName.length > 2) {
-      found = cards.find(card => {
-        const cardMainName = card.name.toLowerCase().split(/[-–—()]/)[0].trim();
-        return cardMainName === mainName;
-      });
-      if (found) {
-        console.log(`[findCardByName] Found main name match: "${found.name}" (main: "${mainName}")`);
-        return found;
-      }
-    }
-    
-    // Try fuzzy matching for very close names (but be more strict)
+    // Try to match the full name with minor variations (handles small differences in punctuation, spacing)
     found = cards.find(card => {
       const cardNameLower = card.name.toLowerCase();
+      // Remove common punctuation and normalize spaces for comparison
+      const normalizedSearch = cleanSearch.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+      const normalizedCardName = cardNameLower.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+      
+      if (normalizedSearch === normalizedCardName) {
+        return true;
+      }
+      
+      // Check if the search term is contained within the card name (but be strict about it)
+      if (normalizedSearch.length >= 8 && normalizedCardName.includes(normalizedSearch)) {
+        return true;
+      }
+      
+      return false;
+    });
+    if (found) {
+      console.log(`[findCardByName] Found normalized match: "${found.name}"`);
+      return found;
+    }
+    
+    // Try fuzzy matching for very close names (but be very strict)
+    found = cards.find(card => {
+      const cardNameLower = card.name.toLowerCase();
+      
+      // Only do fuzzy matching if the search term is substantial
+      if (cleanSearch.length < 6) {
+        return false;
+      }
+      
       // Check if the search term is a significant part of the card name
-      if (cleanSearch.length >= 4 && cardNameLower.includes(cleanSearch)) {
+      if (cardNameLower.includes(cleanSearch)) {
         return true;
       }
+      
       // Check if the card name is a significant part of the search term
-      if (cardNameLower.length >= 4 && cleanSearch.includes(cardNameLower)) {
+      if (cleanSearch.includes(cardNameLower) && cardNameLower.length >= 6) {
         return true;
       }
+      
       return false;
     });
     if (found) {
