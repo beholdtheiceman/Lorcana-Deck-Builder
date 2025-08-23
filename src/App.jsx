@@ -725,8 +725,8 @@ async function getWorkingImageUrl(card) {
   return null;
 }
 
-// Helper function to ensure we always get string URLs
-function toUrlString(v) {
+// Helper function to ensure we always get string URLs - single source of truth
+function asUrl(v) {
   if (!v) return null;
   if (typeof v === 'string') return v;
   // tolerate different shapes - extract URL from common object patterns
@@ -2082,24 +2082,32 @@ function parseTextImport(text) {
           
           try {
             // Generate the best possible image URL - NOW GUARANTEED to return strings
-            const rawUrl = generateLorcastURL(foundCard);   // string | null
-            const proxied = proxyImageUrl(rawUrl);          // string | null
+            const rawUrl = generateLorcastURL(foundCard);      // string | null
+            const proxied = proxyImageUrl(rawUrl);             // string | null
+            
+            // Single source of truth: normalize to string | null
+            let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+            
+            // Runtime guard - if anything weird slips through:
+            if (image_url && typeof image_url !== 'string') {
+              console.warn('[parseTextImport] non-string image_url; clearing', image_url);
+              image_url = null;
+            }
             
             console.log(`[parseTextImport] Image URLs for ${foundCard.name}:`, {
               raw: rawUrl,
               proxied: proxied,
+              final: image_url,
               rawType: typeof rawUrl,
-              proxiedType: typeof proxied
+              proxiedType: typeof proxied,
+              finalType: typeof image_url
             });
             
-            // Final image URL - guaranteed to be string | null
-            const finalImg = proxied || rawUrl || null;
-            
-            // Store the card with enhanced image data
+            // Store the card with enhanced image data - NEVER store objects
             deck.entries[key] = { 
               card: {
                 ...foundCard,
-                image_url: finalImg,  // 🚨 This is now guaranteed to be string | null
+                image_url,  // 🚨 This is now guaranteed to be string | null
                 _generatedImageUrl: rawUrl,    // Keep original for debugging
                 _proxiedImageUrl: proxied      // Keep proxied for debugging
               }, 
@@ -2108,8 +2116,8 @@ function parseTextImport(text) {
             
             console.log(`[parseTextImport] Stored card with image_url:`, {
               name: foundCard.name,
-              image_url: finalImg,
-              type: typeof finalImg
+              image_url,
+              type: typeof image_url
             });
             
           } catch (error) {
@@ -2192,7 +2200,7 @@ function parseTextImport(text) {
   
   // Extract all valid image URLs for prefetching (ensuring they're strings)
   const imageUrlsToPrefetch = Object.values(deck.entries)
-    .map(entry => toUrlString(entry.card?.image_url))
+    .map(entry => asUrl(entry.card?.image_url))
     .filter(url => typeof url === 'string' && url.length > 0);
   
   console.log(`[parseTextImport] Extracted ${imageUrlsToPrefetch.length} valid image URLs for prefetching`);
