@@ -2218,7 +2218,7 @@ function parseTextImport(text) {
   return deck;
 }
 
-// Helper function to find a card by name in the current card database
+// Helper function to find a card by name in the current card database - ENHANCED subtitle handling
 function findCardByName(cardName) {
   // This will be populated when cards are loaded
   if (window.getCurrentCards) {
@@ -2229,9 +2229,14 @@ function findCardByName(cardName) {
       return null;
     }
     
-    // Clean the search term
-    const cleanSearch = cardName.trim().toLowerCase();
-    console.log(`[findCardByName] Searching for: "${cardName}" (cleaned: "${cleanSearch}")`);
+    // ENHANCED: Normalize dashes and whitespace for better subtitle matching
+    const normalize = (s) => s.toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[–—-]/g, '-')  // en/em dashes to hyphen
+      .trim();
+    
+    const normalizedSearch = normalize(cardName);
+    console.log(`[findCardByName] Searching for: "${cardName}" (normalized: "${normalizedSearch}")`);
     console.log(`[findCardByName] Total cards in database: ${cards.length}`);
     
     // Log a few sample cards to see the data structure
@@ -2239,11 +2244,11 @@ function findCardByName(cardName) {
       console.log('[findCardByName] Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
     }
     
-    // ENHANCED: Handle "Name - Subtitle" format
-    const hasSubtitle = cardName.includes(' - ');
+    // ENHANCED: Handle "Name - Subtitle" format with normalized matching
+    const hasSubtitle = normalizedSearch.includes(' - ');
     let baseName = null;
     if (hasSubtitle) {
-      baseName = cardName.split(' - ')[0].trim();
+      baseName = normalizedSearch.split(' - ')[0].trim();
       console.log(`[findCardByName] Detected subtitle format, base name: "${baseName}"`);
     }
     
@@ -2256,29 +2261,21 @@ function findCardByName(cardName) {
     }
     console.log(`[findCardByName] No exact match found`);
     
-    // Try case-insensitive exact match
-    console.log(`[findCardByName] Trying case-insensitive match for: "${cleanSearch}"`);
-    found = cards.find(card => card.name.toLowerCase() === cleanSearch);
+    // Try normalized exact match (handles dashes and whitespace variations)
+    console.log(`[findCardByName] Trying normalized match for: "${normalizedSearch}"`);
+    found = cards.find(card => normalize(card.name) === normalizedSearch);
     if (found) {
-      console.log(`[findCardByName] Found case-insensitive match: "${found.name}"`);
+      console.log(`[findCardByName] Found normalized match: "${found.name}"`);
       return found;
     }
-    console.log(`[findCardByName] No case-insensitive match found`);
+    console.log(`[findCardByName] No normalized match found`);
     
-    // NEW: Try base name match if we have a subtitle
+    // ENHANCED: Try base name match if we have a subtitle
     if (baseName) {
       console.log(`[findCardByName] Trying base name match for: "${baseName}"`);
-      found = cards.find(card => card.name === baseName);
+      found = cards.find(card => normalize(card.name) === baseName);
       if (found) {
         console.log(`[findCardByName] Found base name match: "${found.name}"`);
-        return found;
-      }
-      
-      // Try case-insensitive base name match
-      const baseNameLower = baseName.toLowerCase();
-      found = cards.find(card => card.name.toLowerCase() === baseNameLower);
-      if (found) {
-        console.log(`[findCardByName] Found case-insensitive base name match: "${found.name}"`);
         return found;
       }
       console.log(`[findCardByName] No base name match found`);
@@ -2286,10 +2283,7 @@ function findCardByName(cardName) {
     
     // Try to match the full name with minor variations (handles small differences in punctuation, spacing)
     found = cards.find(card => {
-      const cardNameLower = card.name.toLowerCase();
-      // Remove common punctuation and normalize spaces for comparison
-      const normalizedSearch = cleanSearch.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
-      const normalizedCardName = cardNameLower.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+      const normalizedCardName = normalize(card.name);
       
       if (normalizedSearch === normalizedCardName) {
         return true;
@@ -2309,20 +2303,20 @@ function findCardByName(cardName) {
     
     // Try fuzzy matching for very close names (but be very strict)
     found = cards.find(card => {
-      const cardNameLower = card.name.toLowerCase();
+      const normalizedCardName = normalize(card.name);
       
       // Only do fuzzy matching if the search term is substantial
-      if (cleanSearch.length < 6) {
+      if (normalizedSearch.length < 6) {
         return false;
       }
       
       // Check if the search term is a significant part of the card name
-      if (cardNameLower.includes(cleanSearch)) {
+      if (normalizedCardName.includes(normalizedSearch)) {
         return true;
       }
       
       // Check if the card name is a significant part of the search term
-      if (cleanSearch.includes(cardNameLower) && cardNameLower.length >= 6) {
+      if (normalizedSearch.includes(normalizedCardName) && normalizedCardName.length >= 6) {
         return true;
       }
       
