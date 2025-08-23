@@ -5408,6 +5408,20 @@ function AppInner() {
   console.log('[App] - shownCards:', shownCards?.length || 0);
   console.log('[App] - loading:', loading);
   
+  // IMMEDIATE DETECTION - Force reload if simplified cards
+  console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
+  if (allCards && allCards.length > 0) {
+    const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
+    console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames found:', cardsWithSubnames.length);
+    
+    if (cardsWithSubnames.length === 0) {
+      console.log('[App] 🚨 IMMEDIATE CHECK: SIMPLIFIED CARDS DETECTED! Need to reload...');
+      // This will trigger our useEffect to reload
+    } else {
+      console.log('[App] ✅ IMMEDIATE CHECK: Cards already have subnames, no reload needed');
+    }
+  }
+  
   // Debug: Check what's actually in allCards
   if (allCards && allCards.length > 0) {
     console.log('[App] allCards already has data! Sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
@@ -5574,10 +5588,12 @@ function AppInner() {
     });
   }, [filters]);
 
+  console.log('[App] 📍 CHECKPOINT: About to define card loading useEffect...');
+  
         // Load all cards on mount - FORCE reload if simplified cards detected
   useEffect(() => {
     console.log('[App] ===== CARD LOADING useEffect triggered =====');
-    console.log('[App] Current allCards state:', allCards?.length || 0);
+    console.log('[App] 🔄 useEffect is running! allCards state:', allCards?.length || 0);
     
     // Check if we already have cards with subnames
     if (allCards && allCards.length > 0) {
