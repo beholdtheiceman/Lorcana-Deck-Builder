@@ -735,6 +735,8 @@ function toUrlString(v) {
 
 // Simple, reliable image proxy solution (from App (7).jsx)
 function proxyImageUrl(src) {
+  console.log(`[proxyImageUrl] Called with src:`, { type: typeof src, value: src });
+  
   if (!src) return "";
   try {
     const u = new URL(src);
@@ -745,7 +747,9 @@ function proxyImageUrl(src) {
   }
   // Use weserv.nl to bypass hotlink/CORS and normalize sizing
   // This is the same approach that works in App (7).jsx
-  return `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg`;
+  const result = `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg`;
+  console.log(`[proxyImageUrl] Returning:`, { type: typeof result, value: result });
+  return result;
 }
 
 // New approach: Generate local placeholder images with card data
@@ -947,6 +951,8 @@ function createCanvasImage(imageUrl) {
 
 // New function: Generate clean Lorcast URLs from card data
 function generateLorcastURL(card) {
+  console.log(`[generateLorcastURL] Called with card:`, { name: card?.name, id: card?.id, set: card?.set, number: card?.number });
+  
   if (!card || typeof card !== 'object') {
     console.warn(`[URL Generation] Invalid card object:`, card);
     return null;
@@ -2208,7 +2214,10 @@ function parseTextImport(text) {
     .map(entry => toUrlString(entry.card?.image_url))
     .filter(url => typeof url === 'string' && url.length > 0);
   
-  console.log(`[parseTextImport] Extracted ${imageUrlsToPrefetch.length} valid image URLs for prefetching:`, imageUrlsToPrefetch.slice(0, 3));
+  console.log(`[parseTextImport] Extracted ${imageUrlsToPrefetch.length} valid image URLs for prefetching`);
+  if (imageUrlsToPrefetch.length > 0) {
+    console.log(`[parseTextImport] Sample URLs:`, imageUrlsToPrefetch.slice(0, 3));
+  }
   
   if (foundCards.length > 0) {
     console.log('[parseTextImport] Found cards:', foundCards);
