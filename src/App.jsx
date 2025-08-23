@@ -2060,10 +2060,23 @@ function parseTextImport(text) {
           try {
             // Generate the best possible image URL
             imageUrl = generateLorcastURL(foundCard);
+            console.log(`[parseTextImport] generateLorcastURL returned for ${foundCard.name}:`, {
+              type: typeof imageUrl,
+              value: imageUrl,
+              isString: typeof imageUrl === 'string',
+              isObject: typeof imageUrl === 'object'
+            });
+            
             if (imageUrl) {
               // Use the proxy to avoid CORS/hotlinking issues
               proxiedUrl = proxyImageUrl(imageUrl);
-              console.log(`[parseTextImport] Generated image URL for ${foundCard.name}:`, {
+              console.log(`[parseTextImport] proxyImageUrl returned for ${foundCard.name}:`, {
+                type: typeof proxiedUrl,
+                value: proxiedUrl,
+                isString: typeof proxiedUrl === 'string'
+              });
+              
+              console.log(`[parseTextImport] Final image URLs for ${foundCard.name}:`, {
                 original: imageUrl,
                 proxied: proxiedUrl
               });
@@ -2082,6 +2095,13 @@ function parseTextImport(text) {
             }, 
             count: countNum 
           };
+          
+          // GUARD: Ensure image_url is a string
+          if (deck.entries[key].card.image_url && typeof deck.entries[key].card.image_url !== 'string') {
+            console.warn(`[parseTextImport] image_url must be string, got:`, deck.entries[key].card.image_url);
+            // Force it to be a string
+            deck.entries[key].card.image_url = String(deck.entries[key].card.image_url);
+          }
           validCards++;
           foundCards.push({ name: cardName.trim(), found: foundCard.name, count: countNum });
         } else {
