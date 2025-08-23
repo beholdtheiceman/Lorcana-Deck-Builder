@@ -5369,12 +5369,22 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
 function AppInner() {
   console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
+  
+  // Debug: Check if allCards has data immediately
+  console.log('[App] ===== COMPONENT STARTUP DEBUG =====');
+  console.log('[App] About to initialize state variables...');
   const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
   const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
   console.log('[App] Initial filters state:', filters);
   const [allCards, setAllCards] = useState([]);
   const [shownCards, setShownCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Debug: Check state immediately after initialization
+  console.log('[App] State variables initialized:');
+  console.log('[App] - allCards:', allCards?.length || 0);
+  console.log('[App] - shownCards:', shownCards?.length || 0);
+  console.log('[App] - loading:', loading);
   const [inspectCard, setInspectCard] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
