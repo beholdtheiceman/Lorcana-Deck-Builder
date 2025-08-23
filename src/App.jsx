@@ -5370,6 +5370,10 @@ function AppInner() {
   console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
   
+  // Debug: Track component lifecycle
+  console.log('[App] ===== COMPONENT LIFECYCLE DEBUG =====');
+  console.log('[App] Component function starting...');
+  
   // Debug: Check if allCards has data immediately
   console.log('[App] ===== COMPONENT STARTUP DEBUG =====');
   console.log('[App] About to initialize state variables...');
