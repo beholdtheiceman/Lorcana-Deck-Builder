@@ -42,11 +42,27 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         return { success: true };
       } else {
-        const error = await response.json();
-        return { success: false, error: error.error };
+        // Handle different HTTP status codes with specific messages
+        let errorMessage = 'Login failed';
+        
+        if (response.status === 401) {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (response.status === 400) {
+          errorMessage = 'Please check your input and try again.';
+        } else {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            errorMessage = `Login failed (${response.status})`;
+          }
+        }
+        
+        return { success: false, error: errorMessage };
       }
     } catch (error) {
-      return { success: false, error: 'Network error' };
+      console.error('Login network error:', error);
+      return { success: false, error: 'Network error - please check your connection and try again.' };
     }
   };
 
@@ -63,11 +79,27 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         return { success: true };
       } else {
-        const error = await response.json();
-        return { success: false, error: error.error };
+        // Handle different HTTP status codes with specific messages
+        let errorMessage = 'Registration failed';
+        
+        if (response.status === 409) {
+          errorMessage = 'An account with this email already exists. Please try logging in instead.';
+        } else if (response.status === 400) {
+          errorMessage = 'Please check your input and try again.';
+        } else {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            errorMessage = `Registration failed (${response.status})`;
+          }
+        }
+        
+        return { success: false, error: errorMessage };
       }
     } catch (error) {
-      return { success: false, error: 'Network error' };
+      console.error('Registration network error:', error);
+      return { success: false, error: 'Network error - please check your connection and try again.' };
     }
   };
 
