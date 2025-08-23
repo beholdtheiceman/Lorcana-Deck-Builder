@@ -1620,31 +1620,35 @@ function normalizeCard(raw) {
   else if (raw.image_url || raw.image) {
     imageUrl = raw.image_url || raw.image;
   }
+  // Try Lorcast API Image field
+  else if (raw.Image) {
+    imageUrl = raw.Image;
+  }
   
-  const name = raw.name || raw.title || "Unknown Card";
-  const setCode = raw.set?.code || raw.set || raw.set_code || raw.setCode || raw.setName || "Unknown";
-  const collectorNo = raw.collector_number || raw.number || raw.no || 0;
-  const cost = raw.cost ?? raw.ink_cost ?? raw.inkCost ?? 0;
-  const inks = raw.ink ? [raw.ink] : [];
-  const type = Array.isArray(raw.type) ? raw.type.join("/") : (raw.type || "Unknown");
-  const rarity = raw.rarity || raw.rarityLabel || "Unknown";
-  const text = raw.text || raw.rules_text || raw.abilityText || raw.rules || raw.abilities || "";
+  const name = raw.name || raw.Name || raw.title || raw.Title || "Unknown Card";
+  const setCode = raw.set?.code || raw.set || raw.set_code || raw.setCode || raw.setName || raw.Set_ID || "Unknown";
+  const collectorNo = raw.collector_number || raw.number || raw.no || raw.Card_Num || 0;
+  const cost = raw.cost ?? raw.ink_cost ?? raw.inkCost ?? raw.Cost ?? 0;
+  const inks = raw.ink ? [raw.ink] : (raw.Color ? raw.Color.split(',').map(c => c.trim()) : []);
+  const type = Array.isArray(raw.type) ? raw.type.join("/") : (raw.type || raw.Type || "Unknown");
+  const rarity = raw.rarity || raw.rarityLabel || raw.Rarity || "Unknown";
+  const text = raw.text || raw.rules_text || raw.abilityText || raw.rules || raw.abilities || raw.Body_Text || "";
   
-  const id = raw.id || raw._id || `${setCode}-${collectorNo}-${name}`;
+  const id = raw.id || raw._id || raw.Unique_ID || `${setCode}-${collectorNo}-${name}`;
   
   return {
     id,
     name,
     set: setCode,
-    setName: raw.set?.name || undefined,
+    setName: raw.set?.name || raw.Set_Name || undefined,
     number: collectorNo,
     cost,
     inks,
     type,
     rarity,
     text,
-    classifications: raw.classifications || raw.subtypes || [],
-    keywords: raw.keywords || raw.abilities || [],
+    classifications: raw.classifications || raw.Classifications || raw.subtypes || [],
+    keywords: raw.keywords || raw.Abilities || raw.abilities || [],
     // Store the image URL directly without processing
     image_url: imageUrl, // This now handles both API formats
     _raw: raw,
@@ -1655,6 +1659,7 @@ function normalizeCard(raw) {
     lore: raw.lore || raw.Lore || 0,
     willpower: raw.willpower || raw.Willpower || 0,
     strength: raw.strength || raw.Strength || 0,
+    setNum: raw.setNum || raw.Set_Num || undefined,
   };
 }
 
@@ -2102,16 +2107,28 @@ function findCardByName(cardName) {
   if (window.getCurrentCards) {
     const cards = window.getCurrentCards();
     
+    if (!cards || cards.length === 0) {
+      console.warn('[findCardByName] No cards available in database');
+      return null;
+    }
+    
     // Clean the search term
     const cleanSearch = cardName.trim().toLowerCase();
+    console.log(`[findCardByName] Searching for: "${cardName}" (cleaned: "${cleanSearch}")`);
     
-    // Try exact match first
+    // Try exact match first (case-sensitive)
     let found = cards.find(card => card.name === cardName);
-    if (found) return found;
+    if (found) {
+      console.log(`[findCardByName] Found exact match: "${found.name}"`);
+      return found;
+    }
     
     // Try case-insensitive exact match
     found = cards.find(card => card.name.toLowerCase() === cleanSearch);
-    if (found) return found;
+    if (found) {
+      console.log(`[findCardByName] Found case-insensitive match: "${found.name}"`);
+      return found;
+    }
     
     // Try to match the main part of the name (before any dash or parentheses)
     const mainName = cleanSearch.split(/[-–—()]/)[0].trim();
@@ -2120,7 +2137,10 @@ function findCardByName(cardName) {
         const cardMainName = card.name.toLowerCase().split(/[-–—()]/)[0].trim();
         return cardMainName === mainName;
       });
-      if (found) return found;
+      if (found) {
+        console.log(`[findCardByName] Found main name match: "${found.name}" (main: "${mainName}")`);
+        return found;
+      }
     }
     
     // Try fuzzy matching for very close names (but be more strict)
@@ -2136,7 +2156,14 @@ function findCardByName(cardName) {
       }
       return false;
     });
-    if (found) return found;
+    if (found) {
+      console.log(`[findCardByName] Found fuzzy match: "${found.name}"`);
+      return found;
+    }
+    
+    console.log(`[findCardByName] No match found for: "${cardName}"`);
+  } else {
+    console.warn('[findCardByName] getCurrentCards function not available');
   }
   
   return null;
