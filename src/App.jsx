@@ -1442,7 +1442,7 @@ function normalizeCards(list, source) {
 // ONE definitive fetchAllCards that RETURNS AN ARRAY and uses DEFAULT_Q
 async function fetchAllCards({ signal } = {}) {
   try {
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 100, signal });
+    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
     const normalized = normalizeCards(list, source);
     console.log(`[API] Loaded ${normalized.length}/${total} cards from ${source}`);
     
@@ -1502,7 +1502,7 @@ async function fetchAllCards({ signal } = {}) {
 async function fetchAllCardsFallback({ signal } = {}) {
   try {
     console.log('[API] Fallback using unified fetch...');
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 100, signal });
+    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
     const normalized = normalizeCards(list, source);
     console.log(`[API] Fallback loaded ${normalized.length}/${total} cards from ${source}`);
     
