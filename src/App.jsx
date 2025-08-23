@@ -5385,6 +5385,17 @@ function AppInner() {
   console.log('[App] - allCards:', allCards?.length || 0);
   console.log('[App] - shownCards:', shownCards?.length || 0);
   console.log('[App] - loading:', loading);
+  
+  // Debug: Check what's actually in allCards
+  if (allCards && allCards.length > 0) {
+    console.log('[App] allCards already has data! Sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+    const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
+    console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
+    if (cardsWithSubnames.length > 0) {
+      console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+    }
+  }
+  
   const [inspectCard, setInspectCard] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
