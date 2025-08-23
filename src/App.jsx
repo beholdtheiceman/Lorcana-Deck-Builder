@@ -5367,6 +5367,7 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
 // Root App -------------------------------------------------------------------
 
 function AppInner() {
+  console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
   const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
   const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
