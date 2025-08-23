@@ -1149,14 +1149,21 @@ async function apiSearchCards({
     const res = await fetch(url, { headers: { Accept: "application/json" }, mode: "cors" });
     if (res.ok) {
       const json = await res.json();
-      console.log('[API] Raw API response structure:', {
-        hasData: !!json?.data,
-        dataLength: json?.data?.length,
-        hasResults: !!json?.results,
-        resultsLength: json?.results?.length,
-        totalCards: json?.total_cards,
-        keys: Object.keys(json || {})
-      });
+      
+      // Safe debugging - wrapped in try-catch to prevent any interference
+      try {
+        console.log('[API] Raw API response structure:', {
+          hasData: !!json?.data,
+          dataLength: json?.data?.length,
+          hasResults: !!json?.results,
+          resultsLength: json?.results?.length,
+          totalCards: json?.total_cards,
+          keys: Object.keys(json || {})
+        });
+      } catch (debugError) {
+        console.warn('[API] Debug logging failed:', debugError);
+      }
+      
       const cards = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
       const total = Number(json?.total_cards ?? cards.length);
       const mapped = cards
@@ -1454,11 +1461,15 @@ async function fetchAllCards({ signal } = {}) {
     const normalized = normalizeCards(list, source);
     console.log(`[API] Loaded ${normalized.length}/${total} cards from ${source}`);
     
-    // Debug: Check if we're getting cards with subnames
-    const cardsWithSubnames = normalized.filter(card => card.name && card.name.includes(' - '));
-    console.log(`[API] Cards with subnames found: ${cardsWithSubnames.length}`);
-    if (cardsWithSubnames.length > 0) {
-      console.log('[API] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+    // Safe debugging: Check if we're getting cards with subnames
+    try {
+      const cardsWithSubnames = normalized.filter(card => card.name && card.name.includes(' - '));
+      console.log(`[API] Cards with subnames found: ${cardsWithSubnames.length}`);
+      if (cardsWithSubnames.length > 0) {
+        console.log('[API] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+      }
+    } catch (debugError) {
+      console.warn('[API] Subname detection debug failed:', debugError);
     }
     
     const mapped = normalized.map(card => ({
