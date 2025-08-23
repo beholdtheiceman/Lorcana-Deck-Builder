@@ -5574,37 +5574,59 @@ function AppInner() {
     });
   }, [filters]);
 
-        // Load all cards on mount
+        // Load all cards on mount - FORCE reload if simplified cards detected
   useEffect(() => {
     console.log('[App] ===== CARD LOADING useEffect triggered =====');
     console.log('[App] Current allCards state:', allCards?.length || 0);
     
+    // Check if we already have cards with subnames
+    if (allCards && allCards.length > 0) {
+      const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
+      console.log('[App] Existing cards with subnames:', cardsWithSubnames.length);
+      
+      if (cardsWithSubnames.length > 0) {
+        console.log('[App] ✅ Already have', cardsWithSubnames.length, 'cards with subnames, skipping API call');
+        setLoading(false);
+        return;
+      } else {
+        console.log('[App] ⚠️  DETECTED SIMPLIFIED CARDS - No subnames found in', allCards.length, 'cards');
+        console.log('[App] 🔄 FORCING API RELOAD to get cards with subnames...');
+      }
+    }
+    
     const loadCards = async () => {
       try {
-        console.log('[App] Loading all cards...');
-        console.log('[App] About to call fetchAllCards()...');
+        console.log('[App] 📡 Calling fetchAllCards() to get cards with subnames...');
         const cards = await fetchAllCards();
-        console.log('[App] fetchAllCards() returned:', cards?.length || 0, 'cards');
+        console.log('[App] ✅ fetchAllCards() returned:', cards?.length || 0, 'cards');
         
-        // Debug: Check what cards we actually got
-        const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
-        console.log('[App] Cards with subnames loaded:', cardsWithSubnames.length);
-        if (cardsWithSubnames.length > 0) {
-          console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+        if (cards && cards.length > 0) {
+          // Debug: Check what cards we actually got
+          const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
+          console.log('[App] 🎯 Cards with subnames loaded:', cardsWithSubnames.length);
+          
+          if (cardsWithSubnames.length > 0) {
+            console.log('[App] ✅ SUCCESS! Sample subname cards:', cardsWithSubnames.slice(0, 3).map(c => c.name));
+            setAllCardsWithLogging(cards);
+            setLoading(false);
+          } else {
+            console.log('[App] ❌ STILL NO SUBNAMES! Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+            // For now, use what we got but log the issue
+            setAllCardsWithLogging(cards);
+            setLoading(false);
+          }
         } else {
-          console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
+          console.log('[App] ❌ fetchAllCards returned no cards');
+          setLoading(false);
         }
-        
-        setAllCardsWithLogging(cards);
-        setLoading(false);
       } catch (error) {
-        console.error('[App] Error loading cards:', error);
+        console.error('[App] ❌ Error loading cards:', error);
         setLoading(false);
       }
     };
     
     loadCards();
-  }, []);
+  }, []); // Only run once on mount
 
   // Apply filters to cards
   useEffect(() => {
