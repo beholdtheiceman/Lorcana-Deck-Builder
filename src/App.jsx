@@ -733,6 +733,48 @@ const logOnce = (key, ...args) => {
   console.log(...args);
 };
 
+// Transform API card data to app format
+function toAppCard(raw) {
+  const id = raw.Unique_ID?.trim()
+    || [raw.Set_ID, raw.Card_Num].filter(Boolean).join("-")
+    || crypto.randomUUID();
+
+  const [baseName, subtitleMaybe] = raw.Name.split(" - ");
+  const subtitle = subtitleMaybe?.trim() || null;
+
+  const splitList = (s) =>
+    s ? s.split(",").map(x => x.trim()).filter(Boolean) : [];
+
+  const abilities = raw.Abilities
+    ? raw.Abilities.split(/[,;]\s*/).map(s => s.trim()).filter(Boolean)
+    : [];
+
+  return {
+    id,
+    setId: raw.Set_ID ?? null,
+    setNum: raw.Set_Num ?? null,
+    cardNum: raw.Card_Num ?? null,
+    name: raw.Name,
+    baseName,
+    subtitle,
+    imageUrl: raw.Image || null,
+    inkable: Boolean(raw.Inkable),
+    colors: splitList(raw.Color),
+    classifications: splitList(raw.Classifications),
+    type: raw.Type ?? null,
+    cost: raw.Cost ?? null,
+    lore: raw.Lore ?? null,
+    willpower: raw.Willpower ?? null,
+    strength: raw.Strength ?? null,
+    rarity: raw.Rarity ?? null,
+    abilities,
+    rulesText: raw.Body_Text ?? null,
+    flavorText: raw.Flavor_Text ?? null,
+    artist: raw.Artist || null,
+    franchise: raw.Franchise || null,
+  };
+}
+
 // Helper function to ensure we always get string URLs - single source of truth
 function asUrl(v) {
   if (!v) return null;
@@ -964,77 +1006,42 @@ function createCanvasImage(imageUrl) {
   });
 }
 
-// New function: Generate clean Lorcast URLs from card data - GUARANTEED to return string | null
+// New function: Generate clean Lorcast URLs from card data - UPDATED for transformed cards
 function generateLorcastURL(card) {
-  console.log(`[generateLorcastURL] Called with card:`, { name: card?.name, id: card?.id, set: card?.set, number: card?.number });
+  console.log(`[generateLorcastURL] Called with card:`, { 
+    name: card?.name, 
+    id: card?.id, 
+    setId: card?.setId, 
+    cardNum: card?.cardNum,
+    imageUrl: card?.imageUrl 
+  });
   
   if (!card || typeof card !== 'object') {
     console.warn(`[URL Generation] Invalid card object:`, card);
     return null;
   }
   
-  // Be more lenient - allow cards without names to still try to generate URLs
-  if (!card.name) {
-    console.warn(`[URL Generation] Card missing name, attempting to generate URL anyway:`, card);
+  // PREFER: Use existing imageUrl from transformed card data
+  if (card.imageUrl && typeof card.imageUrl === 'string' && card.imageUrl.startsWith('http')) {
+    console.log(`[URL Generation] Using existing imageUrl for ${card.name}:`, card.imageUrl);
+    return String(card.imageUrl);
   }
   
-  // Try to use existing _imageFromAPI if it exists and looks valid
-  if (card._imageFromAPI && typeof card._imageFromAPI === 'string' && card._imageFromAPI.startsWith('http')) {
-    // Clean up the existing URL
-    let cleanURL = card._imageFromAPI;
-    
-    // Remove any query parameters
-    cleanURL = cleanURL.split('?')[0];
-    
-    // Clean up common URL issues
-    cleanURL = cleanURL
-      .replace(/\s+/g, '%20')  // Replace spaces with %20
-      .replace(/'/g, '%27')    // Replace apostrophes with %27
-      .replace(/"/g, '%22')    // Replace quotes with %22
-      .replace(/!/g, '%21')    // Replace exclamation marks with %21
-      .replace(/\?/g, '%3F')   // Replace question marks with %3F
-      .replace(/&/g, '%26')    // Replace ampersands with %26
-      .replace(/=/g, '%3D')    // Replace equals with %3D
-      .replace(/#/g, '%23');   // Replace hash with %23
-    
-    console.log(`[URL Generation] Cleaned existing URL for ${card.name}:`, {
-      original: card._imageFromAPI,
-      cleaned: cleanURL
-    });
-    
-    // GUARANTEE: Return string, not object
-    return String(cleanURL);
+  // FALLBACK: Generate URL using card ID or set/number
+  if (card.id) {
+    const imageUrl = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
+    console.log(`[URL Generation] Generated image URL using card ID for ${card.name}:`, imageUrl);
+    return String(imageUrl);
   }
   
-  // Generate fallback URL from card data using the correct Lorcast API structure
-  if (card.set && card.number) {
-    // According to the official API docs, image URLs should be:
-    // https://cards.lorcast.io/card/digital/{size}/{card_id}.avif
-    // But we need the card ID, not just set/number
+  // LAST RESORT: Try to construct URL using set and number
+  if (card.setId && card.cardNum) {
+    const setCode = card.setId.toString().toUpperCase();
+    const cardNumber = card.cardNum.toString().padStart(3, '0');
     
-    // Try to construct a URL using the card ID if available
-    if (card.id) {
-      const imageUrl = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
-      console.log(`[URL Generation] Generated image URL using card ID for ${card.name}:`, imageUrl);
-      // GUARANTEE: Return string, not object
-      return String(imageUrl);
-    }
-    
-    // Fallback: try to construct URL using set and number (less reliable)
-    const setCode = card.set.toString().toUpperCase();
-    const cardNumber = card.number.toString().padStart(3, '0');
-    
-    // These are the correct URL patterns according to the API docs
-    const urlPatterns = [
-      `https://cards.lorcast.io/card/digital/large/crd_${setCode}_${cardNumber}.avif`,
-      `https://cards.lorcast.io/card/digital/normal/crd_${setCode}_${cardNumber}.avif`,
-      `https://cards.lorcast.io/card/digital/small/crd_${setCode}_${cardNumber}.avif`
-    ];
-    
-    console.log(`[URL Generation] Generated fallback URLs for ${card.name}:`, urlPatterns);
-    
-    // Return the large size first - GUARANTEE: Return string, not object
-    return String(urlPatterns[0]);
+    const imageUrl = `https://cards.lorcast.io/card/digital/large/crd_${setCode}_${cardNumber}.avif`;
+    console.log(`[URL Generation] Generated fallback URL using set/number for ${card.name}:`, imageUrl);
+    return String(imageUrl);
   }
   
   console.warn(`[URL Generation] Could not generate URL for card: ${card.name}`, card);
@@ -2089,9 +2096,18 @@ function parseTextImport(text) {
           let proxiedUrl = null;
           
           try {
-            // Generate the best possible image URL - NOW GUARANTEED to return strings
-            const rawUrl = generateLorcastURL(foundCard);      // string | null
-            const proxied = proxyImageUrl(rawUrl);             // string | null
+            // TRANSFORM: Convert to app format for consistent data structure
+            const transformedCard = toAppCard(foundCard);
+            console.log(`[parseTextImport] Transformed card for ${foundCard.name}:`, {
+              original: foundCard.name,
+              transformed: transformedCard.name,
+              inkable: transformedCard.inkable,
+              imageUrl: transformedCard.imageUrl
+            });
+            
+            // Generate the best possible image URL - PREFER existing imageUrl
+            const rawUrl = generateLorcastURL(transformedCard);      // string | null
+            const proxied = proxyImageUrl(rawUrl);                   // string | null
             
             // Single source of truth: normalize to string | null
             let image_url = asUrl(proxied) ?? asUrl(rawUrl);
@@ -2102,7 +2118,7 @@ function parseTextImport(text) {
               image_url = null;
             }
             
-            console.log(`[parseTextImport] Image URLs for ${foundCard.name}:`, {
+            console.log(`[parseTextImport] Image URLs for ${transformedCard.name}:`, {
               raw: rawUrl,
               proxied: proxied,
               final: image_url,
@@ -2111,11 +2127,11 @@ function parseTextImport(text) {
               finalType: typeof image_url
             });
             
-            // Store the card with enhanced image data - NEVER store objects
+            // Store the TRANSFORMED card with enhanced image data - NEVER store objects
             deck.entries[key] = { 
               card: {
-                ...foundCard,
-                image_url,  // 🚨 This is now guaranteed to be string | null
+                ...transformedCard,  // Use transformed data structure
+                image_url,           // 🚨 This is now guaranteed to be string | null
                 _generatedImageUrl: rawUrl,    // Keep original for debugging
                 _proxiedImageUrl: proxied      // Keep proxied for debugging
               }, 
@@ -2128,10 +2144,11 @@ function parseTextImport(text) {
               deck.entries[key].card.image_url = null;
             }
             
-            console.log(`[parseTextImport] Stored card with image_url:`, {
-              name: foundCard.name,
+            console.log(`[parseTextImport] Stored transformed card with image_url:`, {
+              name: transformedCard.name,
               image_url: deck.entries[key].card.image_url,
-              type: typeof deck.entries[key].card.image_url
+              type: typeof deck.entries[key].card.image_url,
+              inkable: transformedCard.inkable
             });
             
           } catch (error) {
