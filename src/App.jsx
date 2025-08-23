@@ -5476,23 +5476,33 @@ function AppInner() {
     });
   }, [filters]);
 
-  // Load all cards on mount
-  useEffect(() => {
-    const loadCards = async () => {
-      try {
-        console.log('[App] Loading all cards...');
-        const cards = await fetchAllCards();
-        console.log('[App] Loaded cards:', cards.length);
-        setAllCards(cards);
-        setLoading(false);
-      } catch (error) {
-        console.error('[App] Error loading cards:', error);
-        setLoading(false);
-      }
-    };
-    
-    loadCards();
-  }, []);
+      // Load all cards on mount
+    useEffect(() => {
+      const loadCards = async () => {
+        try {
+          console.log('[App] Loading all cards...');
+          const cards = await fetchAllCards();
+          console.log('[App] Loaded cards:', cards.length);
+          
+          // Debug: Check what cards we actually got
+          const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
+          console.log('[App] Cards with subnames loaded:', cardsWithSubnames.length);
+          if (cardsWithSubnames.length > 0) {
+            console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+          } else {
+            console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
+          }
+          
+          setAllCards(cards);
+          setLoading(false);
+        } catch (error) {
+          console.error('[App] Error loading cards:', error);
+          setLoading(false);
+        }
+      };
+      
+      loadCards();
+    }, []);
 
   // Apply filters to cards
   useEffect(() => {
