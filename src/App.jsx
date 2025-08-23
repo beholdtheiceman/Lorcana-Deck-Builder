@@ -2115,20 +2115,30 @@ function findCardByName(cardName) {
     // Clean the search term
     const cleanSearch = cardName.trim().toLowerCase();
     console.log(`[findCardByName] Searching for: "${cardName}" (cleaned: "${cleanSearch}")`);
+    console.log(`[findCardByName] Total cards in database: ${cards.length}`);
+    
+    // Log a few sample cards to see the data structure
+    if (cards.length > 0) {
+      console.log('[findCardByName] Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+    }
     
     // Try exact match first (case-sensitive)
+    console.log(`[findCardByName] Trying exact match for: "${cardName}"`);
     let found = cards.find(card => card.name === cardName);
     if (found) {
       console.log(`[findCardByName] Found exact match: "${found.name}"`);
       return found;
     }
+    console.log(`[findCardByName] No exact match found`);
     
     // Try case-insensitive exact match
+    console.log(`[findCardByName] Trying case-insensitive match for: "${cleanSearch}"`);
     found = cards.find(card => card.name.toLowerCase() === cleanSearch);
     if (found) {
       console.log(`[findCardByName] Found case-insensitive match: "${found.name}"`);
       return found;
     }
+    console.log(`[findCardByName] No case-insensitive match found`);
     
     // Try to match the full name with minor variations (handles small differences in punctuation, spacing)
     found = cards.find(card => {
