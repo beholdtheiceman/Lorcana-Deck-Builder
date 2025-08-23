@@ -3807,6 +3807,7 @@ return (
 
 function ImportModal({ open, onClose, onImport }) {
   const [text, setText] = useState("");
+  const [importFormat, setImportFormat] = useState("json");
   const [savedDecks, setSavedDecks] = useState([]);
   const [showSavedDecks, setShowSavedDecks] = useState(false);
   
@@ -3896,15 +3897,40 @@ function ImportModal({ open, onClose, onImport }) {
           )}
         </div>
         
-        {/* Import JSON Section */}
+        {/* Import Section */}
         <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-3">Import from JSON</h3>
-          <div className="text-sm text-gray-400 mb-3">
-            Paste deck JSON exported from this app (or adapt from another builder).
+          <h3 className="text-lg font-semibold mb-3">Import Deck</h3>
+          
+          {/* Format Selector */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Import Format:</label>
+            <select
+              value={importFormat}
+              onChange={(e) => {
+                setImportFormat(e.target.value);
+                setText(""); // Clear textarea when format changes
+              }}
+              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm"
+            >
+              <option value="json">JSON</option>
+              <option value="txt">Text</option>
+            </select>
           </div>
+          
+          {/* Format-specific help text */}
+          {importFormat === 'json' && (
+            <div className="text-sm text-gray-400 mb-3">
+              Paste deck JSON exported from this app (or adapt from another builder).
+            </div>
+          )}
+          {importFormat === 'txt' && (
+            <div className="text-sm text-gray-400 mb-3">
+              Paste your deck list with one card per line. Format: "4 Rafiki - Mystical Fighter"
+            </div>
+          )}
           <textarea
             className="w-full h-48 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
-            placeholder='{"name":"My Deck","entries":{...},"total":60}'
+            placeholder={importFormat === 'json' ? '{"name":"My Deck","entries":{...},"total":60}' : '4 Rafiki - Mystical Fighter\n2 The Magic Feather\n4 Sail The Azurite Sea'}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -3912,12 +3938,35 @@ function ImportModal({ open, onClose, onImport }) {
             <button
               className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
               onClick={() => {
+                if (!text.trim()) {
+                  alert("Please enter some text to import");
+                  return;
+                }
+                
                 try {
-                  const obj = JSON.parse(text);
-                  onImport(obj);
+                  let importedDeck;
+                  
+                  if (importFormat === 'json') {
+                    importedDeck = JSON.parse(text);
+                  } else if (importFormat === 'txt') {
+                    // Use the global parseTextImport function
+                    if (typeof window.parseTextImport === 'function') {
+                      importedDeck = window.parseTextImport(text);
+                    } else {
+                      throw new Error('Text import function not available');
+                    }
+                  } else {
+                    throw new Error(`Unsupported format: ${importFormat}`);
+                  }
+                  
+                  onImport(importedDeck);
                   onClose();
-                } catch {
-                  alert("Invalid JSON");
+                } catch (error) {
+                  if (importFormat === 'json') {
+                    alert("Invalid JSON");
+                  } else {
+                    alert(`Import failed: ${error.message}`);
+                  }
                 }
               }}
             >
@@ -5520,9 +5569,13 @@ useEffect(() => {
   // Also expose the current card list for debugging
   window.getCurrentCards = () => shownCards || [];
   
+  // Expose the text import function globally
+  window.parseTextImport = parseTextImport;
+  
   return () => {
     delete window.checkCardFields;
     delete window.getCurrentCards;
+    delete window.parseTextImport;
   };
 }, [shownCards]);
 
