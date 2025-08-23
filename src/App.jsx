@@ -725,6 +725,14 @@ async function getWorkingImageUrl(card) {
   return null;
 }
 
+// Helper function to ensure we always get string URLs
+function toUrlString(v) {
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  // tolerate different shapes - extract URL from common object patterns
+  return v.url ?? v.href ?? v.src ?? v.toString?.() ?? null;
+}
+
 // Simple, reliable image proxy solution (from App (7).jsx)
 function proxyImageUrl(src) {
   if (!src) return "";
@@ -2058,49 +2066,77 @@ function parseTextImport(text) {
           let proxiedUrl = null;
           
           try {
-            // Generate the best possible image URL
-            imageUrl = generateLorcastURL(foundCard);
+            // Generate the best possible image URL with string guards
+            const rawUrlOut = generateLorcastURL(foundCard);   // may be string or object
+            const rawUrlStr = toUrlString(rawUrlOut);
+            
             console.log(`[parseTextImport] generateLorcastURL returned for ${foundCard.name}:`, {
-              type: typeof imageUrl,
-              value: imageUrl,
-              isString: typeof imageUrl === 'string',
-              isObject: typeof imageUrl === 'object'
+              type: typeof rawUrlOut,
+              value: rawUrlOut,
+              isString: typeof rawUrlOut === 'string',
+              isObject: typeof rawUrlOut === 'object',
+              extracted: rawUrlStr
             });
             
-            if (imageUrl) {
+            if (rawUrlStr) {
               // Use the proxy to avoid CORS/hotlinking issues
-              proxiedUrl = proxyImageUrl(imageUrl);
+              const proxiedOut = proxyImageUrl(rawUrlStr);
+              const proxiedStr = toUrlString(proxiedOut);
+              
               console.log(`[parseTextImport] proxyImageUrl returned for ${foundCard.name}:`, {
-                type: typeof proxiedUrl,
-                value: proxiedUrl,
-                isString: typeof proxiedUrl === 'string'
+                type: typeof proxiedOut,
+                value: proxiedOut,
+                isString: typeof proxiedOut === 'string',
+                extracted: proxiedStr
               });
               
+              // Final image URL - ensure it's a string
+              const finalImg = proxiedStr || rawUrlStr || null;
+              
+              if (finalImg && typeof finalImg !== 'string') {
+                console.warn('[parseTextImport] image_url must be string, got:', finalImg);
+              }
+              
               console.log(`[parseTextImport] Final image URLs for ${foundCard.name}:`, {
-                original: imageUrl,
-                proxied: proxiedUrl
+                original: rawUrlStr,
+                proxied: proxiedStr,
+                final: finalImg
               });
+              
+              // Store the card with enhanced image data
+              deck.entries[key] = { 
+                card: {
+                  ...foundCard,
+                  image_url: finalImg,  // 🚨 This is now guaranteed to be a string
+                  _generatedImageUrl: rawUrlStr, // Keep original for debugging
+                  _proxiedImageUrl: proxiedStr   // Keep proxied for debugging
+                }, 
+                count: countNum 
+              };
+            } else {
+              // No image URL generated, store without image
+              deck.entries[key] = { 
+                card: {
+                  ...foundCard,
+                  image_url: null,
+                  _generatedImageUrl: null,
+                  _proxiedImageUrl: null
+                }, 
+                count: countNum 
+              };
             }
           } catch (error) {
             console.warn(`[parseTextImport] Error generating image URL for ${foundCard.name}:`, error);
-          }
-          
-          // Store the card with enhanced image data
-          deck.entries[key] = { 
-            card: {
-              ...foundCard,
-              image_url: proxiedUrl || foundCard.image_url || null,
-              _generatedImageUrl: imageUrl, // Keep original for debugging
-              _proxiedImageUrl: proxiedUrl   // Keep proxied for actual use
-            }, 
-            count: countNum 
-          };
-          
-          // GUARD: Ensure image_url is a string
-          if (deck.entries[key].card.image_url && typeof deck.entries[key].card.image_url !== 'string') {
-            console.warn(`[parseTextImport] image_url must be string, got:`, deck.entries[key].card.image_url);
-            // Force it to be a string
-            deck.entries[key].card.image_url = String(deck.entries[key].card.image_url);
+            // Store the card without image on error
+            deck.entries[key] = { 
+              card: {
+                ...foundCard,
+                image_url: null,
+                _generatedImageUrl: null,
+                _proxiedImageUrl: null
+              }, 
+              count: countNum 
+            };
           }
           validCards++;
           foundCards.push({ name: cardName.trim(), found: foundCard.name, count: countNum });
@@ -2166,6 +2202,14 @@ function parseTextImport(text) {
   
   // Log detailed results for debugging
   console.log(`[parseTextImport] Successfully parsed ${validCards} unique cards, ${totalCards} total cards (skipped ${skippedLines} lines)`);
+  
+  // Extract all valid image URLs for prefetching (ensuring they're strings)
+  const imageUrlsToPrefetch = Object.values(deck.entries)
+    .map(entry => toUrlString(entry.card?.image_url))
+    .filter(url => typeof url === 'string' && url.length > 0);
+  
+  console.log(`[parseTextImport] Extracted ${imageUrlsToPrefetch.length} valid image URLs for prefetching:`, imageUrlsToPrefetch.slice(0, 3));
+  
   if (foundCards.length > 0) {
     console.log('[parseTextImport] Found cards:', foundCards);
   }
