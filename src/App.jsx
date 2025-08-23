@@ -742,6 +742,12 @@ function sortLog(...args) {
 // TODO: Fix favicon 404 - either add /public/vite.svg or change reference in index.html
 // Current error: /vite.svg:1 Failed to load resource: the server responded with a status of 404 ()
 
+// Helper function to detect cards with subtitles (used in multiple places)
+const hasSubtitleLike = (card) => {
+  return !!(card.subname && card.subname.trim()) || 
+         /\s[-–]\s/.test((card.name || "").toLowerCase());
+};
+
 // Auth-safe fetch wrapper to prevent 401 spam
 async function authSafeFetch(input, init = {}) {
   const token = localStorage.getItem("auth_token");
@@ -5633,12 +5639,6 @@ function AppInner() {
   // FIXED: IMMEDIATE DETECTION - Accept hyphenated titles, don't force reload unnecessarily
   console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
   if (allCards && allCards.length > 0) {
-    // Check for separate subname field OR Name containing subtitle separator
-    const hasSubtitleLike = (card) => {
-      return !!(card.subname && card.subname.trim()) || 
-             /\s[-–]\s/.test((card.name || "").toLowerCase());
-    };
-    
     const cardsWithSubnames = allCards.filter(hasSubtitleLike);
     console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames/subtitles found:', cardsWithSubnames.length);
     
@@ -5835,14 +5835,8 @@ function AppInner() {
       console.log('[App] ===== CARD LOADING useEffect triggered =====');
       console.log('[App] 🔄 useEffect is running! allCards state:', allCards?.length || 0);
     
-    // UPDATED: Check if we already have cards with subnames OR subtitles in Name field
+    // FIXED: Check if we already have cards with subnames OR subtitles in Name field
     if (allCards && allCards.length > 0) {
-      // Check for separate subname field OR Name containing subtitle separator
-      const hasSubtitleLike = (card) => {
-        return !!(card.subname && card.subname.trim()) || 
-               /\s[-–]\s/.test((card.name || "").toLowerCase());
-      };
-      
       const cardsWithSubnames = allCards.filter(hasSubtitleLike);
       console.log('[App] Existing cards with subnames/subtitles:', cardsWithSubnames.length);
       
