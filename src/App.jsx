@@ -5590,7 +5590,13 @@ function AppInner() {
 
   console.log('[App] 📍 CHECKPOINT: About to define card loading useEffect...');
   
+  // TEST: Simple useEffect to see if any useEffect works
+  useEffect(() => {
+    console.log('[App] 🧪 TEST useEffect is running!');
+  }, []);
+  
   // Load all cards on mount - FORCE reload if simplified cards detected
+  console.log('[App] 🔧 About to define the main card loading useEffect...');
   useEffect(() => {
     console.log('[App] ===== CARD LOADING useEffect triggered =====');
     console.log('[App] 🔄 useEffect is running! allCards state:', allCards?.length || 0);
