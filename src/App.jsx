@@ -5578,17 +5578,20 @@ function AppInner() {
   console.log('[App] - shownCards:', shownCards?.length || 0);
   console.log('[App] - loading:', loading);
   
-  // IMMEDIATE DETECTION - Force reload if simplified cards
+  // UPDATED: IMMEDIATE DETECTION - Force reload if simplified cards (check subnames OR subtitles in Name)
   console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
   if (allCards && allCards.length > 0) {
-    const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
-    console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames found:', cardsWithSubnames.length);
+    const cardsWithSubnames = allCards.filter(card => {
+      // Check for separate subname field OR Name containing subtitle separator
+      return !!card.subname || (card.name && card.name.includes(' - '));
+    });
+    console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames/subtitles found:', cardsWithSubnames.length);
     
     if (cardsWithSubnames.length === 0) {
       console.log('[App] 🚨 IMMEDIATE CHECK: SIMPLIFIED CARDS DETECTED! Need to reload...');
       // This will trigger our useEffect to reload
     } else {
-      console.log('[App] ✅ IMMEDIATE CHECK: Cards already have subnames, no reload needed');
+      console.log('[App] ✅ IMMEDIATE CHECK: Cards already have subnames/subtitles, no reload needed');
     }
   }
   
@@ -5607,26 +5610,28 @@ function AppInner() {
     console.log('[App] ===== INVESTIGATING CARD SOURCE =====');
     console.log('[App] Checking if cards are from localStorage or other cache...');
     
-    // Check if there's a localStorage cache
-    try {
-      const cachedCards = localStorage.getItem('lorcana-cards-cache');
-      if (cachedCards) {
-        console.log('[App] Found cached cards in localStorage!');
-        const parsed = JSON.parse(cachedCards);
-        console.log('[App] Cached cards count:', parsed.length);
-        if (parsed.length > 0) {
-          const cachedWithSubnames = parsed.filter(card => card.name && card.name.includes(' - '));
-          console.log('[App] Cached cards with subnames:', cachedWithSubnames.length);
-          if (cachedWithSubnames.length > 0) {
-            console.log('[App] Sample cached subname cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
+            // Check if there's a localStorage cache
+        try {
+          const cachedCards = localStorage.getItem('lorcana-cards-cache');
+          if (cachedCards) {
+            console.log('[App] Found cached cards in localStorage!');
+            const parsed = JSON.parse(cachedCards);
+            console.log('[App] Cached cards count:', parsed.length);
+            if (parsed.length > 0) {
+              const cachedWithSubnames = parsed.filter(card => {
+                return !!card.subname || (card.name && card.name.includes(' - '));
+              });
+              console.log('[App] Cached cards with subnames/subtitles:', cachedWithSubnames.length);
+              if (cachedWithSubnames.length > 0) {
+                console.log('[App] Sample cached subname/subtitle cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
+              }
+            }
+          } else {
+            console.log('[App] No cached cards found in localStorage');
           }
+        } catch (error) {
+          console.log('[App] Error checking localStorage cache:', error);
         }
-      } else {
-        console.log('[App] No cached cards found in localStorage');
-      }
-    } catch (error) {
-      console.log('[App] Error checking localStorage cache:', error);
-    }
     
     // Check if there's a sessionStorage cache
     try {
@@ -5775,18 +5780,21 @@ function AppInner() {
       console.log('[App] ===== CARD LOADING useEffect triggered =====');
       console.log('[App] 🔄 useEffect is running! allCards state:', allCards?.length || 0);
     
-    // Check if we already have cards with subnames
+    // UPDATED: Check if we already have cards with subnames OR subtitles in Name field
     if (allCards && allCards.length > 0) {
-      const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
-      console.log('[App] Existing cards with subnames:', cardsWithSubnames.length);
+      const cardsWithSubnames = allCards.filter(card => {
+        // Check for separate subname field OR Name containing subtitle separator
+        return !!card.subname || (card.name && card.name.includes(' - '));
+      });
+      console.log('[App] Existing cards with subnames/subtitles:', cardsWithSubnames.length);
       
       if (cardsWithSubnames.length > 0) {
-        console.log('[App] ✅ Already have', cardsWithSubnames.length, 'cards with subnames, skipping API call');
+        console.log('[App] ✅ Already have', cardsWithSubnames.length, 'cards with subnames/subtitles, skipping API call');
         setLoading(false);
         return;
       } else {
-        console.log('[App] ⚠️  DETECTED SIMPLIFIED CARDS - No subnames found in', allCards.length, 'cards');
-        console.log('[App] 🔄 FORCING API RELOAD to get cards with subnames...');
+        console.log('[App] ⚠️  DETECTED SIMPLIFIED CARDS - No subnames/subtitles found in', allCards.length, 'cards');
+        console.log('[App] 🔄 FORCING API RELOAD to get cards with subnames/subtitles...');
       }
     }
     
@@ -5797,16 +5805,22 @@ function AppInner() {
         console.log('[App] ✅ fetchAllCards() returned:', cards?.length || 0, 'cards');
         
         if (cards && cards.length > 0) {
-          // Debug: Check what cards we actually got
-          const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
-          console.log('[App] 🎯 Cards with subnames loaded:', cardsWithSubnames.length);
+          // UPDATED: Check what cards we actually got (subnames OR subtitles in Name)
+          const cardsWithSubnames = cards.filter(card => {
+            return !!card.subname || (card.name && card.name.includes(' - '));
+          });
+          console.log('[App] 🎯 Cards with subnames/subtitles loaded:', cardsWithSubnames.length);
           
           if (cardsWithSubnames.length > 0) {
-            console.log('[App] ✅ SUCCESS! Sample subname cards:', cardsWithSubnames.slice(0, 3).map(c => c.name));
+            console.log('[App] ✅ SUCCESS! Sample subname/subtitle cards:', cardsWithSubnames.slice(0, 3).map(c => ({ 
+              name: c.name, 
+              subname: c.subname,
+              hasSubtitle: c.name && c.name.includes(' - ')
+            })));
             setAllCardsWithLogging(cards);
             setLoading(false);
           } else {
-            console.log('[App] ❌ STILL NO SUBNAMES! Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+            console.log('[App] ❌ STILL NO SUBNAMES/SUBTITLES! Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
             // For now, use what we got but log the issue
             setAllCardsWithLogging(cards);
             setLoading(false);
@@ -5833,10 +5847,12 @@ function AppInner() {
     console.log('[App] allCards length:', allCards?.length);
     if (allCards && allCards.length > 0) {
       console.log('[App] allCards sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
-      const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
-      console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
+      const cardsWithSubnames = allCards.filter(card => {
+        return !!card.subname || (card.name && card.name.includes(' - '));
+      });
+      console.log('[App] Cards with subnames/subtitles found:', cardsWithSubnames.length);
       if (cardsWithSubnames.length > 0) {
-        console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+        console.log('[App] Sample subname/subtitle cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
       }
     }
     
