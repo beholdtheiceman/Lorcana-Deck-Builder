@@ -725,6 +725,14 @@ async function getWorkingImageUrl(card) {
   return null;
 }
 
+// Utility to reduce noisy logs in dev (StrictMode double-runs)
+const logged = new Set();
+const logOnce = (key, ...args) => {
+  if (logged.has(key)) return;
+  logged.add(key);
+  console.log(...args);
+};
+
 // Helper function to ensure we always get string URLs - single source of truth
 function asUrl(v) {
   if (!v) return null;
@@ -2114,10 +2122,16 @@ function parseTextImport(text) {
               count: countNum 
             };
             
+            // FINAL GUARD: Ensure image_url is never an object
+            if (deck.entries[key].card.image_url && typeof deck.entries[key].card.image_url !== 'string') {
+              console.warn('[parseTextImport] CRITICAL: image_url is still an object! Clearing it:', deck.entries[key].card.image_url);
+              deck.entries[key].card.image_url = null;
+            }
+            
             console.log(`[parseTextImport] Stored card with image_url:`, {
               name: foundCard.name,
-              image_url,
-              type: typeof image_url
+              image_url: deck.entries[key].card.image_url,
+              type: typeof deck.entries[key].card.image_url
             });
             
           } catch (error) {
