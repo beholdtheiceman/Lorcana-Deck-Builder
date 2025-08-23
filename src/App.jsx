@@ -733,23 +733,30 @@ function toUrlString(v) {
   return v.url ?? v.href ?? v.src ?? v.toString?.() ?? null;
 }
 
-// Simple, reliable image proxy solution (from App (7).jsx)
+// Simple, reliable image proxy solution (from App (7).jsx) - GUARANTEED to return string | null
 function proxyImageUrl(src) {
   console.log(`[proxyImageUrl] Called with src:`, { type: typeof src, value: src });
   
-  if (!src) return "";
+  if (!src) return null;  // Return null instead of empty string for consistency
+  
+  // Ensure src is a string
+  const srcStr = String(src);
+  
   try {
-    const u = new URL(src);
+    const u = new URL(srcStr);
     // Avoid double-proxying
-    if (u.hostname.includes("weserv.nl")) return src;
+    if (u.hostname.includes("weserv.nl")) return srcStr;
   } catch {
     // ignore bad URLs; still try to proxy
   }
+  
   // Use weserv.nl to bypass hotlink/CORS and normalize sizing
   // This is the same approach that works in App (7).jsx
-  const result = `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg`;
+  const result = `https://images.weserv.nl/?url=${encodeURIComponent(srcStr)}&output=jpg`;
   console.log(`[proxyImageUrl] Returning:`, { type: typeof result, value: result });
-  return result;
+  
+  // GUARANTEE: Return string, not object
+  return String(result);
 }
 
 // New approach: Generate local placeholder images with card data
@@ -949,7 +956,7 @@ function createCanvasImage(imageUrl) {
   });
 }
 
-// New function: Generate clean Lorcast URLs from card data
+// New function: Generate clean Lorcast URLs from card data - GUARANTEED to return string | null
 function generateLorcastURL(card) {
   console.log(`[generateLorcastURL] Called with card:`, { name: card?.name, id: card?.id, set: card?.set, number: card?.number });
   
@@ -987,7 +994,8 @@ function generateLorcastURL(card) {
       cleaned: cleanURL
     });
     
-    return cleanURL;
+    // GUARANTEE: Return string, not object
+    return String(cleanURL);
   }
   
   // Generate fallback URL from card data using the correct Lorcast API structure
@@ -1000,7 +1008,8 @@ function generateLorcastURL(card) {
     if (card.id) {
       const imageUrl = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
       console.log(`[URL Generation] Generated image URL using card ID for ${card.name}:`, imageUrl);
-      return imageUrl;
+      // GUARANTEE: Return string, not object
+      return String(imageUrl);
     }
     
     // Fallback: try to construct URL using set and number (less reliable)
@@ -1016,8 +1025,8 @@ function generateLorcastURL(card) {
     
     console.log(`[URL Generation] Generated fallback URLs for ${card.name}:`, urlPatterns);
     
-    // Return the large size first
-    return urlPatterns[0];
+    // Return the large size first - GUARANTEE: Return string, not object
+    return String(urlPatterns[0]);
   }
   
   console.warn(`[URL Generation] Could not generate URL for card: ${card.name}`, card);
@@ -2072,65 +2081,37 @@ function parseTextImport(text) {
           let proxiedUrl = null;
           
           try {
-            // Generate the best possible image URL with string guards
-            const rawUrlOut = generateLorcastURL(foundCard);   // may be string or object
-            const rawUrlStr = toUrlString(rawUrlOut);
+            // Generate the best possible image URL - NOW GUARANTEED to return strings
+            const rawUrl = generateLorcastURL(foundCard);   // string | null
+            const proxied = proxyImageUrl(rawUrl);          // string | null
             
-            console.log(`[parseTextImport] generateLorcastURL returned for ${foundCard.name}:`, {
-              type: typeof rawUrlOut,
-              value: rawUrlOut,
-              isString: typeof rawUrlOut === 'string',
-              isObject: typeof rawUrlOut === 'object',
-              extracted: rawUrlStr
+            console.log(`[parseTextImport] Image URLs for ${foundCard.name}:`, {
+              raw: rawUrl,
+              proxied: proxied,
+              rawType: typeof rawUrl,
+              proxiedType: typeof proxied
             });
             
-            if (rawUrlStr) {
-              // Use the proxy to avoid CORS/hotlinking issues
-              const proxiedOut = proxyImageUrl(rawUrlStr);
-              const proxiedStr = toUrlString(proxiedOut);
-              
-              console.log(`[parseTextImport] proxyImageUrl returned for ${foundCard.name}:`, {
-                type: typeof proxiedOut,
-                value: proxiedOut,
-                isString: typeof proxiedOut === 'string',
-                extracted: proxiedStr
-              });
-              
-              // Final image URL - ensure it's a string
-              const finalImg = proxiedStr || rawUrlStr || null;
-              
-              if (finalImg && typeof finalImg !== 'string') {
-                console.warn('[parseTextImport] image_url must be string, got:', finalImg);
-              }
-              
-              console.log(`[parseTextImport] Final image URLs for ${foundCard.name}:`, {
-                original: rawUrlStr,
-                proxied: proxiedStr,
-                final: finalImg
-              });
-              
-              // Store the card with enhanced image data
-              deck.entries[key] = { 
-                card: {
-                  ...foundCard,
-                  image_url: finalImg,  // 🚨 This is now guaranteed to be a string
-                  _generatedImageUrl: rawUrlStr, // Keep original for debugging
-                  _proxiedImageUrl: proxiedStr   // Keep proxied for debugging
-                }, 
-                count: countNum 
-              };
-            } else {
-              // No image URL generated, store without image
-              deck.entries[key] = { 
-                card: {
-                  ...foundCard,
-                  image_url: null,
-                  _generatedImageUrl: null,
-                  _proxiedImageUrl: null
-                }, 
-                count: countNum 
-              };
-            }
+            // Final image URL - guaranteed to be string | null
+            const finalImg = proxied || rawUrl || null;
+            
+            // Store the card with enhanced image data
+            deck.entries[key] = { 
+              card: {
+                ...foundCard,
+                image_url: finalImg,  // 🚨 This is now guaranteed to be string | null
+                _generatedImageUrl: rawUrl,    // Keep original for debugging
+                _proxiedImageUrl: proxied      // Keep proxied for debugging
+              }, 
+              count: countNum 
+            };
+            
+            console.log(`[parseTextImport] Stored card with image_url:`, {
+              name: foundCard.name,
+              image_url: finalImg,
+              type: typeof finalImg
+            });
+            
           } catch (error) {
             console.warn(`[parseTextImport] Error generating image URL for ${foundCard.name}:`, error);
             // Store the card without image on error
