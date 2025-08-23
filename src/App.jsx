@@ -809,6 +809,25 @@ function proxyImageUrl(src) {
   return String(result);
 }
 
+// NEW: Get card image URL - PREFER feed Image, fallback to generator only if needed
+function getCardImageUrl(card) {
+  // PREFER: Use the Image field from the feed
+  if (card.imageUrl && typeof card.imageUrl === 'string') {
+    console.log(`[getCardImageUrl] Using feed imageUrl for ${card.name}:`, card.imageUrl);
+    return card.imageUrl;
+  }
+  
+  // FALLBACK: Generate URL only if absolutely necessary
+  try {
+    const generated = generateLorcastURL(card);
+    console.log(`[getCardImageUrl] Generated fallback URL for ${card.name}:`, generated);
+    return generated;
+  } catch (error) {
+    console.warn(`[getCardImageUrl] Failed to generate URL for ${card.name}:`, error);
+    return null;
+  }
+}
+
 // New approach: Generate local placeholder images with card data
 function generateLocalCardImage(card) {
   if (!card || typeof card !== 'object') return null;
@@ -2105,8 +2124,8 @@ function parseTextImport(text) {
               imageUrl: transformedCard.imageUrl
             });
             
-            // Generate the best possible image URL - PREFER existing imageUrl
-            const rawUrl = generateLorcastURL(transformedCard);      // string | null
+            // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
+            const rawUrl = getCardImageUrl(transformedCard);         // string | null
             const proxied = proxyImageUrl(rawUrl);                   // string | null
             
             // Single source of truth: normalize to string | null
@@ -2231,7 +2250,15 @@ function parseTextImport(text) {
   
   // Extract all valid image URLs for prefetching (ensuring they're strings)
   const imageUrlsToPrefetch = Object.values(deck.entries)
-    .map(entry => asUrl(entry.card?.image_url))
+    .map(entry => {
+      const card = entry.card;
+      if (!card) return null;
+      
+      // Use getCardImageUrl to get the best possible URL
+      const rawUrl = getCardImageUrl(card);
+      const proxied = proxyImageUrl(rawUrl);
+      return asUrl(proxied) ?? asUrl(rawUrl);
+    })
     .filter(url => typeof url === 'string' && url.length > 0);
   
   console.log(`[parseTextImport] Extracted ${imageUrlsToPrefetch.length} valid image URLs for prefetching`);
