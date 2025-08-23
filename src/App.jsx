@@ -5393,7 +5393,61 @@ function AppInner() {
     console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
     if (cardsWithSubnames.length > 0) {
       console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+    } else {
+      console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
     }
+    
+    // Debug: Check if this is cached data
+    console.log('[App] ===== INVESTIGATING CARD SOURCE =====');
+    console.log('[App] Checking if cards are from localStorage or other cache...');
+    
+    // Check if there's a localStorage cache
+    try {
+      const cachedCards = localStorage.getItem('lorcana-cards-cache');
+      if (cachedCards) {
+        console.log('[App] Found cached cards in localStorage!');
+        const parsed = JSON.parse(cachedCards);
+        console.log('[App] Cached cards count:', parsed.length);
+        if (parsed.length > 0) {
+          const cachedWithSubnames = parsed.filter(card => card.name && card.name.includes(' - '));
+          console.log('[App] Cached cards with subnames:', cachedWithSubnames.length);
+          if (cachedWithSubnames.length > 0) {
+            console.log('[App] Sample cached subname cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
+          }
+        }
+      } else {
+        console.log('[App] No cached cards found in localStorage');
+      }
+    } catch (error) {
+      console.log('[App] Error checking localStorage cache:', error);
+    }
+    
+    // Check if there's a sessionStorage cache
+    try {
+      const sessionCards = sessionStorage.getItem('lorcana-cards-session');
+      if (sessionCards) {
+        console.log('[App] Found cards in sessionStorage!');
+        const parsed = JSON.parse(sessionCards);
+        console.log('[App] Session cards count:', parsed.length);
+      } else {
+        console.log('[App] No cards found in sessionStorage');
+      }
+    } catch (error) {
+      console.log('[App] Error checking sessionStorage:', error);
+    }
+    
+    // Check if there are any global variables
+    if (window.lorcanaCards) {
+      console.log('[App] Found global lorcanaCards variable!');
+      console.log('[App] Global cards count:', window.lorcanaCards.length);
+    }
+    
+    if (window.allCards) {
+      console.log('[App] Found global allCards variable!');
+      console.log('[App] Global allCards count:', window.allCards.length);
+    }
+    
+    console.log('[App] ===== END INVESTIGATION =====');
   }
   
   const [inspectCard, setInspectCard] = useState(null);
@@ -5674,18 +5728,10 @@ function AppInner() {
       });
     };
     
-    window.getCurrentCards = () => {
-      console.log('Current cards:', {
-        allCards: allCards.length,
-        shownCards: shownCards.length,
-        deck: deck,
-        filters: filters
-      });
-    };
+    // Removed duplicate window.getCurrentCards exposure - keeping only the one in the later useEffect
     
     return () => {
       delete window.checkCardFields;
-      delete window.getCurrentCards;
     };
     }, [shownCards]);
 
