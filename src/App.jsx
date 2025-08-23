@@ -2052,7 +2052,36 @@ function parseTextImport(text) {
         const foundCard = findCardByName(cardName.trim());
         if (foundCard) {
           const key = deckKey(foundCard);
-          deck.entries[key] = { card: foundCard, count: countNum };
+          
+          // ENHANCED: Pre-compute image URL and use proxy for better image loading
+          let imageUrl = null;
+          let proxiedUrl = null;
+          
+          try {
+            // Generate the best possible image URL
+            imageUrl = generateLorcastURL(foundCard);
+            if (imageUrl) {
+              // Use the proxy to avoid CORS/hotlinking issues
+              proxiedUrl = proxyImageUrl(imageUrl);
+              console.log(`[parseTextImport] Generated image URL for ${foundCard.name}:`, {
+                original: imageUrl,
+                proxied: proxiedUrl
+              });
+            }
+          } catch (error) {
+            console.warn(`[parseTextImport] Error generating image URL for ${foundCard.name}:`, error);
+          }
+          
+          // Store the card with enhanced image data
+          deck.entries[key] = { 
+            card: {
+              ...foundCard,
+              image_url: proxiedUrl || foundCard.image_url || null,
+              _generatedImageUrl: imageUrl, // Keep original for debugging
+              _proxiedImageUrl: proxiedUrl   // Keep proxied for actual use
+            }, 
+            count: countNum 
+          };
           validCards++;
           foundCards.push({ name: cardName.trim(), found: foundCard.name, count: countNum });
         } else {
@@ -2148,6 +2177,14 @@ function findCardByName(cardName) {
       console.log('[findCardByName] Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
     }
     
+    // ENHANCED: Handle "Name - Subtitle" format
+    const hasSubtitle = cardName.includes(' - ');
+    let baseName = null;
+    if (hasSubtitle) {
+      baseName = cardName.split(' - ')[0].trim();
+      console.log(`[findCardByName] Detected subtitle format, base name: "${baseName}"`);
+    }
+    
     // Try exact match first (case-sensitive)
     console.log(`[findCardByName] Trying exact match for: "${cardName}"`);
     let found = cards.find(card => card.name === cardName);
@@ -2165,6 +2202,25 @@ function findCardByName(cardName) {
       return found;
     }
     console.log(`[findCardByName] No case-insensitive match found`);
+    
+    // NEW: Try base name match if we have a subtitle
+    if (baseName) {
+      console.log(`[findCardByName] Trying base name match for: "${baseName}"`);
+      found = cards.find(card => card.name === baseName);
+      if (found) {
+        console.log(`[findCardByName] Found base name match: "${found.name}"`);
+        return found;
+      }
+      
+      // Try case-insensitive base name match
+      const baseNameLower = baseName.toLowerCase();
+      found = cards.find(card => card.name.toLowerCase() === baseNameLower);
+      if (found) {
+        console.log(`[findCardByName] Found case-insensitive base name match: "${found.name}"`);
+        return found;
+      }
+      console.log(`[findCardByName] No base name match found`);
+    }
     
     // Try to match the full name with minor variations (handles small differences in punctuation, spacing)
     found = cards.find(card => {
