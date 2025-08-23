@@ -5376,9 +5376,27 @@ function AppInner() {
   const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
   const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
   console.log('[App] Initial filters state:', filters);
+  
+  // Debug: Track when allCards is modified
   const [allCards, setAllCards] = useState([]);
   const [shownCards, setShownCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Debug: Create a custom setAllCards that logs when it's called
+  const setAllCardsWithLogging = useCallback((cards) => {
+    console.log('[App] ===== setAllCards CALLED =====');
+    console.log('[App] Cards being set:', cards?.length || 0);
+    if (cards && cards.length > 0) {
+      console.log('[App] Sample cards being set:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+      const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
+      console.log('[App] Cards with subnames in new data:', cardsWithSubnames.length);
+      if (cardsWithSubnames.length > 0) {
+        console.log('[App] Sample subname cards in new data:', cardsWithSubnames.slice(0, 3).map(c => c.name));
+      }
+    }
+    console.log('[App] ===== END setAllCards LOG =====');
+    setAllCards(cards);
+  }, []);
   
   // Debug: Check state immediately after initialization
   console.log('[App] State variables initialized:');
@@ -5572,7 +5590,7 @@ function AppInner() {
           console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
         }
         
-        setAllCards(cards);
+        setAllCardsWithLogging(cards);
         setLoading(false);
       } catch (error) {
         console.error('[App] Error loading cards:', error);
