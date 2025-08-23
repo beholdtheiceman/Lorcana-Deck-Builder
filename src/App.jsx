@@ -29,6 +29,9 @@ import {
 // Icons (lucide-react) - optional; replace with your icon lib || inline SVGs
 // import { Search, Filter, Settings, X, Download, Upload } from "lucide-react";
 
+// Authentication components
+import AuthButton from './components/AuthButton';
+
 // Ink colors supported by the filters. Feel free to expand.
 const INK_COLORS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"];
 
@@ -2429,6 +2432,7 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
       </div>
 
       <div className="flex items-center gap-2">
+
         <button
           className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
           onClick={onToggleFilters}
@@ -2457,6 +2461,11 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
         >
           Import
         </button>
+        
+        {/* Authentication Button */}
+        <div className="ml-4 border-l border-gray-700 pl-4">
+          <AuthButton />
+        </div>
       </div>
     </div>
   );
@@ -2926,6 +2935,13 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
       
       {/* Add/Remove buttons with card count - always visible to prevent layout shifts */}
       <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-2">
+        {/* Card count display */}
+        <div className="bg-black/90 backdrop-blur-sm rounded-md px-2 py-1 min-w-[2.5rem] text-center border border-gray-600/50">
+          <div className="text-xs font-bold text-white">
+            {deckCount}/4
+          </div>
+        </div>
+        
         <button
           className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center transition-colors"
           onClick={(e) => { e.stopPropagation(); onAdd(card, 1); }}
@@ -2933,13 +2949,6 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         >
           +
         </button>
-        
-        {/* Card count display */}
-        <div className="bg-black/90 backdrop-blur-sm rounded-md px-2 py-1 min-w-[2.5rem] text-center border border-gray-600/50">
-          <div className="text-xs font-bold text-white">
-            {deckCount}/4
-          </div>
-        </div>
         
         <button
           className={`w-6 h-6 rounded-full border text-xs flex items-center justify-center transition-colors ${
@@ -3062,12 +3071,14 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
           <div className="w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Your Decks</h3>
-              <button
-                onClick={() => setShowNewDeckForm(true)}
-                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
-              >
-                + New
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowNewDeckForm(true)}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                >
+                  + New
+                </button>
+              </div>
             </div>
 
             {showNewDeckForm && (
@@ -3277,6 +3288,32 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
     [entries]
   );
 
+  // Calculate inkable vs uninkable counts
+  const inkableCounts = useMemo(() => {
+    let inkable = 0;
+    let uninkable = 0;
+    
+    console.log('[Inkable Detection] Processing entries:', entries.length);
+    
+    for (const e of entries) {
+      // Use the actual inkable field from Lorcast API
+      const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell;
+      
+      console.log(`[Inkable Detection] Card: ${e.card.name}, inkable field: ${isInkable}, raw.inkable: ${e.card._raw?.inkable}, raw.inkwell: ${e.card._raw?.inkwell}`);
+      
+      if (isInkable) {
+        inkable += e.count;
+        console.log(`[Inkable Detection] ${e.card.name} marked as INKABLE`);
+      } else {
+        uninkable += e.count;
+        console.log(`[Inkable Detection] ${e.card.name} marked as UNINKABLE`);
+      }
+    }
+    
+    console.log(`[Inkable Detection] Final counts: ${inkable} inkable, ${uninkable} uninkable`);
+    return { inkable, uninkable };
+  }, [entries]);
+
   return (
     <div className="p-3 bg-gray-950 border-l border-gray-800 h-full flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -3298,6 +3335,23 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
           >
             Import
           </button>
+        </div>
+      </div>
+
+      {/* Inkable vs Uninkable Ratio with Icons */}
+      <div className="flex items-center justify-center gap-4 p-3 bg-gray-900 rounded-xl border border-gray-800">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-emerald-500"></div>
+          <span className="text-sm text-emerald-400 font-semibold">
+            {inkableCounts.inkable} Inkable
+          </span>
+        </div>
+        <div className="text-gray-500">vs</div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-red-500"></div>
+          <span className="text-sm text-red-400 font-semibold">
+            {inkableCounts.uninkable} Uninkable
+          </span>
         </div>
       </div>
 
@@ -3348,18 +3402,18 @@ function DeckRow({ entry, onSetCount, onRemove }) {
         )}
       </div>
       <div className="flex items-center gap-1">
-        <button
-          className="w-6 h-6 rounded-md bg-gray-800 border border-gray-700 hover:bg-gray-700"
-          onClick={() => onSetCount(Math.max(0, entry.count - 1))}
-        >
-          -
-        </button>
         <input
           className="w-10 text-center rounded-md bg-gray-800 border border-gray-700"
           type="number"
           value={entry.count}
           onChange={(e) => onSetCount(parseInt(e.target.value || 0))}
         />
+        <button
+          className="w-6 h-6 rounded-md bg-gray-800 border border-gray-700 hover:bg-gray-700"
+          onClick={() => onSetCount(Math.max(0, entry.count - 1))}
+        >
+          -
+        </button>
         <button
           className="w-6 h-6 rounded-md bg-gray-800 border border-gray-700 hover:bg-gray-700"
           onClick={() => onSetCount(Math.min(DECK_RULES.MAX_COPIES, entry.count + 1))}
@@ -4011,6 +4065,368 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   const mostExpensive = sortedByCost[0];
   const cheapest = sortedByCost[sortedByCost.length - 1];
   
+  // Function to generate deck image
+  async function generateDeckImage() {
+    try {
+      // Get the button element to show loading state
+      const button = event?.target;
+      const originalText = button?.textContent;
+      const originalDisabled = button?.disabled;
+      
+      if (button) {
+        button.disabled = true;
+        button.textContent = '🔄 Generating...';
+      }
+      // Create canvas for deck image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Layout constants - tune these for the exact look you want
+      const posterW = 1400;       // Fixed width like your clean mock
+      const columns = 8;          // 8 across for more compact layout
+      const gap = 16;             // Space between cards
+      const margin = 32;          // Outer edge margin
+      const headerH = 120;        // Title band height
+      const cardAR = 63/88;       // Lorcana card aspect ratio
+      
+      // Calculate card size from width/columns (no dead space)
+      const cardWidth = Math.floor((posterW - margin * 2 - gap * (columns - 1)) / columns);
+      const cardHeight = Math.floor(cardWidth / cardAR);
+      const cardsPerRow = columns;
+      
+      // Get grouped entries for sorting
+      const groupedEntries = groupAndSortForText(entries);
+      
+      // Flatten all entries into one continuous list, maintaining order
+      const allEntries = [];
+      try {
+        for (const { entries: list } of groupedEntries) {
+          // Sort each group by cost, then by name for consistent ordering
+          const sortedList = [...list].sort((a, b) => {
+            const costA = getCost(a.card) ?? 0;
+            const costB = getCost(b.card) ?? 0;
+            if (costA !== costB) {
+              return costA - costB; // Sort by cost first
+            }
+            // If costs are equal, sort by name
+            return a.card.name.localeCompare(b.card.name);
+          });
+          allEntries.push(...sortedList);
+        }
+        
+        // Debug: log the entries we're working with
+        console.log(`[Deck Image] Total entries to draw:`, allEntries.length);
+      } catch (sortError) {
+        console.error(`[Deck Image] Error sorting entries:`, sortError);
+        // Fallback: just use the original entries without sorting
+        for (const { entries: list } of groupedEntries) {
+          allEntries.push(...list);
+        }
+      }
+      
+      // Calculate exact grid dimensions (no dead space)
+      const totalRows = Math.ceil(allEntries.length / cardsPerRow);
+      const gridHeight = totalRows * cardHeight + (totalRows - 1) * gap;
+      
+      // Compute exact poster height (no hard-coded values)
+      const posterH = headerH + margin + gridHeight + margin;
+      
+      // Set canvas dimensions exactly
+      canvas.width = posterW;
+      canvas.height = posterH;
+      
+      // Debug logging for dimensions
+      console.log(`[Deck Image] Layout calculation:`, {
+        posterW,
+        posterH,
+        columns,
+        cardWidth,
+        cardHeight,
+        gap,
+        margin,
+        headerH,
+        totalRows,
+        totalCards: allEntries.length
+      });
+      
+      // Background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Title and username on same row, centered
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 56px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(deck.name || 'Untitled Deck', canvas.width / 2, margin);
+      
+      // Username on same row, centered below title
+      ctx.font = '500 32px Inter, system-ui, sans-serif';
+      ctx.fillStyle = '#cdd2e0';
+      const username = deck.createdBy || deck.username || 'Unknown User';
+      ctx.fillText(`by ${username}`, canvas.width / 2, margin + 70);
+      
+      // Draw cards in grid - one continuous grid without section breaks
+      let currentRow = 0;
+      let currentCol = 0;
+      const yOffset = headerH + margin;
+      
+      // Draw all cards in one continuous grid
+      for (const entry of allEntries) {
+        const x = margin + currentCol * (cardWidth + gap);
+        const y = yOffset + currentRow * (cardHeight + gap);
+        
+        // Draw card background
+        ctx.fillStyle = '#2d3748';
+        ctx.fillRect(x, y, cardWidth, cardHeight);
+        ctx.strokeStyle = '#718096';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cardWidth, cardHeight);
+        
+        // Draw card image if available - try multiple image sources
+        const card = entry.card;
+        let imageDrawn = false;
+        
+        // Try multiple image sources in order of preference
+        const imageSources = [
+          card.image_url,
+          card.image,
+          card._imageFromAPI,
+          card._raw?.image_uris?.digital?.large,
+          card._raw?.image_uris?.digital?.normal,
+          card._raw?.image_uris?.large,
+          card._raw?.image_uris?.normal,
+          // Try to generate Lorcast URLs if we have set/number
+          card.set && card.number ? `https://cards.lorcast.io/card/digital/large/crd_${card.set}_${card.number.toString().padStart(3, '0')}.avif` : null,
+          card.set && card.number ? `https://api.lorcast.com/v0/cards/${card.set}/${card.number}/image` : null
+        ].filter(Boolean);
+        
+        // Debug: log what image sources we have
+        console.log(`[Deck Image] Card: ${card.name}, Image sources:`, imageSources);
+        
+        for (const imageSrc of imageSources) {
+          if (imageSrc && !imageDrawn) {
+            try {
+              console.log(`[Deck Image] Trying image source: ${imageSrc}`);
+              
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              // Try to use proxy for CORS issues
+              let finalImageSrc = imageSrc;
+              if (imageSrc.includes('cards.lorcast.io') || imageSrc.includes('api.lorcast.com')) {
+                try {
+                  // Use the existing proxy function if available
+                  if (typeof proxyImageUrl === 'function') {
+                    finalImageSrc = proxyImageUrl(imageSrc);
+                    console.log(`[Deck Image] Using proxy URL: ${finalImageSrc}`);
+                  } else {
+                    // Fallback proxy
+                    finalImageSrc = `https://images.weserv.nl/?url=${encodeURIComponent(imageSrc)}&output=jpg`;
+                    console.log(`[Deck Image] Using fallback proxy: ${finalImageSrc}`);
+                  }
+                } catch (proxyError) {
+                  console.warn(`[Deck Image] Proxy failed, using original: ${imageSrc}`);
+                }
+              }
+              
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 5000);
+                img.onload = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Successfully loaded image: ${finalImageSrc}`);
+                  resolve();
+                };
+                img.onerror = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Failed to load image: ${finalImageSrc}`);
+                  reject(new Error('Image failed to load'));
+                };
+                img.src = finalImageSrc;
+              });
+              
+              // Draw image maintaining aspect ratio
+              const imgAspect = img.width / img.height;
+              const cardAspect = cardWidth / cardHeight;
+              
+              let drawWidth = cardWidth;
+              let drawHeight = cardHeight;
+              let drawX = x;
+              let drawY = y;
+              
+              if (imgAspect > cardAspect) {
+                drawHeight = cardWidth / imgAspect;
+                drawY = y + (cardHeight - drawHeight) / 2;
+              } else {
+                drawWidth = cardHeight * imgAspect;
+                drawX = x + (cardWidth - drawWidth) / 2;
+              }
+              
+              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+              imageDrawn = true;
+              console.log(`[Deck Image] Successfully drew image for ${card.name}`);
+              break; // Successfully drew image, stop trying other sources
+              
+            } catch (error) {
+              console.warn(`[Deck Image] Failed to load image from ${imageSrc}:`, error);
+              continue; // Try next image source
+            }
+          }
+        }
+        
+        // If no image was drawn, try one more approach with existing functions
+        if (!imageDrawn) {
+          try {
+            // Try to use the existing image loading functions from the codebase
+            if (typeof getWorkingImageUrl === 'function') {
+              const workingUrl = await getWorkingImageUrl(card);
+              if (workingUrl) {
+                console.log(`[Deck Image] Trying getWorkingImageUrl: ${workingUrl}`);
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                await new Promise((resolve, reject) => {
+                  const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
+                  img.onload = resolve;
+                  img.onerror = reject;
+                  img.src = workingUrl;
+                });
+                
+                // Draw the image
+                const imgAspect = img.width / img.height;
+                const cardAspect = cardWidth / cardHeight;
+                
+                let drawWidth = cardWidth;
+                let drawHeight = cardHeight;
+                let drawX = x;
+                let drawY = y;
+                
+                if (imgAspect > cardAspect) {
+                  drawHeight = cardWidth / imgAspect;
+                  drawY = y + (cardHeight - drawHeight) / 2;
+                } else {
+                  drawWidth = cardHeight * imgAspect;
+                  drawX = x + (cardWidth - drawWidth) / 2;
+                }
+                
+                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                imageDrawn = true;
+                console.log(`[Deck Image] Successfully drew image using getWorkingImageUrl for ${card.name}`);
+              }
+            }
+          } catch (error) {
+            console.warn(`[Deck Image] getWorkingImageUrl failed for ${card.name}:`, error);
+          }
+        }
+        
+        // If still no image was drawn, use fallback
+        if (!imageDrawn) {
+          drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
+        }
+        
+        // Draw count indicator
+        if (entry.count > 1) {
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(x + cardWidth - 25, y, 25, 25);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 16px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(entry.count.toString(), x + cardWidth - 12.5, y + 18);
+        }
+        
+        // Move to next position
+        currentCol++;
+        if (currentCol >= cardsPerRow) {
+          currentCol = 0;
+          currentRow++;
+        }
+      }
+      
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${deck.name || 'deck'}_${new Date().toISOString().split('T')[0]}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+        
+        // Restore button state
+        if (button) {
+          button.disabled = originalDisabled;
+          button.textContent = originalText;
+        }
+      }, 'image/png');
+      
+    } catch (error) {
+      console.error('Failed to generate deck image:', error);
+      alert('Failed to generate deck image. Please try again.');
+      
+      // Restore button state on error
+      if (button) {
+        button.disabled = originalDisabled;
+        button.textContent = originalText;
+      }
+    }
+  }
+  
+  // Helper function to draw fallback card content
+  function drawFallbackCard(ctx, x, y, width, height, card) {
+    // Card background
+    ctx.fillStyle = '#2d3748';
+    ctx.fillRect(x, y, width, height);
+    
+    // Card border
+    ctx.strokeStyle = '#718096';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
+    
+    // Card name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    
+    // Wrap text if too long
+    const maxWidth = width - 10;
+    const words = (card.name || 'Unknown').split(' ');
+    let line = '';
+    let lineY = y + 20;
+    
+    for (let i = 0; i < words.length; i++) {
+      const testLine = line + words[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxWidth && i > 0) {
+        ctx.fillText(line, x + width / 2, lineY);
+        line = words[i] + ' ';
+        lineY += 15;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x + width / 2, lineY);
+    
+    // Card details
+    ctx.font = '10px Arial, sans-serif';
+    ctx.fillStyle = '#cccccc';
+    
+    if (card.set) {
+      ctx.fillText(`Set: ${card.set}`, x + width / 2, lineY + 20);
+    }
+    
+    if (card.number) {
+      ctx.fillText(`#${card.number}`, x + width / 2, lineY + 35);
+    }
+    
+    if (card.cost !== undefined) {
+      ctx.fillText(`Cost: ${card.cost}`, x + width / 2, lineY + 50);
+    }
+  }
+  
   return (
     <Modal open={true} onClose={onClose} title="Deck Presentation" size="full">
       <div className="space-y-6">
@@ -4532,16 +4948,11 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           <div className="flex justify-center gap-4 flex-wrap">
             {/* Download Image Button */}
             <button
-              onClick={() => {
-                // For now, copy deck to clipboard since image generation was removed
-                const deckText = `Deck: ${deck.name}\nTotal Cards: ${totalCards}\n\nCards:\n${Object.values(deck.entries || {}).filter(e => e.count > 0).map(e => `${e.count}x ${e.card.name}`).join('\n')}`;
-                navigator.clipboard.writeText(deckText);
-                alert('Deck copied to clipboard! (Image download temporarily disabled)');
-              }}
+              onClick={generateDeckImage}
               className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors shadow-lg"
-              title="Copy deck to clipboard (image download temporarily disabled)"
+              title="Download deck as image (PNG)"
             >
-              📋 Copy Deck
+              🖼️ Download Image
             </button>
 
             {/* Print Button - Opens print dialog */}
@@ -5034,8 +5445,11 @@ function handleSaveDeck() {
       // Update the decks state and ensure it's immediately available
       setDecks(updatedDecks);
       
-      // Save to localStorage
+      // Save to localStorage (for offline backup)
       saveAllDecks(updatedDecks);
+      
+      // Save to cloud database if user is logged in
+      saveDeckToCloud(updatedDeck);
       
       // Don't call deckDispatch here - let the useEffect handle synchronization
       // This prevents interference with the deck switching logic
@@ -5050,6 +5464,110 @@ function handleSaveDeck() {
   } catch (error) {
     console.error("Error saving deck:", error);
     addToast("Failed to save deck", "error");
+  }
+}
+
+// Save deck to cloud database
+async function saveDeckToCloud(deckData) {
+  try {
+    const response = await fetch('/api/decks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: deckData.name,
+        data: deckData,
+      }),
+    });
+
+    if (response.ok) {
+      console.log('[saveDeckToCloud] Deck saved to cloud successfully');
+    } else {
+      console.warn('[saveDeckToCloud] Failed to save to cloud, but local save succeeded');
+    }
+  } catch (error) {
+    console.warn('[saveDeckToCloud] Cloud save failed, but local save succeeded:', error);
+  }
+}
+
+// Load decks from cloud database
+async function loadDecksFromCloud() {
+  try {
+    console.log('[loadDecksFromCloud] Attempting to load decks from cloud...');
+    const response = await fetch('/api/decks', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const cloudDecks = await response.json();
+      console.log('[loadDecksFromCloud] Successfully loaded from cloud:', cloudDecks);
+      
+      // Convert cloud format to app format
+      const convertedDecks = {};
+      if (Array.isArray(cloudDecks)) {
+        cloudDecks.forEach(cloudDeck => {
+          if (cloudDeck.data && cloudDeck.data.id) {
+            convertedDecks[cloudDeck.data.id] = cloudDeck.data;
+          }
+        });
+      }
+      
+      console.log('[loadDecksFromCloud] Converted cloud decks:', convertedDecks);
+      return convertedDecks;
+    } else {
+      console.warn('[loadDecksFromCloud] Cloud response not ok:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.warn('[loadDecksFromCloud] Failed to load from cloud:', error);
+    return null;
+  }
+}
+
+// Sync decks between cloud and local storage
+async function syncDecksWithCloud() {
+  try {
+    console.log('[syncDecksWithCloud] Starting cloud sync...');
+    
+    // Load from cloud first
+    const cloudDecks = await loadDecksFromCloud();
+    
+    if (cloudDecks) {
+      // Load local decks
+      const localDecks = loadLS(LS_KEYS.DECKS, {});
+      
+      // Merge: cloud takes priority, but keep local changes
+      const mergedDecks = { ...localDecks };
+      
+      Object.entries(cloudDecks).forEach(([id, cloudDeck]) => {
+        const localDeck = localDecks[id];
+        
+        if (!localDeck || (cloudDeck.updatedAt > localDeck.updatedAt)) {
+          // Cloud deck is newer or doesn't exist locally
+          mergedDecks[id] = cloudDeck;
+          console.log(`[syncDecksWithCloud] Synced cloud deck: ${cloudDeck.name}`);
+        } else if (localDeck.updatedAt > cloudDeck.updatedAt) {
+          // Local deck is newer, push to cloud
+          console.log(`[syncDecksWithCloud] Local deck is newer, will push: ${localDeck.name}`);
+          saveDeckToCloud(localDeck);
+        }
+      });
+      
+      // Save merged result to localStorage
+      saveAllDecks(mergedDecks);
+      
+      console.log('[syncDecksWithCloud] Cloud sync completed');
+      return mergedDecks;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[syncDecksWithCloud] Error during cloud sync:', error);
+    return null;
   }
 }
 
@@ -5130,38 +5648,71 @@ function handleImportDeck(importedDeck) {
   addToast(`Imported deck: "${importedDeck.name}"`, "success");
 }
 
-// Initialize deck management system - only load decks that were explicitly saved
+// Initialize deck management system with cloud sync
 useEffect(() => {
-  const { decks: loadedDecks, currentDeckId: loadedCurrentDeckId } = loadAllDecks();
-  
-  console.log('[App] Initialization - loadedDecks:', loadedDecks);
-  console.log('[App] Initialization - loadedCurrentDeckId:', loadedCurrentDeckId);
-  
-  // Only load decks that have been explicitly saved (have a valid updatedAt timestamp)
-  const savedDecks = {};
-  Object.entries(loadedDecks).forEach(([id, deck]) => {
-    console.log('[App] Processing deck:', { id, deckId: deck.id, deckName: deck.name, hasId: !!deck.id });
-    if (deck.updatedAt && deck.updatedAt > 0) {
-      // Ensure the deck has the correct ID
-      const deckWithId = { ...deck, id: id };
-      savedDecks[id] = deckWithId;
-      console.log('[App] Added deck to savedDecks:', { id, deckId: deckWithId.id, deckName: deckWithId.name });
+  const initializeDecks = async () => {
+    try {
+      console.log('[App] Starting deck initialization with cloud sync...');
+      
+      // First try to sync with cloud
+      const syncedDecks = await syncDecksWithCloud();
+      
+      // Fall back to local storage if cloud sync fails
+      const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
+      
+      // Use synced decks if available, otherwise use local
+      const finalDecks = syncedDecks || localDecks;
+      const finalCurrentDeckId = localCurrentDeckId;
+      
+      console.log('[App] Initialization - finalDecks:', finalDecks);
+      console.log('[App] Initialization - finalCurrentDeckId:', finalCurrentDeckId);
+      
+      // Only load decks that have been explicitly saved (have a valid updatedAt timestamp)
+      const savedDecks = {};
+      Object.entries(finalDecks).forEach(([id, deck]) => {
+        console.log('[App] Processing deck:', { id, deckId: deck.id, deckName: deck.name, hasId: !!deck.id });
+        if (deck.updatedAt && deck.updatedAt > 0) {
+          // Ensure the deck has the correct ID
+          const deckWithId = { ...deck, id: id };
+          savedDecks[id] = deckWithId;
+          console.log('[App] Added deck to savedDecks:', { id, deckId: deckWithId.id, deckName: deckWithId.name });
+        }
+      });
+      
+      console.log('[App] Final savedDecks:', savedDecks);
+      setDecks(savedDecks);
+      
+      // Only set current deck if it was explicitly saved
+      if (finalCurrentDeckId && savedDecks[finalCurrentDeckId]) {
+        setCurrentDeckId(finalCurrentDeckId);
+        deckDispatch({ type: "SWITCH_DECK", deck: savedDecks[finalCurrentDeckId] });
+      } else {
+        // Create a new empty deck if no saved deck exists - but don't add it to decks collection
+        const newDeck = createNewDeck("Untitled Deck");
+        setCurrentDeckId(newDeck.id);
+        deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+      }
+      
+      console.log('[App] Deck initialization completed');
+    } catch (error) {
+      console.error('[App] Error during deck initialization:', error);
+      
+      // Fallback to local-only initialization
+      const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
+      setDecks(localDecks);
+      
+      if (localCurrentDeckId && localDecks[localCurrentDeckId]) {
+        setCurrentDeckId(localCurrentDeckId);
+        deckDispatch({ type: "SWITCH_DECK", deck: localDecks[localCurrentDeckId] });
+      } else {
+        const newDeck = createNewDeck("Untitled Deck");
+        setCurrentDeckId(newDeck.id);
+        deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+      }
     }
-  });
+  };
   
-  console.log('[App] Final savedDecks:', savedDecks);
-  setDecks(savedDecks);
-  
-  // Only set current deck if it was explicitly saved
-  if (loadedCurrentDeckId && savedDecks[loadedCurrentDeckId]) {
-    setCurrentDeckId(loadedCurrentDeckId);
-    deckDispatch({ type: "SWITCH_DECK", deck: savedDecks[loadedCurrentDeckId] });
-  } else {
-    // Create a new empty deck if no saved deck exists - but don't add it to decks collection
-    const newDeck = createNewDeck("Untitled Deck");
-    setCurrentDeckId(newDeck.id);
-    deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
-  }
+  initializeDecks();
 }, []);
 
 // Keyboard shortcuts (basic)
@@ -5252,6 +5803,7 @@ useEffect(() => {
             onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
             onNewDeck={handleNewDeck}
             onDeckManager={() => setShowDeckManager(true)}
+
           />
 
           {/* Essential Quick Filters */}
@@ -5591,7 +6143,6 @@ useEffect(() => {
               onImport={handleImport}
               onDeckPresentation={handleDeckPresentation}
             />
-            <DeckStats deck={deck} />
             <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
               {deckValid
                 ? "Deck is valid."
