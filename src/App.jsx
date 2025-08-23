@@ -2305,7 +2305,102 @@ function parseTextImport(text) {
   return deck;
 }
 
-// Helper function to find a card by name in the current card database - ENHANCED subtitle handling
+// ADVANCED: Deterministic card matching system with clear outcomes
+function matchCard(line, db) {
+  const raw = line.trim();
+  
+  // Normalize function for consistent matching
+  const clean = (s = '') => s.toLowerCase()
+    .normalize('NFKD')
+    .replace(/[–—]/g, '-')     // dash normalize
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const normLine = clean(raw);
+  
+  // Split title into base and subtitle
+  function splitTitle(line) {
+    const m = clean(line).split(/\s-\s/); // tolerant of hyphenated subtitles
+    return { base: m[0], sub: m[1] ?? '' };
+  }
+  
+  // 1) Exact match on full normalized name
+  const exact = db.find(c => clean(c.name) === normLine);
+  if (exact) {
+    console.log(`[matchCard] Exact match found: "${exact.name}"`);
+    return { match: exact, needsConfirmation: false, reason: "exact-name" };
+  }
+  
+  // 2) Name - Subtitle pairing
+  const { base, sub } = splitTitle(raw);
+  if (sub) {
+    console.log(`[matchCard] Trying subtitle match: base="${base}", sub="${sub}"`);
+    const subtitleCandidates = db.filter(c => {
+      const [cBase, cSub = ''] = clean(c.name).split(/\s-\s/);
+      return cBase === clean(base) && cSub === clean(sub);
+    });
+    
+    if (subtitleCandidates.length === 1) {
+      console.log(`[matchCard] Single subtitle match: "${subtitleCandidates[0].name}"`);
+      return { match: subtitleCandidates[0], needsConfirmation: false, reason: "name+subtitle" };
+    }
+    if (subtitleCandidates.length > 1) {
+      console.log(`[matchCard] Multiple subtitle matches (${subtitleCandidates.length}), needs confirmation`);
+      return { candidates: subtitleCandidates, needsConfirmation: true, reason: "ambiguous-name+subtitle" };
+    }
+  }
+  
+  // 3) Unique base-name fallback
+  const baseMatches = db.filter(c => {
+    const [cBase] = clean(c.name).split(/\s-\s/);
+    return cBase === clean(base);
+  });
+  
+  if (baseMatches.length === 1) {
+    console.log(`[matchCard] Unique base name match: "${baseMatches[0].name}"`);
+    return { match: baseMatches[0], needsConfirmation: false, reason: "unique-base" };
+  }
+  
+  if (baseMatches.length > 1) {
+    console.log(`[matchCard] Multiple base matches (${baseMatches.length}), applying tiebreakers`);
+    
+    // Apply soft tiebreakers: set, color, inkable
+    const boosted = [...baseMatches].sort((a, b) => {
+      let scoreA = 0, scoreB = 0;
+      if (normLine.includes(clean(String(a.setId)))) scoreA += 3;
+      if (normLine.includes(clean(String(b.setId)))) scoreB += 3;
+      if (normLine.includes(clean(String(a.setNum)))) scoreA += 2;
+      if (normLine.includes(clean(String(b.setNum)))) scoreB += 2;
+      if (normLine.includes(clean(String(a.colors?.[0])))) scoreA += 1;
+      if (normLine.includes(clean(String(b.colors?.[0])))) scoreB += 1;
+      return scoreB - scoreA;
+    });
+    
+    // If the top score is unique & >0, pick it; else ask user
+    const top = boosted[0];
+    const topScore = (() => {
+      let s = 0;
+      if (normLine.includes(clean(String(top.setId)))) s += 3;
+      if (normLine.includes(clean(String(top.setNum)))) s += 2;
+      if (normLine.includes(clean(String(top.colors?.[0])))) s += 1;
+      return s;
+    })();
+    
+    if (topScore > 0 && (boosted.length === 1 || top !== boosted[1])) {
+      console.log(`[matchCard] Tiebreaker resolved: "${top.name}" (score: ${topScore})`);
+      return { match: top, needsConfirmation: false, reason: "base+tiebreak" };
+    }
+    
+    console.log(`[matchCard] Ambiguous base matches, needs confirmation`);
+    return { candidates: baseMatches, needsConfirmation: true, reason: "ambiguous-base" };
+  }
+  
+  // 4) Give up cleanly
+  console.log(`[matchCard] No match found for: "${line}"`);
+  return { candidates: [], needsConfirmation: true, reason: "no-match" };
+}
+
+// UPDATED: Enhanced card finder using the new matching system
 function findCardByName(cardName) {
   // This will be populated when cards are loaded
   if (window.getCurrentCards) {
@@ -2316,105 +2411,24 @@ function findCardByName(cardName) {
       return null;
     }
     
-    // ENHANCED: Normalize dashes and whitespace for better subtitle matching
-    const normalize = (s) => s.toLowerCase()
-      .replace(/\s+/g, ' ')
-      .replace(/[–—-]/g, '-')  // en/em dashes to hyphen
-      .trim();
-    
-    const normalizedSearch = normalize(cardName);
-    console.log(`[findCardByName] Searching for: "${cardName}" (normalized: "${normalizedSearch}")`);
+    console.log(`[findCardByName] Searching for: "${cardName}"`);
     console.log(`[findCardByName] Total cards in database: ${cards.length}`);
     
-    // Log a few sample cards to see the data structure
-    if (cards.length > 0) {
-      console.log('[findCardByName] Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
-    }
+    // Use the new matching system
+    const outcome = matchCard(cardName, cards);
     
-    // ENHANCED: Handle "Name - Subtitle" format with normalized matching
-    const hasSubtitle = normalizedSearch.includes(' - ');
-    let baseName = null;
-    if (hasSubtitle) {
-      baseName = normalizedSearch.split(' - ')[0].trim();
-      console.log(`[findCardByName] Detected subtitle format, base name: "${baseName}"`);
-    }
-    
-    // Try exact match first (case-sensitive)
-    console.log(`[findCardByName] Trying exact match for: "${cardName}"`);
-    let found = cards.find(card => card.name === cardName);
-    if (found) {
-      console.log(`[findCardByName] Found exact match: "${found.name}"`);
-      return found;
-    }
-    console.log(`[findCardByName] No exact match found`);
-    
-    // Try normalized exact match (handles dashes and whitespace variations)
-    console.log(`[findCardByName] Trying normalized match for: "${normalizedSearch}"`);
-    found = cards.find(card => normalize(card.name) === normalizedSearch);
-    if (found) {
-      console.log(`[findCardByName] Found normalized match: "${found.name}"`);
-      return found;
-    }
-    console.log(`[findCardByName] No normalized match found`);
-    
-    // ENHANCED: Try base name match if we have a subtitle
-    if (baseName) {
-      console.log(`[findCardByName] Trying base name match for: "${baseName}"`);
-      found = cards.find(card => normalize(card.name) === baseName);
-      if (found) {
-        console.log(`[findCardByName] Found base name match: "${found.name}"`);
-        return found;
+    if ("match" in outcome) {
+      console.log(`[findCardByName] Found match: "${outcome.match.name}" (reason: ${outcome.reason})`);
+      return outcome.match;
+    } else {
+      console.log(`[findCardByName] Needs confirmation or no match:`, outcome.reason);
+      if (outcome.candidates.length > 0) {
+        console.log(`[findCardByName] Candidates:`, outcome.candidates.map(c => c.name));
+        // For now, return the first candidate (you can enhance this with a UI later)
+        return outcome.candidates[0];
       }
-      console.log(`[findCardByName] No base name match found`);
+      return null;
     }
-    
-    // Try to match the full name with minor variations (handles small differences in punctuation, spacing)
-    found = cards.find(card => {
-      const normalizedCardName = normalize(card.name);
-      
-      if (normalizedSearch === normalizedCardName) {
-        return true;
-      }
-      
-      // Check if the search term is contained within the card name (but be strict about it)
-      if (normalizedSearch.length >= 8 && normalizedCardName.includes(normalizedSearch)) {
-        return true;
-      }
-      
-      return false;
-    });
-    if (found) {
-      console.log(`[findCardByName] Found normalized match: "${found.name}"`);
-      return found;
-    }
-    
-    // Try fuzzy matching for very close names (but be very strict)
-    found = cards.find(card => {
-      const normalizedCardName = normalize(card.name);
-      
-      // Only do fuzzy matching if the search term is substantial
-      if (normalizedSearch.length < 6) {
-        return false;
-      }
-      
-      // Check if the search term is a significant part of the card name
-      if (normalizedCardName.includes(normalizedSearch)) {
-        return true;
-      }
-      
-      // Check if the card name is a significant part of the search term
-      if (normalizedSearch.includes(normalizedCardName) && normalizedCardName.length >= 6) {
-        return true;
-      }
-      
-      return false;
-    });
-    if (found) {
-      console.log(`[findCardByName] Found fuzzy match: "${found.name}"`);
-      return found;
-    }
-    
-    console.log(`[findCardByName] No match found for: "${cardName}"`);
   } else {
     console.warn('[findCardByName] getCurrentCards function not available');
   }
