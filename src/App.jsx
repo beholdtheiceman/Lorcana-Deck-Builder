@@ -739,6 +739,9 @@ function sortLog(...args) {
   if (DEBUG_SORT) console.log(...args); 
 }
 
+// TODO: Fix favicon 404 - either add /public/vite.svg or change reference in index.html
+// Current error: /vite.svg:1 Failed to load resource: the server responded with a status of 404 ()
+
 // Auth-safe fetch wrapper to prevent 401 spam
 async function authSafeFetch(input, init = {}) {
   const token = localStorage.getItem("auth_token");
