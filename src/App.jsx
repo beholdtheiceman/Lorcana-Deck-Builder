@@ -2117,7 +2117,60 @@ function importDeck(data, format = 'json') {
   }
 }
 
-// Parse text import (enhanced implementation)
+// Find card by Lorcanito export format: "Card Name — Subtitle (Set #Number)"
+function findCardByLorcanitoFormat(cardName, subtitle, setId, setNumber) {
+  if (window.getCurrentCards) {
+    const cards = window.getCurrentCards();
+    
+    if (!cards || cards.length === 0) {
+      console.warn('[findCardByLorcanitoFormat] No cards available in database');
+      return null;
+    }
+    
+    console.log(`[findCardByLorcanitoFormat] Searching for: "${cardName} — ${subtitle}" (Set ${setId} #${setNumber})`);
+    
+    // Try exact match first
+    const exactMatch = cards.find(c => 
+      c.name === `${cardName} — ${subtitle}` ||
+      (c.name === cardName && c.subname === subtitle)
+    );
+    
+    if (exactMatch) {
+      console.log(`[findCardByLorcanitoFormat] Exact match found: "${exactMatch.name}"`);
+      return exactMatch;
+    }
+    
+    // Try matching by set and number
+    const setMatch = cards.find(c => 
+      String(c.setId) === String(setId) && 
+      String(c.setNumber) === String(setNumber)
+    );
+    
+    if (setMatch) {
+      console.log(`[findCardByLorcanitoFormat] Set match found: "${setMatch.name}" (Set ${setMatch.setId} #${setMatch.setNumber})`);
+      return setMatch;
+    }
+    
+    // Try fuzzy name matching
+    const fuzzyMatch = cards.find(c => 
+      c.name.toLowerCase().includes(cardName.toLowerCase()) &&
+      c.name.toLowerCase().includes(subtitle.toLowerCase())
+    );
+    
+    if (fuzzyMatch) {
+      console.log(`[findCardByLorcanitoFormat] Fuzzy match found: "${fuzzyMatch.name}"`);
+      return fuzzyMatch;
+    }
+    
+    console.log(`[findCardByLorcanitoFormat] No match found for "${cardName} — ${subtitle}"`);
+    return null;
+  } else {
+    console.warn('[findCardByLorcanitoFormat] getCurrentCards function not available');
+    return null;
+  }
+}
+
+// Parse text import - REVERSE ENGINEERED from export format for reliability
 function parseTextImport(text) {
   if (!text || typeof text !== 'string') {
     throw new Error('Invalid text input');
@@ -2135,14 +2188,142 @@ function parseTextImport(text) {
   let foundCards = [];
   let notFoundCards = [];
   
+  // Parse Lorcanito export format: "4 Card Name — Subtitle (Set #Number)"
+  const lorcanitoPattern = /^(\d+)\s+(.+?)\s*—\s*(.+?)\s*\((\d+)\s*#(\d+)\)$/;
+  
   lines.forEach((line, index) => {
-    // Skip empty lines and comments (lines starting with # or //)
+    // Skip empty lines and comments
     if (!line || line.startsWith('#') || line.startsWith('//')) {
       skippedLines++;
       return;
     }
     
-    // Handle format: "4 Rafiki - Mystical Fighter"
+    // Try Lorcanito format first (most reliable)
+    const lorcanitoMatch = line.match(lorcanitoPattern);
+    if (lorcanitoMatch) {
+      const [, count, cardName, subtitle, setId, setNumber] = lorcanitoMatch;
+      const countNum = parseInt(count);
+      
+      if (countNum > 0 && cardName.trim()) {
+        totalCards += countNum;
+        console.log(`[parseTextImport] Parsed Lorcanito format: ${countNum}x "${cardName} — ${subtitle}" (Set ${setId} #${setNumber})`);
+        
+        // Try to find the card using the exact format
+        const foundCard = findCardByLorcanitoFormat(cardName.trim(), subtitle.trim(), setId, setNumber);
+        if (foundCard) {
+          const key = deckKey(foundCard);
+          
+          try {
+            // TRANSFORM: Convert to app format for consistent data structure
+            const transformedCard = toAppCard(foundCard);
+            console.log(`[parseTextImport] Transformed card for ${foundCard.name}:`, {
+              original: foundCard.name,
+              transformed: transformedCard.name,
+              inkable: transformedCard.inkable,
+              imageUrl: transformedCard.imageUrl
+            });
+            
+            // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
+            const rawUrl = getCardImageUrl(transformedCard);         // string | null
+            console.log(`[parseTextImport] About to call proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
+            const proxied = proxyImageUrl(rawUrl);                   // string | null
+            
+            // Single source of truth: normalize to string | null
+            let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+            
+            // Runtime guard - if anything weird slips through:
+            if (image_url && typeof image_url !== 'string') {
+              console.log('[parseTextImport] non-string image_url; clearing', image_url);
+              image_url = null;
+            }
+            
+            console.log(`[parseTextImport] Image URLs for ${transformedCard.name}:`, {
+              raw: rawUrl,
+              proxied: proxied,
+              final: image_url,
+              rawType: typeof rawUrl,
+              proxiedType: typeof proxied,
+              finalType: typeof image_url
+            });
+            
+            // Store the TRANSFORMED card with enhanced image data - NEVER store objects
+            deck.entries[key] = { 
+              card: {
+                ...transformedCard,  // Use transformed data structure
+                image_url,           // 🚨 This is now guaranteed to be string | null
+                _generatedImageUrl: rawUrl,    // Keep original for debugging
+                _proxiedImageUrl: proxied      // Keep proxied for debugging
+              }, 
+              count: countNum 
+            };
+            
+            // FINAL GUARD: Ensure image_url is never an object
+            if (deck.entries[key].card.image_url && typeof deck.entries[key].card.image_url !== 'string') {
+              console.warn('[parseTextImport] CRITICAL: image_url is still an object! Clearing it:', deck.entries[key].card.image_url);
+              deck.entries[key].card.image_url = null;
+            }
+            
+            console.log(`[parseTextImport] Stored transformed card with image_url:`, {
+              name: transformedCard.name,
+              image_url: deck.entries[key].card.image_url,
+              type: typeof deck.entries[key].card.image_url,
+              inkable: transformedCard.inkable
+            });
+            
+          } catch (error) {
+            console.warn(`[parseTextImport] Error generating image URL for ${foundCard.name}:`, error);
+            // Store the card without image on error
+            deck.entries[key] = { 
+              card: {
+                ...foundCard,
+                image_url: null,
+                _generatedImageUrl: null,
+                _proxiedImageUrl: null
+              }, 
+              count: countNum 
+            };
+          }
+          validCards++;
+          foundCards.push({ name: `${cardName} — ${subtitle}`, found: foundCard.name, count: countNum });
+        } else {
+          // If card not found, create a placeholder entry with better structure
+          const placeholderCard = { 
+            name: `${cardName} — ${subtitle}`, 
+            set: setId, 
+            number: setNumber, 
+            cost: 0,
+            inks: [],
+            type: "Unknown",
+            rarity: "Unknown",
+            text: "",
+            classifications: [],
+            keywords: [],
+            image_url: "",
+            _raw: {},
+            // Add these fields to match expected card structure
+            setCode: setId,
+            setName: `Set ${setId}`,
+            setNum: setNumber,
+            inkable: false,
+            lore: 0,
+            willpower: 0,
+            strength: 0,
+            franchise: "",
+            gamemode: "Lorcana"
+          };
+          const key = deckKey(placeholderCard);
+          deck.entries[key] = { card: placeholderCard, count: countNum };
+          validCards++;
+          notFoundCards.push({ name: `${cardName} — ${subtitle}`, count: countNum });
+        }
+        return; // Skip to next line
+      } else {
+        console.warn(`[parseTextImport] Invalid count on line ${index + 1}: "${line}"`);
+        skippedLines++;
+      }
+    }
+    
+    // Fallback: Handle old format "4 Rafiki - Mystical Fighter"
     const simpleMatch = line.match(/^(\d+)\s+(.+)$/);
     if (simpleMatch) {
       const [, count, cardName] = simpleMatch;
@@ -2150,6 +2331,8 @@ function parseTextImport(text) {
       
       if (countNum > 0 && cardName.trim()) {
         totalCards += countNum;
+        console.log(`[parseTextImport] Fallback parsing: ${countNum}x "${cardName}"`);
+        
         // Try to find the card in the current card database
         const foundCard = findCardByName(cardName.trim());
         if (foundCard) {
