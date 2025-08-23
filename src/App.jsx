@@ -1999,6 +1999,8 @@ function parseTextImport(text) {
   let validCards = 0;
   let totalCards = 0;
   let skippedLines = 0;
+  let foundCards = [];
+  let notFoundCards = [];
   
   lines.forEach((line, index) => {
     // Skip empty lines and comments (lines starting with # or //)
@@ -2021,6 +2023,7 @@ function parseTextImport(text) {
           const key = deckKey(foundCard);
           deck.entries[key] = { card: foundCard, count: countNum };
           validCards++;
+          foundCards.push({ name: cardName.trim(), found: foundCard.name, count: countNum });
         } else {
           // If card not found, create a placeholder entry
           const placeholderCard = { 
@@ -2040,6 +2043,7 @@ function parseTextImport(text) {
           const key = deckKey(placeholderCard);
           deck.entries[key] = { card: placeholderCard, count: countNum };
           validCards++;
+          notFoundCards.push({ name: cardName.trim(), count: countNum });
         }
       } else {
         console.warn(`[parseTextImport] Invalid count or card name on line ${index + 1}: "${line}"`);
@@ -2055,6 +2059,7 @@ function parseTextImport(text) {
         deck.entries[key] = { card, count: parseInt(count) };
         validCards++;
         totalCards += parseInt(count);
+        foundCards.push({ name: name, found: name, count: parseInt(count) });
       } else {
         console.warn(`[parseTextImport] Unrecognized format on line ${index + 1}: "${line}"`);
         skippedLines++;
@@ -2066,7 +2071,15 @@ function parseTextImport(text) {
     throw new Error('No valid cards found in text input');
   }
   
+  // Log detailed results for debugging
   console.log(`[parseTextImport] Successfully parsed ${validCards} unique cards, ${totalCards} total cards (skipped ${skippedLines} lines)`);
+  if (foundCards.length > 0) {
+    console.log('[parseTextImport] Found cards:', foundCards);
+  }
+  if (notFoundCards.length > 0) {
+    console.log('[parseTextImport] Not found cards:', notFoundCards);
+  }
+  
   return deck;
 }
 
@@ -2075,19 +2088,41 @@ function findCardByName(cardName) {
   // This will be populated when cards are loaded
   if (window.getCurrentCards) {
     const cards = window.getCurrentCards();
+    
+    // Clean the search term
+    const cleanSearch = cardName.trim().toLowerCase();
+    
     // Try exact match first
     let found = cards.find(card => card.name === cardName);
     if (found) return found;
     
-    // Try case-insensitive match
-    found = cards.find(card => card.name.toLowerCase() === cardName.toLowerCase());
+    // Try case-insensitive exact match
+    found = cards.find(card => card.name.toLowerCase() === cleanSearch);
     if (found) return found;
     
-    // Try partial match (card name contains the search term)
-    found = cards.find(card => 
-      card.name.toLowerCase().includes(cardName.toLowerCase()) ||
-      cardName.toLowerCase().includes(card.name.toLowerCase())
-    );
+    // Try to match the main part of the name (before any dash or parentheses)
+    const mainName = cleanSearch.split(/[-–—()]/)[0].trim();
+    if (mainName.length > 2) {
+      found = cards.find(card => {
+        const cardMainName = card.name.toLowerCase().split(/[-–—()]/)[0].trim();
+        return cardMainName === mainName;
+      });
+      if (found) return found;
+    }
+    
+    // Try fuzzy matching for very close names (but be more strict)
+    found = cards.find(card => {
+      const cardNameLower = card.name.toLowerCase();
+      // Check if the search term is a significant part of the card name
+      if (cleanSearch.length >= 4 && cardNameLower.includes(cleanSearch)) {
+        return true;
+      }
+      // Check if the card name is a significant part of the search term
+      if (cardNameLower.length >= 4 && cleanSearch.includes(cardNameLower)) {
+        return true;
+      }
+      return false;
+    });
     if (found) return found;
   }
   
@@ -3952,6 +3987,18 @@ function ImportModal({ open, onClose, onImport }) {
                     // Use the global parseTextImport function
                     if (typeof window.parseTextImport === 'function') {
                       importedDeck = window.parseTextImport(text);
+                      
+                      // Check for cards that weren't found and show user feedback
+                      const notFoundCards = Object.values(importedDeck.entries)
+                        .filter(entry => entry.card.set === "Unknown")
+                        .map(entry => entry.card.name);
+                      
+                      if (notFoundCards.length > 0) {
+                        const message = `Import successful! ${importedDeck.total} cards imported.\n\nNote: ${notFoundCards.length} cards were not found in the database:\n${notFoundCards.join(', ')}\n\nThese may need to be loaded first or check spelling.`;
+                        alert(message);
+                      } else {
+                        alert(`Import successful! ${importedDeck.total} cards imported.`);
+                      }
                     } else {
                       throw new Error('Text import function not available');
                     }
