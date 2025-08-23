@@ -817,6 +817,7 @@ function asUrl(v) {
 // FIXED: Simple, reliable image proxy solution - GUARANTEED to return string | null
 function proxyImageUrl(src) {
   console.log(`[proxyImageUrl] Called with src:`, { type: typeof src, value: src });
+  console.log(`[proxyImageUrl] Function ID:`, proxyImageUrl.name, proxyImageUrl.toString().slice(0, 50));
   
   if (!src) return null;  // Return null instead of empty string for consistency
   
@@ -2170,6 +2171,7 @@ function parseTextImport(text) {
             
             // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
             const rawUrl = getCardImageUrl(transformedCard);         // string | null
+            console.log(`[parseTextImport] About to call proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
             const proxied = proxyImageUrl(rawUrl);                   // string | null
             
             // Single source of truth: normalize to string | null
@@ -2300,6 +2302,7 @@ function parseTextImport(text) {
       
       // Use getCardImageUrl to get the best possible URL
       const rawUrl = getCardImageUrl(card);
+      console.log(`[parseTextImport] Prefetch call to proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
       const proxied = proxyImageUrl(rawUrl);
       return asUrl(proxied) ?? asUrl(rawUrl);
     })
