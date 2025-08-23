@@ -2025,7 +2025,7 @@ function parseTextImport(text) {
           validCards++;
           foundCards.push({ name: cardName.trim(), found: foundCard.name, count: countNum });
         } else {
-          // If card not found, create a placeholder entry
+          // If card not found, create a placeholder entry with better structure
           const placeholderCard = { 
             name: cardName.trim(), 
             set: "Unknown", 
@@ -2038,7 +2038,17 @@ function parseTextImport(text) {
             classifications: [],
             keywords: [],
             image_url: "",
-            _raw: {}
+            _raw: {},
+            // Add these fields to match expected card structure
+            setCode: "Unknown",
+            setName: "Unknown",
+            setNum: "?",
+            inkable: false,
+            lore: 0,
+            willpower: 0,
+            strength: 0,
+            franchise: "",
+            gamemode: "Lorcana"
           };
           const key = deckKey(placeholderCard);
           deck.entries[key] = { card: placeholderCard, count: countNum };
@@ -2070,6 +2080,9 @@ function parseTextImport(text) {
   if (validCards === 0) {
     throw new Error('No valid cards found in text input');
   }
+  
+  // Ensure the deck has the total count properly set
+  deck.total = totalCards;
   
   // Log detailed results for debugging
   console.log(`[parseTextImport] Successfully parsed ${validCards} unique cards, ${totalCards} total cards (skipped ${skippedLines} lines)`);
