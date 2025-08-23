@@ -805,7 +805,7 @@ function asUrl(v) {
   return v.url ?? v.href ?? v.src ?? v.toString?.() ?? null;
 }
 
-// UPDATED: Simple, reliable image proxy solution - GUARANTEED to return string | null
+// FIXED: Simple, reliable image proxy solution - GUARANTEED to return string | null
 function proxyImageUrl(src) {
   console.log(`[proxyImageUrl] Called with src:`, { type: typeof src, value: src });
   
@@ -827,12 +827,18 @@ function proxyImageUrl(src) {
   const result = `https://images.weserv.nl/?url=${encodeURIComponent(srcStr)}&output=jpg`;
   console.log(`[proxyImageUrl] Returning:`, { type: typeof result, value: result });
   
-  // GUARANTEE: Return string, not object - this fixes the "Returning: Object" bug
-  return String(result);
+  // CRITICAL FIX: Return the string directly, not wrapped in an object
+  return result;  // This fixes the "Returning: Object" bug
 }
 
-// UPDATED: Get card image URL - prefer canonical Lorcast ID, fallback to feed Image
+// HARDENED: Get card image URL - prefer canonical Lorcast ID, fallback to feed Image
 function getCardImageUrl(card) {
+  // GUARD: Handle undefined/null cards gracefully
+  if (!card) {
+    console.warn(`[getCardImageUrl] No card provided, returning placeholder`);
+    return "/img/placeholders/card.avif";
+  }
+  
   // PREFER: Canonical Lorcast ID (most reliable)
   if (card?.id?.startsWith("crd_")) {
     const url = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
@@ -853,7 +859,7 @@ function getCardImageUrl(card) {
     return generated;
   } catch (error) {
     console.warn(`[getCardImageUrl] Failed to generate URL for ${card.name}:`, error);
-    return null;
+    return "/img/placeholders/card.avif";
   }
 }
 
@@ -5621,13 +5627,16 @@ function AppInner() {
   console.log('[App] - shownCards:', shownCards?.length || 0);
   console.log('[App] - loading:', loading);
   
-  // UPDATED: IMMEDIATE DETECTION - Force reload if simplified cards (check subnames OR subtitles in Name)
+  // FIXED: IMMEDIATE DETECTION - Accept hyphenated titles, don't force reload unnecessarily
   console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
   if (allCards && allCards.length > 0) {
-    const cardsWithSubnames = allCards.filter(card => {
-      // Check for separate subname field OR Name containing subtitle separator
-      return !!card.subname || (card.name && card.name.includes(' - '));
-    });
+    // Check for separate subname field OR Name containing subtitle separator
+    const hasSubtitleLike = (card) => {
+      return !!(card.subname && card.subname.trim()) || 
+             /\s[-–]\s/.test((card.name || "").toLowerCase());
+    };
+    
+    const cardsWithSubnames = allCards.filter(hasSubtitleLike);
     console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames/subtitles found:', cardsWithSubnames.length);
     
     if (cardsWithSubnames.length === 0) {
@@ -5825,10 +5834,13 @@ function AppInner() {
     
     // UPDATED: Check if we already have cards with subnames OR subtitles in Name field
     if (allCards && allCards.length > 0) {
-      const cardsWithSubnames = allCards.filter(card => {
-        // Check for separate subname field OR Name containing subtitle separator
-        return !!card.subname || (card.name && card.name.includes(' - '));
-      });
+      // Check for separate subname field OR Name containing subtitle separator
+      const hasSubtitleLike = (card) => {
+        return !!(card.subname && card.subname.trim()) || 
+               /\s[-–]\s/.test((card.name || "").toLowerCase());
+      };
+      
+      const cardsWithSubnames = allCards.filter(hasSubtitleLike);
       console.log('[App] Existing cards with subnames/subtitles:', cardsWithSubnames.length);
       
       if (cardsWithSubnames.length > 0) {
@@ -5848,10 +5860,8 @@ function AppInner() {
         console.log('[App] ✅ fetchAllCards() returned:', cards?.length || 0, 'cards');
         
         if (cards && cards.length > 0) {
-          // UPDATED: Check what cards we actually got (subnames OR subtitles in Name)
-          const cardsWithSubnames = cards.filter(card => {
-            return !!card.subname || (card.name && card.name.includes(' - '));
-          });
+          // FIXED: Check what cards we actually got (subnames OR subtitles in Name)
+          const cardsWithSubnames = cards.filter(hasSubtitleLike);
           console.log('[App] 🎯 Cards with subnames/subtitles loaded:', cardsWithSubnames.length);
           
           if (cardsWithSubnames.length > 0) {
@@ -5890,9 +5900,7 @@ function AppInner() {
     console.log('[App] allCards length:', allCards?.length);
     if (allCards && allCards.length > 0) {
       console.log('[App] allCards sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
-      const cardsWithSubnames = allCards.filter(card => {
-        return !!card.subname || (card.name && card.name.includes(' - '));
-      });
+      const cardsWithSubnames = allCards.filter(hasSubtitleLike);
       console.log('[App] Cards with subnames/subtitles found:', cardsWithSubnames.length);
       if (cardsWithSubnames.length > 0) {
         console.log('[App] Sample subname/subtitle cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
