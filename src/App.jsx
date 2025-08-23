@@ -5507,6 +5507,17 @@ function AppInner() {
 
   // Apply filters to cards
   useEffect(() => {
+    console.log('[App] Filtering cards...');
+    console.log('[App] allCards length:', allCards?.length);
+    if (allCards && allCards.length > 0) {
+      console.log('[App] allCards sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+      const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
+      console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
+      if (cardsWithSubnames.length > 0) {
+        console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+      }
+    }
+    
     if (allCards.length === 0) return;
     
     console.log('[App] Applying filters to cards...');
