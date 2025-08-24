@@ -3697,10 +3697,10 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
   );
 }
 
-// Simple image function that works exactly like App (7).jsx
+// Enhanced image function that supports multiple image sources
 function getCardImg(card) {
-  // Use the normalized image field (as suggested by ChatGPT)
-  const u = card.image || card.image_url || "";
+  // Use multiple image sources for better compatibility
+  const u = card.image_url || card._imageFromAPI || card.image || "";
   return u; // or: `https://images.weserv.nl/?url=${encodeURIComponent(u)}&output=jpg`;
 }
 
@@ -3717,8 +3717,8 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
     );
   }
   
-  // Use the simple image approach like the HTML file
-  const img = card.image_url; // Direct access, no complex processing
+  // Use multiple image sources for better compatibility
+  const img = card.image_url || card._imageFromAPI || card.image;
   
   return (
     <div className="group relative overflow-hidden hover:scale-105 transition-all duration-200 cursor-pointer w-full h-64">
@@ -4234,8 +4234,38 @@ function DeckRow({ entry, onSetCount, onRemove }) {
   const imgSrc = getCardImg(c);
 
   return (
-    <div className="flex items-center gap-2 p-2">
-      <img src={imgSrc} alt={c.name} className="w-10 h-14 object-cover rounded-md" />
+    <div className="flex items-center gap-3 p-3 relative">
+      {/* Enhanced Card Image with Count Bubble */}
+      <div className="relative">
+        {imgSrc ? (
+          <img 
+            src={imgSrc} 
+            alt={c.name} 
+            className="w-16 h-22 object-cover rounded-lg border border-gray-700 hover:border-gray-600 transition-colors" 
+            onError={(e) => {
+              // Fallback to text display if image fails to load
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        {/* Fallback display when no image */}
+        <div 
+          className={`w-16 h-22 bg-gray-800 rounded-lg border border-gray-700 flex items-center justify-center ${
+            imgSrc ? 'hidden' : 'flex'
+          }`}
+        >
+          <div className="text-center text-gray-400">
+            <div className="text-xs mb-1">No image</div>
+            <div className="text-xs font-medium">{c.name}</div>
+          </div>
+        </div>
+        
+        {/* Rounded Count Bubble - positioned at top-right corner of image */}
+        <div className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
+          {entry.count}
+        </div>
+      </div>
       <div className="flex-1">
         <div className="text-sm font-semibold">{c.name}</div>
         <div className="text-xs text-gray-400">
