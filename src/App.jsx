@@ -4153,8 +4153,16 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
     console.log('[Inkable Detection] Processing entries:', entries.length);
     
     for (const e of entries) {
-      // Use the actual inkable field from Lorcast API
-      const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell;
+      // Enhanced inkable detection with multiple fallbacks
+      const isInkable = e.card.inkable || 
+                       e.card._raw?.inkable || 
+                       e.card._raw?.inkwell ||
+                       e.card._raw?.can_be_ink ||
+                       e.card._raw?.Inkable ||
+                       // Fallback: check if card text mentions inkable
+                       (e.card.text && e.card.text.toLowerCase().includes('inkable')) ||
+                       // Fallback: check card type (most cards are inkable except specific types)
+                       (e.card.type && !['song', 'location'].includes(e.card.type.toLowerCase()));
       
       console.log(`[Inkable Detection] Card: ${e.card.name}, inkable field: ${isInkable}, raw.inkable: ${e.card._raw?.inkable}, raw.inkwell: ${e.card._raw?.inkwell}`);
       
@@ -4349,8 +4357,16 @@ function DeckStats({ deck }) {
     let uninkable = 0;
     
     for (const e of entries) {
-      // Use the same inkable detection logic as the main deck view
-      const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell;
+      // Use the same enhanced inkable detection logic as the main deck view
+      const isInkable = e.card.inkable || 
+                       e.card._raw?.inkable || 
+                       e.card._raw?.inkwell ||
+                       e.card._raw?.can_be_ink ||
+                       e.card._raw?.Inkable ||
+                       // Fallback: check if card text mentions inkable
+                       (e.card.text && e.card.text.toLowerCase().includes('inkable')) ||
+                       // Fallback: check card type (most cards are inkable except specific types)
+                       (e.card.type && !['song', 'location'].includes(e.card.type.toLowerCase()));
       
       if (isInkable) {
         inkable += e.count;
@@ -4964,7 +4980,15 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   // Calculate deck statistics
   const totalCards = entries.reduce((sum, e) => sum + e.count, 0);
   const totalInkable = entries.reduce((sum, e) => {
-    const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell || /inkable/i.test(e.card.text || "");
+    const isInkable = e.card.inkable || 
+                     e.card._raw?.inkable || 
+                     e.card._raw?.inkwell ||
+                     e.card._raw?.can_be_ink ||
+                     e.card._raw?.Inkable ||
+                     // Fallback: check if card text mentions inkable
+                     (e.card.text && e.card.text.toLowerCase().includes('inkable')) ||
+                     // Fallback: check card type (most cards are inkable except specific types)
+                     (e.card.type && !['song', 'location'].includes(e.card.type.toLowerCase()));
     return sum + (isInkable ? e.count : 0);
   }, 0);
   const totalUninkable = totalCards - totalInkable;
