@@ -6283,6 +6283,26 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 cost: cards[0].cost
               });
               console.log('[Comp Dashboard] Sample card full structure:', cards[0]);
+              
+              // Check for any fields that might contain lore values
+              const allCardFields = Object.keys(cards[0]);
+              const loreRelatedFields = allCardFields.filter(field => 
+                field.toLowerCase().includes('lore') || 
+                field.toLowerCase().includes('quest') ||
+                field.toLowerCase().includes('win')
+              );
+              console.log('[Comp Dashboard] Lore-related fields found:', loreRelatedFields);
+              
+              // Check raw fields too
+              if (cards[0]._raw) {
+                const allRawFields = Object.keys(cards[0]._raw);
+                const rawLoreRelatedFields = allRawFields.filter(field => 
+                  field.toLowerCase().includes('lore') || 
+                  field.toLowerCase().includes('quest') ||
+                  field.toLowerCase().includes('win')
+                );
+                console.log('[Comp Dashboard] Raw lore-related fields found:', rawLoreRelatedFields);
+              }
             }
 
             // --- Curve (stacked inkable/uninkable) ---
@@ -6367,6 +6387,17 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   raw_loreValue: c._raw?.loreValue,
                   final: lore
                 });
+                
+                // Also check if there are any other lore-related fields
+                const allFields = Object.keys(c).filter(key => key.toLowerCase().includes('lore'));
+                const allRawFields = Object.keys(c._raw || {}).filter(key => key.toLowerCase().includes('lore'));
+                if (allFields.length > 0 || allRawFields.length > 0) {
+                  console.log('[Comp Dashboard] Additional lore fields for', c.name, ':', {
+                    cardFields: allFields,
+                    rawFields: allRawFields
+                  });
+                }
+                
                 return a + lore;
               }, 0);
               const result = Number((totalLore / Math.max(cards.length,1)).toFixed(2));
