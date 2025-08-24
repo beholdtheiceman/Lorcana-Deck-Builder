@@ -6182,8 +6182,6 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
   }
 
 // Root App -------------------------------------------------------------------
-}
-}
 
 function AppInner() {
   console.log('[App] AppInner component starting up...');
@@ -7574,7 +7572,8 @@ useEffect(() => {
       </div>
     </ImageCacheProvider>
   </ToastProvider>
-);
+  );
+} // End AppInner function
 
 // -----------------------------------------------------------------------------
 // Filtering + Sorting
@@ -8248,8 +8247,6 @@ function useBatchImageLoader() {
 
 
 
-} // Close AppInner function
-
 // --- Wrapper to ensure ImageCache is available everywhere ---
 export default function App(props) {
   return (
@@ -8257,4 +8254,5 @@ export default function App(props) {
       <AppInner {...props} />
     </ImageCacheProvider>
   );
+}
 }
