@@ -5039,6 +5039,23 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       card: entries[0].card,
       raw: entries[0].card._raw
     });
+    
+    // Also log a few more cards to check for dual-ink patterns
+    console.log('[Ink Distribution Debug] Checking for dual-ink cards...');
+    entries.slice(0, 5).forEach((e, i) => {
+      console.log(`[Ink Distribution Debug] Card ${i + 1}: ${e.card.name}`);
+      if (e.card._raw) {
+        const raw = e.card._raw;
+        console.log(`  - raw.ink: ${raw.ink}`);
+        console.log(`  - raw.Ink: ${raw.Ink}`);
+        console.log(`  - raw.inkColor: ${raw.inkColor}`);
+        console.log(`  - raw.Ink_Color: ${raw.Ink_Color}`);
+        console.log(`  - raw.color: ${raw.color}`);
+        console.log(`  - raw.Color: ${raw.Color}`);
+        console.log(`  - raw.colors: ${JSON.stringify(raw.colors)}`);
+        console.log(`  - raw.Colors: ${JSON.stringify(raw.Colors)}`);
+      }
+    });
   }
   
   entries.forEach(e => {
@@ -5118,6 +5135,10 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       }
     }
   });
+  
+  // Debug: log dual-ink cards found
+  console.log('[Ink Distribution Debug] Dual-ink cards found:', dualInkCards);
+  console.log('[Ink Distribution Debug] Final inkDistribution:', inkDistribution);
   
   // Calculate average cost
   const totalCost = entries.reduce((sum, e) => sum + (getCost(e.card) * e.count), 0);
@@ -6028,7 +6049,6 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     dataKey="value"
                     nameKey="name"
                     outerRadius={80}
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   >
                     {Object.entries(inkDistribution).map(([ink, count], index) => {
                       const colors = {
@@ -6045,7 +6065,31 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     })}
                   </Pie>
                   <Tooltip formatter={(value, name) => [value, name]} />
-                  <Legend />
+                  
+                  {/* Custom Legend with Percentages */}
+                  <div className="mt-3 flex justify-center gap-4">
+                    {Object.entries(inkDistribution).map(([ink, count], index) => {
+                      const percentage = ((count / totalCards) * 100).toFixed(0);
+                      const colors = {
+                        'Amber': '#f59e0b',
+                        'Amethyst': '#8b5cf6',
+                        'Emerald': '#10b981',
+                        'Ruby': '#ef4444',
+                        'Sapphire': '#3b82f6',
+                        'Steel': '#6b7280'
+                      };
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: colors[ink] || '#6b7280' }}
+                          />
+                          <span className="text-sm text-gray-300">{ink}</span>
+                          <span className="text-sm font-semibold text-gray-100">{percentage}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </PieChart>
                 
                 {/* Dual-ink cards summary */}
