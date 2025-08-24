@@ -6163,6 +6163,13 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     </div>
                   </div>
                 )}
+                
+                {/* Debug: Show dual-ink cards data */}
+                <div className="mt-4 p-3 bg-red-900/20 border border-red-700/30 rounded text-xs text-red-200">
+                  <p className="text-center font-bold">DEBUG: Dual-Ink Cards Data</p>
+                  <p>Total dual-ink cards: {dualInkCards.length}</p>
+                  <p>Dual-ink cards: {JSON.stringify(dualInkCards)}</p>
+                </div>
               </ResponsiveContainer>
             ) : (
               <div className="text-center text-gray-400 py-8">
