@@ -2415,6 +2415,9 @@ function parseTextImport(text) {
       const key = deckKey(foundCard);
       
               try {
+          // Extract inkable information from the original card data BEFORE processing
+          const inkable = foundCard.inkable ?? foundCard._raw?.inkable ?? foundCard._raw?.can_be_ink ?? foundCard._raw?.Inkable ?? false;
+          
           const transformedCard = toAppCard(foundCard);
           const rawUrl = getCardImageUrl(transformedCard);
           const proxied = lorcanaImageProxyUrl(rawUrl);
@@ -2424,13 +2427,11 @@ function parseTextImport(text) {
             image_url = null;
           }
           
-          // Ensure inkable field is properly preserved from the original card data
-          const inkable = foundCard.inkable ?? foundCard._raw?.inkable ?? foundCard._raw?.can_be_ink ?? foundCard._raw?.Inkable ?? foundCard._raw?.inkwell ?? false;
-          
           deck.entries[key] = { 
             card: {
               ...transformedCard,
-              inkable: Boolean(inkable), // Override with the correct inkable value
+              inkable: Boolean(inkable), // Use the extracted inkable value
+              _raw: foundCard._raw, // Preserve the original raw data
               image_url,
               _generatedImageUrl: rawUrl,
               _proxiedImageUrl: proxied
@@ -2462,6 +2463,9 @@ function parseTextImport(text) {
       const key = deckKey(bestMatch);
       
               try {
+          // Extract inkable information from the original card data BEFORE processing
+          const inkable = bestMatch.inkable ?? bestMatch._raw?.inkable ?? bestMatch._raw?.can_be_ink ?? bestMatch._raw?.Inkable ?? false;
+          
           const transformedCard = toAppCard(bestMatch);
           const rawUrl = getCardImageUrl(transformedCard);
           const proxied = lorcanaImageProxyUrl(rawUrl);
@@ -2471,13 +2475,11 @@ function parseTextImport(text) {
             image_url = null;
           }
           
-          // Ensure inkable field is properly preserved from the original card data
-          const inkable = bestMatch.inkable ?? bestMatch._raw?.inkable ?? bestMatch._raw?.can_be_ink ?? bestMatch._raw?.Inkable ?? bestMatch._raw?.inkwell ?? false;
-          
           deck.entries[key] = { 
             card: {
               ...transformedCard,
-              inkable: Boolean(inkable), // Override with the correct inkable value
+              inkable: Boolean(inkable), // Use the extracted inkable value
+              _raw: bestMatch._raw, // Preserve the original raw data
               image_url,
               _generatedImageUrl: rawUrl,
               _proxiedImageUrl: proxied,
