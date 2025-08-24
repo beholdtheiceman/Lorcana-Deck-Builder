@@ -4509,8 +4509,8 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
           ×
         </button>
         
-        {/* Card Title - centered over card */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/30">
+        {/* Card Title - above the card */}
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/30">
           {card.name}{card.subname ? ` - ${card.subname}` : ''} • {card.setName || card.set}
         </div>
         
