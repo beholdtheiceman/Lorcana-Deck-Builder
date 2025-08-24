@@ -3452,44 +3452,7 @@ function filterReducer(state, action) {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Card image cache context
-// -----------------------------------------------------------------------------
-
-console.log('[Context] Creating ImageCacheContext...');
-const ImageCacheContext = createContext();
-console.log('[Context] ImageCacheContext created:', ImageCacheContext);
-
-function ImageCacheProvider({ children }) {
-  console.log('[ImageCacheProvider] Initializing...');
-  const [cache, setCache] = useState(() => loadLS(LS_KEYS.CACHE_IMG, {}));
-  const [cacheVersion, setCacheVersion] = useState(0);
-  
-  useEffect(() => {
-    console.log('[ImageCacheProvider] Cache updated, saving to localStorage');
-    saveLS(LS_KEYS.CACHE_IMG, cache);
-  }, [cache]);
-
-  const get = useCallback((key) => cache[key], [cache]);
-  const put = useCallback((key, value) => {
-    setCache((c) => ({ ...c, [key]: value }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
-  const putFailed = useCallback((key) => {
-    setCache((c) => ({ ...c, [key]: 'FAILED' }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
-
-  const value = useMemo(() => ({ get, put, putFailed, cache, cacheVersion }), [get, put, putFailed, cache, cacheVersion]);
-
-  console.log('[ImageCacheProvider] About to render with value:', value);
-
-  return (
-    <ImageCacheContext.Provider value={value}>
-      {children}
-    </ImageCacheContext.Provider>
-  );
-}
+// DUPLICATE SECTION REMOVED - ImageCacheProvider is now only defined at the top of the file
 
 // -----------------------------------------------------------------------------
 // Components
