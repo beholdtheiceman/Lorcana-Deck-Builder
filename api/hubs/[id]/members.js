@@ -10,139 +10,109 @@ const transferOwnershipSchema = z.object({
   newOwnerId: z.string().uuid()
 });
 
-export async function DELETE(request, { params }) {
-  try {
-    const session = getSession(request);
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const user = { id: session.uid, email: session.email };
+export default async function handler(req, res) {
+  const { id: hubId } = req.query;
 
-    const { id: hubId } = params;
-    const body = await request.json();
-    const { userId } = removeMemberSchema.parse(body);
-
-    // Check if user is the hub owner
-    const hub = await prisma.hub.findUnique({
-      where: { id: hubId }
-    });
-
-    if (!hub || hub.ownerId !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Check if trying to remove the owner
-    if (userId === user.id) {
-      return new Response(JSON.stringify({ error: 'Cannot remove yourself as owner' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Remove member
-    await prisma.hubMember.deleteMany({
-      where: {
-        hubId,
-        userId
+  if (req.method === 'DELETE') {
+    try {
+      const session = getSession(req);
+      if (!session) {
+        return res.status(401).json({ error: 'Unauthorized' });
       }
-    });
+      
+      const user = { id: session.uid, email: session.email };
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Error removing member:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
+      const { userId } = removeMemberSchema.parse(req.body);
 
-export async function PATCH(request, { params }) {
-  try {
-    const session = getSession(request);
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
+      // Check if user is the hub owner
+      const hub = await prisma.hub.findUnique({
+        where: { id: hubId }
       });
-    }
-    
-    const user = { id: session.uid, email: session.email };
 
-    const { id: hubId } = params;
-    const body = await request.json();
-    const { newOwnerId } = transferOwnershipSchema.parse(body);
+      if (!hub || hub.ownerId !== user.id) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
 
-    // Check if user is the current hub owner
-    const hub = await prisma.hub.findUnique({
-      where: { id: hubId }
-    });
+      // Check if trying to remove the owner
+      if (userId === user.id) {
+        return res.status(400).json({ error: 'Cannot remove yourself as owner' });
+      }
 
-    if (!hub || hub.ownerId !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
+      // Remove member
+      await prisma.hubMember.deleteMany({
+        where: {
+          hubId,
+          userId
+        }
       });
-    }
 
-    // Check if new owner is a member
-    const newOwnerMembership = await prisma.hubMember.findUnique({
-      where: {
-        hubId_userId: {
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Error removing member:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  } else if (req.method === 'PATCH') {
+    try {
+      const session = getSession(req);
+      if (!session) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const user = { id: session.uid, email: session.email };
+
+      const { newOwnerId } = transferOwnershipSchema.parse(req.body);
+
+      // Check if user is the current hub owner
+      const hub = await prisma.hub.findUnique({
+        where: { id: hubId }
+      });
+
+      if (!hub || hub.ownerId !== user.id) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      // Check if new owner is a member
+      const newOwnerMembership = await prisma.hubMember.findUnique({
+        where: {
+          hubId_userId: {
+            hubId,
+            userId: newOwnerId
+          }
+        }
+      });
+
+      if (!newOwnerMembership) {
+        return res.status(400).json({ error: 'New owner must be a member of the hub' });
+      }
+
+      // Transfer ownership
+      await prisma.hub.update({
+        where: { id: hubId },
+        data: { ownerId: newOwnerId }
+      });
+
+      // Remove new owner from members list since they're now the owner
+      await prisma.hubMember.deleteMany({
+        where: {
           hubId,
           userId: newOwnerId
         }
-      }
-    });
-
-    if (!newOwnerMembership) {
-      return new Response(JSON.stringify({ error: 'New owner must be a member of the hub' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
       });
+
+      // Add old owner as a member
+      await prisma.hubMember.create({
+        data: {
+          hubId,
+          userId: user.id
+        }
+      });
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Error transferring ownership:', error);
+      return res.status(500).json({ error: 'Internal server error' });
     }
-
-    // Transfer ownership
-    await prisma.hub.update({
-      where: { id: hubId },
-      data: { ownerId: newOwnerId }
-    });
-
-    // Remove new owner from members list since they're now the owner
-    await prisma.hubMember.deleteMany({
-      where: {
-        hubId,
-        userId: newOwnerId
-      }
-    });
-
-    // Add old owner as a member
-    await prisma.hubMember.create({
-      data: {
-        hubId,
-        userId: user.id
-      }
-    });
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Error transferring ownership:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+  } else {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 }
