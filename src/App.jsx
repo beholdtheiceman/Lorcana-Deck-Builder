@@ -4508,7 +4508,7 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         <img 
           src={imgSrc} 
           alt={card.name} 
-          className="w-auto h-auto max-w-[98%] max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
+          className="w-auto h-auto max-w-[99.5%] max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
         />
       </div>
     </Modal>
