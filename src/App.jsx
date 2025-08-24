@@ -3739,14 +3739,15 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         </div>
       )}
       
-      {/* Add/Remove buttons with card count - always visible to prevent layout shifts */}
-      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-2">
-        {/* Card count display */}
-        <div className="bg-black/90 backdrop-blur-sm rounded-md px-2 py-1 min-w-[2.5rem] text-center border border-gray-600/50">
-          <div className="text-xs font-bold text-white">
-            {deckCount}/4
-          </div>
+      {/* Card count bubble - positioned at top-right corner */}
+      {deckCount > 0 && (
+        <div className="absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
+          {deckCount}
         </div>
+      )}
+      
+      {/* Add/Remove buttons - always visible to prevent layout shifts */}
+      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-2">
         
         <button
           className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center transition-colors"
@@ -4715,8 +4716,8 @@ function PrintableSheet({ deck, onClose }) {
               </div>
                               {/* Count bubble */}
                 <div 
-                  className="absolute bg-gray-700/80 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-gray-800"
-                  style={{ top: '-2px', right: '-2px' }}
+                  className="absolute bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-emerald-700 shadow-lg"
+                  style={{ top: '8px', right: '8px' }}
                 >
                   {e.count}
                 </div>
