@@ -4548,41 +4548,48 @@ function DeckStats({ deck }) {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="cost" />
               <YAxis allowDecimals={false} />
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  console.log('[Tooltip Debug] Content called:', { active, payload, label });
-                  
-                  if (active && payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    console.log('[Tooltip Debug] Data from payload:', data);
-                    
-                    return (
-                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                        <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
-                        {data.cards && data.cards.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">Cards:</p>
-                            <div className="max-h-32 overflow-y-auto">
-                              {data.cards.map((card, index) => (
-                                <p key={index} className="text-gray-400 text-xs">{card}</p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {(!data.cards || data.cards.length === 0) && (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">No card list available</p>
-                            <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
-                          </div>
-                        )}
+              <Bar 
+                dataKey="count" 
+                name="count" 
+                fill="#10b981"
+                onMouseEnter={(data, index, e) => {
+                  console.log('[Bar MouseEnter] Data:', data, 'Index:', index);
+                  // Create a custom tooltip
+                  const tooltip = document.createElement('div');
+                  tooltip.className = 'fixed bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg z-50';
+                  tooltip.innerHTML = `
+                    <p class="text-white font-semibold">Cost ${data.cost}: ${data.count} cards</p>
+                    ${data.cards && data.cards.length > 0 ? `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">Cards:</p>
+                        <div class="max-h-32 overflow-y-auto">
+                          ${data.cards.map(card => `<p class="text-gray-400 text-xs">${card}</p>`).join('')}
+                        </div>
                       </div>
-                    );
-                  }
-                  return null;
+                    ` : `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">No card list available</p>
+                      </div>
+                    `}
+                  `;
+                  
+                  // Position the tooltip
+                  tooltip.style.left = e.pageX + 10 + 'px';
+                  tooltip.style.top = e.pageY - 10 + 'px';
+                  
+                  // Store reference and add to DOM
+                  e.currentTarget._customTooltip = tooltip;
+                  document.body.appendChild(tooltip);
                 }}
-                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                onMouseLeave={(data, index, e) => {
+                  console.log('[Bar MouseLeave] Data:', data, 'Index:', index);
+                  // Remove custom tooltip
+                  if (e.currentTarget._customTooltip) {
+                    document.body.removeChild(e.currentTarget._customTooltip);
+                    e.currentTarget._customTooltip = null;
+                  }
+                }}
               />
-              <Bar dataKey="count" name="count" fill="#10b981" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -4597,41 +4604,48 @@ function DeckStats({ deck }) {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="type" />
               <YAxis allowDecimals={false} />
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  console.log('[Tooltip Debug] Card Types content called:', { active, payload, label });
-                  
-                  if (active && payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    console.log('[Tooltip Debug] Card Types data from payload:', data);
-                    
-                    return (
-                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                        <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
-                        {data.cards && data.cards.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">Cards:</p>
-                            <div className="max-h-32 overflow-y-auto">
-                              {data.cards.map((card, index) => (
-                                <p key={index} className="text-gray-400 text-xs">{card}</p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {(!data.cards || data.cards.length === 0) && (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">No card list available</p>
-                            <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
-                          </div>
-                        )}
+              <Bar 
+                dataKey="count" 
+                name="count" 
+                fill="#3b82f6"
+                onMouseEnter={(data, index, e) => {
+                  console.log('[Bar MouseEnter] Card Types Data:', data, 'Index:', index);
+                  // Create a custom tooltip
+                  const tooltip = document.createElement('div');
+                  tooltip.className = 'fixed bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg z-50';
+                  tooltip.innerHTML = `
+                    <p class="text-white font-semibold">${data.type}: ${data.count} cards</p>
+                    ${data.cards && data.cards.length > 0 ? `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">Cards:</p>
+                        <div class="max-h-32 overflow-y-auto">
+                          ${data.cards.map(card => `<p class="text-gray-400 text-xs">${card}</p>`).join('')}
+                        </div>
                       </div>
-                    );
-                  }
-                  return null;
+                    ` : `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">No card list available</p>
+                      </div>
+                    `}
+                  `;
+                  
+                  // Position the tooltip
+                  tooltip.style.left = e.pageX + 10 + 'px';
+                  tooltip.style.top = e.pageY - 10 + 'px';
+                  
+                  // Store reference and add to DOM
+                  e.currentTarget._customTooltip = tooltip;
+                  document.body.appendChild(tooltip);
                 }}
-                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                onMouseLeave={(data, index, e) => {
+                  console.log('[Bar MouseLeave] Card Types Data:', data, 'Index:', index);
+                  // Remove custom tooltip
+                  if (e.currentTarget._customTooltip) {
+                    document.body.removeChild(e.currentTarget._customTooltip);
+                    e.currentTarget._customTooltip = null;
+                  }
+                }}
               />
-              <Bar dataKey="count" name="count" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>
         </div>
