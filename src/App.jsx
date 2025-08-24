@@ -6080,9 +6080,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           {/* Ink Color Distribution */}
           <div className="bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
-            <div className="text-xs text-gray-400 text-center mb-3 p-2 bg-gray-700 rounded">
-              <strong>Note:</strong> Dual-ink cards now have their own category and are not counted in individual ink colors
-            </div>
+
             {Object.keys(inkDistribution).length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
