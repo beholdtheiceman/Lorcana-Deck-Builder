@@ -4485,22 +4485,13 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   const imgSrc = getCardImg(card || {});
   if (!open || !card) return null;
   
-  // Debug: Log the card object to see what fields it has
-  console.log('[InspectCardModal] Card object:', {
-    name: card.name,
-    version: card.version,
-    subname: card.subname,
-    subtitle: card.subtitle,
-    setName: card.setName,
-    set: card.set,
-    allKeys: Object.keys(card)
-  });
+
   
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`${card.name}${card.version ? ` - ${card.version}` : ''} • ${card.setName || card.set}`}
+      title={`${card.name}${card.subname ? ` - ${card.subname}` : ''} • ${card.setName || card.set}`}
       size="lg"
       footer={
         <div className="flex items-center justify-end gap-2">
