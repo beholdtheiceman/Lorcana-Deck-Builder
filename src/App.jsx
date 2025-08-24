@@ -2372,11 +2372,7 @@ function parseTextImport(text) {
   
   // Simple, permissive line format that handles:
   // "4 Name - Subtitle (TFC #123)"
-  // "4 Name (1 #123)" 
-  // "4 Name - Subtitle"
-  // "4 Name"
-  const LINE_RE = /^(\d+)\s+(.+?)(?:\s*[-–—]\s*(.+?))?(?:\s*\(([^)]+)\))?$/;
-  
+  // Parse each line - just count and full card name
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     // Skip empty lines and comments
@@ -2388,42 +2384,31 @@ function parseTextImport(text) {
     // DEBUG: Log the actual line content to see what we're parsing
     console.log(`[parseTextImport] Processing line ${index + 1}: "${line}"`);
     
-    // Try to parse the line with the new permissive regex
-    const match = line.match(LINE_RE);
+    // Try to parse the line - just count and full card name
+    const match = line.match(/^(\d+)\s+(.+)$/);
     if (!match) {
       console.warn(`[parseTextImport] Unrecognized format on line ${index + 1}: "${line}"`);
       skippedLines++;
       continue;
     }
     
-    const [, count, name, subtitle, setMaybe, noMaybe] = match;
+    const [, count, fullCardName] = match;
     const countNum = parseInt(count);
     
-    if (countNum <= 0 || !name.trim()) {
+    if (countNum <= 0 || !fullCardName.trim()) {
       console.warn(`[parseTextImport] Invalid count or card name on line ${index + 1}: "${line}"`);
       skippedLines++;
       continue;
     }
     
     totalCards += countNum;
-    const cardName = name.trim();
-    const cardSubtitle = subtitle?.trim() || null;
-    const cardSet = setMaybe ? String(setMaybe).toUpperCase() : null;
-    const cardNumber = noMaybe || null;
+    const cardName = fullCardName.trim();
     
-    console.log(`[parseTextImport] Parsed: ${countNum}x "${cardName}"${cardSubtitle ? ` - ${cardSubtitle}` : ''}${cardSet && cardNumber ? ` (${cardSet} #${cardNumber})` : ''}`);
+    console.log(`[parseTextImport] Parsed: ${countNum}x "${cardName}"`);
     
-    // Try to find the card using the available information
+    // Try to find the card by the complete name
     const cards = window.getCurrentCards ? window.getCurrentCards() : [];
-    let foundCard = null;
-    
-    if (cardSubtitle) {
-      // Try to find by name + subtitle
-      foundCard = findCardByName(`${cardName} - ${cardSubtitle}`, cards);
-    } else {
-      // Try to find by name only
-      foundCard = findCardByName(cardName, cards);
-    }
+    const foundCard = findCardByName(cardName, cards);
     
     if (foundCard && !foundCard.reason) {
       // Card found successfully
@@ -2466,7 +2451,7 @@ function parseTextImport(text) {
       
     } else if (foundCard && foundCard.reason === 'ambiguous-base' && foundCard.candidates) {
       // Handle ambiguous cases
-      console.log(`[parseTextImport] Ambiguous card found for "${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}", ${foundCard.candidates.length} candidates`);
+      console.log(`[parseTextImport] Ambiguous card found for "${cardName}", ${foundCard.candidates.length} candidates`);
       
       // Use the first candidate as a best guess
       const bestMatch = foundCard.candidates[0];
@@ -2767,23 +2752,8 @@ function findCardByName(userLine, cards) {
     }))
   );
   
-  // DEBUG: Look for cards with similar names to understand the data structure
-  if (typed.includes(" - ")) {
-    const [baseTyped, subTyped] = typed.split(/\s*[-–—]\s*/);
-    const similarCards = cards.filter(c => {
-      const cardName = (c.Name || c.name || "").toLowerCase();
-      return cardName.startsWith(baseTyped.toLowerCase());
-    }).slice(0, 10);
-    
-    console.log(`[findCardByName] Cards with baseName="${baseTyped}":`, 
-      similarCards.map(c => ({
-        Name: c.Name || c.name,
-        Unique_ID: c.Unique_ID,
-        Set_ID: c.Set_ID,
-        Card_Num: c.Card_Num
-      }))
-    );
-  }
+  // DEBUG: Show what we're searching for
+  console.log(`[findCardByName] Searching for complete card name: "${typed}"`);
 
   // 1) Try exact match first (case-insensitive)
   console.log(`[findCardByName] Trying exact match for: "${typed}"`);
@@ -2803,80 +2773,24 @@ function findCardByName(userLine, cards) {
   }
   console.log(`[findCardByName] No case-insensitive match found`);
 
-  // 3) Parse "Base - Subtitle" from user line and match using the actual Name field
-  const parts = typed.split(/\s*[-–—]\s*/);
-  const baseTyped = (parts[0] || "").trim();
-  const subTyped = (parts[1] || null)?.trim() || null;
-  
-  console.log(`[findCardByName] Parsed user input: baseTyped="${baseTyped}", subTyped="${subTyped}"`);
-
-  if (subTyped) {
-    // Try to find cards with matching base name and subtitle using the Name field
-    const subtitleMatches = cards.filter(c => {
-      const cardName = (c.Name || c.name || "").toLowerCase();
-      const userFullName = typed.toLowerCase();
-      
-      // Check if the card name exactly matches what the user typed
-      return cardName === userFullName;
-    });
-    
-    console.log(`[findCardByName] Found ${subtitleMatches.length} exact subtitle matches for "${typed}"`);
-    console.log(`[findCardByName] Looking for exact match: "${typed.toLowerCase()}"`);
-    
-    if (subtitleMatches.length > 0) {
-      console.log(`[findCardByName] Subtitle matches:`, subtitleMatches.map(c => c.Name || c.name));
-      if (subtitleMatches.length === 1) {
-        console.log(`[findCardByName] Single subtitle match found: "${subtitleMatches[0].Name || subtitleMatches[0].name}"`);
-        return subtitleMatches[0];
-      } else {
-        console.log(`[findCardByName] Multiple subtitle matches found, returning ambiguous result`);
-        return { reason: "ambiguous-subtitle", candidates: subtitleMatches };
-      }
-    }
-    
-    // If no exact match, try partial matching on the Name field
-    console.log(`[findCardByName] No exact subtitle match, trying partial matching...`);
-    const partialMatches = cards.filter(c => {
-      const cardName = (c.Name || c.name || "").toLowerCase();
-      const userFullName = typed.toLowerCase();
-      
-      // Check if the card name contains the user's full input
-      return cardName.includes(userFullName);
-    });
-    
-    console.log(`[findCardByName] Found ${partialMatches.length} partial matches for "${typed}"`);
-    if (partialMatches.length > 0) {
-      console.log(`[findCardByName] Partial matches:`, partialMatches.map(c => c.Name || c.name));
-      if (partialMatches.length === 1) {
-        console.log(`[findCardByName] Single partial match found: "${partialMatches[0].Name || partialMatches[0].name}"`);
-        return partialMatches[0];
-      } else {
-        // Find the best partial match by checking which one most closely matches the user's input
-        const bestMatch = partialMatches.find(c => 
-          (c.Name || c.name || "").toLowerCase() === userFullName
-        ) || partialMatches[0];
-        console.log(`[findCardByName] Using best partial match: "${bestMatch.Name || bestMatch.name}"`);
-        return bestMatch;
-      }
-    }
-  }
-
-  // 4) Try fuzzy matching on base name only using the Name field
+  // 3) Try fuzzy matching on the complete card name
   let candidates = cards.filter(c => {
     const cardName = (c.Name || c.name || "").toLowerCase();
-    // Check if the card name starts with the base name (before the dash)
-    return cardName.startsWith(baseTyped.toLowerCase());
+    const userFullName = typed.toLowerCase();
+    
+    // Check if the card name starts with the user's input or vice versa
+    return cardName.startsWith(userFullName) || userFullName.startsWith(cardName);
   });
   
-  console.log(`[findCardByName] Found ${candidates.length} candidates with baseName="${baseTyped}"`);
+  console.log(`[findCardByName] Found ${candidates.length} fuzzy matches for "${typed}"`);
   if (candidates.length > 0) {
-    console.log(`[findCardByName] Base name candidates:`, candidates.slice(0, 3).map(c => ({ name: c.Name || c.name })));
+    console.log(`[findCardByName] Fuzzy match candidates:`, candidates.slice(0, 3).map(c => ({ name: c.Name || c.name })));
     
     if (candidates.length === 1) {
-      console.log(`[findCardByName] Found fuzzy match: "${candidates[0].Name || candidates[0].name}"`);
+      console.log(`[findCardByName] Found single fuzzy match: "${candidates[0].Name || candidates[0].name}"`);
       return candidates[0];
     } else {
-      console.log(`[findCardByName] Multiple base name matches found, returning ambiguous result`);
+      console.log(`[findCardByName] Multiple fuzzy matches found, returning ambiguous result`);
       return { reason: "ambiguous-base", candidates };
     }
   }
