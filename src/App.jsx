@@ -2210,8 +2210,20 @@ function parseTextImport(text) {
       return;
     }
     
+    // DEBUG: Log the actual line content to see what we're parsing
+    console.log(`[parseTextImport] Processing line ${index + 1}: "${line}"`);
+    
     // Try Lorcanito format first (most reliable)
     const lorcanitoMatch = line.match(lorcanitoPattern);
+    if (lorcanitoMatch) {
+      console.log(`[parseTextImport] ✅ Lorcanito pattern MATCHED for line: "${line}"`);
+    } else {
+      console.log(`[parseTextImport] ❌ Lorcanito pattern FAILED for line: "${line}"`);
+      console.log(`[parseTextImport] Pattern: ${lorcanitoPattern}`);
+      console.log(`[parseTextImport] Line length: ${line.length}`);
+      console.log(`[parseTextImport] Contains em dash (—): ${line.includes('—')}`);
+      console.log(`[parseTextImport] Contains regular dash (-): ${line.includes('-')}`);
+    }
     if (lorcanitoMatch) {
       const [, count, cardName, subtitle, setId, setNumber] = lorcanitoMatch;
       const countNum = parseInt(count);
