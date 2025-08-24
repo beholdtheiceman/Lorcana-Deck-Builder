@@ -4553,8 +4553,10 @@ function DeckStats({ deck }) {
                 <Bar dataKey="count" fill="#10b981" />
                 <Tooltip 
                   content={({ active, payload, label }) => {
+                    console.log('[Tooltip Debug] Cost Curve Tooltip called:', { active, payload, label });
                     if (active && payload && payload.length > 0) {
                       const data = payload[0].payload;
+                      console.log('[Tooltip Debug] Cost Curve data:', data);
                       return (
                         <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
                           <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
@@ -4571,6 +4573,7 @@ function DeckStats({ deck }) {
                         </div>
                       );
                     }
+                    console.log('[Tooltip Debug] Cost Curve Tooltip returning null');
                     return null;
                   }}
                 />
@@ -4591,8 +4594,10 @@ function DeckStats({ deck }) {
                 <Bar dataKey="count" fill="#3b82f6" />
                 <Tooltip 
                   content={({ active, payload, label }) => {
+                    console.log('[Tooltip Debug] Card Types Tooltip called:', { active, payload, label });
                     if (active && payload && payload.length > 0) {
                       const data = payload[0].payload;
+                      console.log('[Tooltip Debug] Card Types data:', data);
                       return (
                         <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
                           <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
@@ -4609,6 +4614,7 @@ function DeckStats({ deck }) {
                         </div>
                       );
                     }
+                    console.log('[Tooltip Debug] Card Types Tooltip returning null');
                     return null;
                   }}
                 />
