@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import HubDetailModal from './HubDetailModal';
+import DeckDetailModal from './DeckDetailModal';
 
 const TeamHub = () => {
   const { user } = useAuth();
@@ -10,6 +12,9 @@ const TeamHub = () => {
   const [hubDecks, setHubDecks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showHubDetail, setShowHubDetail] = useState(false);
+  const [showDeckDetail, setShowDeckDetail] = useState(false);
+  const [selectedDeck, setSelectedDeck] = useState(null);
 
   // Form states
   const [hubName, setHubName] = useState('');
@@ -255,7 +260,7 @@ const TeamHub = () => {
                   <button
                     onClick={() => {
                       setSelectedHub(hub);
-                      fetchHubDecks(hub.id);
+                      setShowHubDetail(true);
                     }}
                     className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
                   >
@@ -419,6 +424,34 @@ const TeamHub = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Hub Detail Modal */}
+      {showHubDetail && selectedHub && (
+        <HubDetailModal
+          hub={selectedHub}
+          onClose={() => {
+            setShowHubDetail(false);
+            setSelectedHub(null);
+          }}
+          onDeckClick={(deck) => {
+            setSelectedDeck(deck);
+            setShowDeckDetail(true);
+            setShowHubDetail(false);
+          }}
+        />
+      )}
+
+      {/* Deck Detail Modal */}
+      {showDeckDetail && selectedDeck && (
+        <DeckDetailModal
+          deck={selectedDeck}
+          hub={selectedHub}
+          onClose={() => {
+            setShowDeckDetail(false);
+            setSelectedDeck(null);
+          }}
+        />
       )}
     </div>
   );
