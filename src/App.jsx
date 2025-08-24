@@ -354,12 +354,50 @@ const textOf = c => (c?.text || c?.rulesText || c?.Body_Text || "").toString();
 function roleForCard(c) {
   const t = textOf(c);
   const type = (c?.type || "").toLowerCase();
+  const lore = Number(c?.lore || c?._raw?.Lore || c?._raw?.lore || c?._raw?.loreValue || 0);
+  const cost = Number(c?.cost || 0);
 
-  if (RX_REMOVAL.test(t) || type === "action") return "Interaction";
-  if (RX_DRAW.test(t) || RX_SEARCH.test(t)) return "Draw / Dig";
-  if (RX_RAMP.test(t) || RX_SONG.test(t)) return "Ramp / Cost";
-  if ((c?.lore ?? 0) >= 2 && (c?.cost ?? 0) >= 6 || RX_FINISH.test(t)) return "Finisher";
-  if ((c?.lore ?? 0) >= 1 && type.includes("character")) return "Questers";
+  // Debug role assignment
+  const debug = {
+    name: c.name,
+    type: type,
+    lore: lore,
+    cost: cost,
+    text: t.substring(0, 100) + '...',
+    tests: {
+      removal: RX_REMOVAL.test(t),
+      isAction: type === "action",
+      draw: RX_DRAW.test(t),
+      search: RX_SEARCH.test(t),
+      ramp: RX_RAMP.test(t),
+      song: RX_SONG.test(t),
+      finisher: (lore >= 2 && cost >= 6) || RX_FINISH.test(t),
+      quester: lore >= 1 && type.includes("character")
+    }
+  };
+
+  if (RX_REMOVAL.test(t) || type === "action") {
+    console.log('[Role Debug]', c.name, '→ Interaction:', debug);
+    return "Interaction";
+  }
+  if (RX_DRAW.test(t) || RX_SEARCH.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Draw / Dig:', debug);
+    return "Draw / Dig";
+  }
+  if (RX_RAMP.test(t) || RX_SONG.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Ramp / Cost:', debug);
+    return "Ramp / Cost";
+  }
+  if ((lore >= 2 && cost >= 6) || RX_FINISH.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Finisher:', debug);
+    return "Finisher";
+  }
+  if (lore >= 1 && type.includes("character")) {
+    console.log('[Role Debug]', c.name, '→ Questers:', debug);
+    return "Questers";
+  }
+  
+  console.log('[Role Debug]', c.name, '→ Tech / Utility (default):', debug);
   return "Tech / Utility";
 }
 
@@ -6408,11 +6446,43 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             // --- Roles breakdown ---
             const roleData = (() => {
               const counts = {};
+              const roleAssignments = {};
+              
               cards.forEach(c => {
                 const r = roleForCard(c);
                 counts[r] = (counts[r]||0)+1;
+                
+                // Track which cards go into which roles
+                if (!roleAssignments[r]) roleAssignments[r] = [];
+                roleAssignments[r].push(c.name);
               });
+              
               console.log('[Comp Dashboard] Role data:', counts);
+              console.log('[Comp Dashboard] Role assignments:', roleAssignments);
+              
+              // Special focus on Tech/Utility cards
+              if (roleAssignments['Tech / Utility']) {
+                console.log('[Comp Dashboard] Tech/Utility cards:', roleAssignments['Tech / Utility']);
+                console.log('[Comp Dashboard] Why these are Tech/Utility:');
+                roleAssignments['Tech / Utility'].forEach(cardName => {
+                  const card = cards.find(c => c.name === cardName);
+                  if (card) {
+                    const cardText = (card.text || card.rulesText || card._raw?.text || card._raw?.rulesText || card._raw?.Body_Text || "").toString().toLowerCase();
+                    const cardType = (card?.type || "").toLowerCase();
+                    const cardLore = Number(card.lore || card._raw?.Lore || card._raw?.lore || card._raw?.loreValue || 0);
+                    const cardCost = Number(card.cost || 0);
+                    
+                    console.log(`  ${cardName}:`, {
+                      type: cardType,
+                      lore: cardLore,
+                      cost: cardCost,
+                      text: cardText.substring(0, 100) + '...',
+                      why: 'No specific role detected - falls through to default'
+                    });
+                  }
+                });
+              }
+              
               return Object.entries(counts).map(([role,value])=>({role, value}));
             })();
 
