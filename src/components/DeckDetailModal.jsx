@@ -60,7 +60,7 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] overflow-hidden">
+             <div className="bg-gray-900 rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
                      <div>
@@ -87,9 +87,9 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
                 <div className="text-gray-400 text-center">
                   <div className="text-6xl mb-4">🎴</div>
                                      <div className="text-lg">{deck.title}</div>
-                  <div className="text-sm mt-2">
-                    {deck.cards?.length || 0} cards
-                  </div>
+                                     <div className="text-sm mt-2">
+                     {deck.cardCount || 0} cards
+                   </div>
                 </div>
               </div>
               
@@ -98,7 +98,7 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
                 <h4 className="text-white font-semibold mb-2">Deck Details</h4>
                 <div className="text-gray-300 text-sm space-y-1">
                   <p>Created: {new Date(deck.createdAt).toLocaleDateString()}</p>
-                  <p>Cards: {deck.cards?.length || 0}</p>
+                                     <p>Cards: {deck.cardCount || 0}</p>
                   {deck.description && (
                     <p>Description: {deck.description}</p>
                   )}
