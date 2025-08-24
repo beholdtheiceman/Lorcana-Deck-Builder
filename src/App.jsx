@@ -2250,8 +2250,8 @@ function parseTextImport(text) {
             
             // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
             const rawUrl = getCardImageUrl(transformedCard);         // string | null
-            console.log(`[parseTextImport] About to call proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
-            const proxied = proxyImageUrl(rawUrl);                   // string | null
+            console.log(`[parseTextImport] About to call lorcanaImageProxyUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof lorcanaImageProxyUrl });
+            const proxied = lorcanaImageProxyUrl(rawUrl);                   // string | null
             
             // Single source of truth: normalize to string | null
             let image_url = asUrl(proxied) ?? asUrl(rawUrl);
@@ -2376,8 +2376,8 @@ function parseTextImport(text) {
             
             // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
             const rawUrl = getCardImageUrl(transformedCard);         // string | null
-            console.log(`[parseTextImport] About to call proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
-            const proxied = proxyImageUrl(rawUrl);                   // string | null
+            console.log(`[parseTextImport] About to call lorcanaImageProxyUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof lorcanaImageProxyUrl });
+            const proxied = lorcanaImageProxyUrl(rawUrl);                   // string | null
             
             // Single source of truth: normalize to string | null
             let image_url = asUrl(proxied) ?? asUrl(rawUrl);
@@ -2500,8 +2500,8 @@ function parseTextImport(text) {
             
             // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
             const rawUrl = getCardImageUrl(transformedCard);         // string | null
-            console.log(`[parseTextImport] About to call proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
-            const proxied = proxyImageUrl(rawUrl);                   // string | null
+            console.log(`[parseTextImport] About to call lorcanaImageProxyUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof lorcanaImageProxyUrl });
+            const proxied = lorcanaImageProxyUrl(rawUrl);                   // string | null
             
             // Single source of truth: normalize to string | null
             let image_url = asUrl(proxied) ?? asUrl(rawUrl);
