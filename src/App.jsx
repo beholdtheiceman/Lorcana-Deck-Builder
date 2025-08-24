@@ -5085,14 +5085,16 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           inks: inks,
           count: e.count
         });
+        // Add to dual-ink category instead of both individual colors
+        inkDistribution['Dual-Ink'] = (inkDistribution['Dual-Ink'] || 0) + e.count;
+      } else {
+        // Single ink card: add to its ink color
+        inks.forEach(ink => {
+          if (ink) {
+            inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+          }
+        });
       }
-      
-      // Handle dual-ink cards: each ink gets the full count
-      inks.forEach(ink => {
-        if (ink) {
-          inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
-        }
-      });
     } else {
       // Enhanced fallback: try to detect ink colors from card properties
       console.log(`[Ink Distribution Debug] No inks found for ${e.card.name}, trying fallback detection`);
@@ -5156,18 +5158,20 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       if (detectedInks.length > 0) {
         console.log(`[Ink Distribution Debug] Fallback detected inks for ${e.card.name}:`, detectedInks);
         
-        // Track dual-ink cards from fallback detection too
         if (detectedInks.length > 1) {
+          // Dual-ink card: add to dual-ink category
           dualInkCards.push({
             name: e.card.name,
             inks: detectedInks,
             count: e.count
           });
+          inkDistribution['Dual-Ink'] = (inkDistribution['Dual-Ink'] || 0) + e.count;
+        } else {
+          // Single ink card: add to its ink color
+          detectedInks.forEach(ink => {
+            inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+          });
         }
-        
-        detectedInks.forEach(ink => {
-          inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
-        });
       } else {
         console.log(`[Ink Distribution Debug] No inks detected for ${e.card.name}, skipping`);
       }
@@ -6077,7 +6081,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           <div className="bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
             <div className="text-xs text-gray-400 text-center mb-3 p-2 bg-gray-700 rounded">
-              <strong>Note:</strong> Dual-ink cards are counted in both colors, so totals may exceed deck size
+              <strong>Note:</strong> Dual-ink cards now have their own category and are not counted in individual ink colors
             </div>
             {Object.keys(inkDistribution).length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
@@ -6098,7 +6102,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                         'Emerald': '#10b981',
                         'Ruby': '#ef4444',
                         'Sapphire': '#3b82f6',
-                        'Steel': '#6b7280'
+                        'Steel': '#6b7280',
+                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
                       };
                       return (
                         <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
@@ -6118,7 +6123,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                         'Emerald': '#10b981',
                         'Ruby': '#ef4444',
                         'Sapphire': '#3b82f6',
-                        'Steel': '#6b7280'
+                        'Steel': '#6b7280',
+                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
                       };
                       return (
                         <div key={index} className="flex items-center gap-2">
@@ -6151,8 +6157,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     </div>
                     <div className="mt-3 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-xs text-blue-200">
                       <p className="text-center">
-                        <strong>Note:</strong> These cards are counted in both ink colors above, 
-                        which is why the total exceeds your 60-card deck size.
+                        <strong>Note:</strong> These cards now have their own "Dual-Ink" category 
+                        in the pie chart above, separate from individual ink colors.
                       </p>
                     </div>
                   </div>
@@ -6191,7 +6197,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             </div>
           </div>
           
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div>
             <h4 className="font-semibold mb-2 text-center">Deck Composition</h4>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
