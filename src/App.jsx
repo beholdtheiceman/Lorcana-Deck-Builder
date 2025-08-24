@@ -2923,6 +2923,8 @@ function parseTextImport(text) {
   
   return deck;
 }
+  }
+}
 
 // ADVANCED: Deterministic card matching system with clear outcomes
 function matchCard(line, db) {
