@@ -890,6 +890,19 @@ function toAppCard(raw) {
     return null;
   }
 
+  // DEBUG: Log the actual structure of the card data
+  console.log('[toAppCard] Raw card data structure:', {
+    keys: Object.keys(raw),
+    name: raw.name,
+    baseName: raw.baseName,
+    subname: raw.subname,
+    setId: raw.setId,
+    setNum: raw.setNum,
+    cost: raw.cost,
+    type: raw.type,
+    inkable: raw.inkable
+  });
+
   const id = raw.Unique_ID?.trim()
     || [raw.Set_ID, raw.Card_Num].filter(Boolean).join("-")
     || crypto.randomUUID();
@@ -908,27 +921,27 @@ function toAppCard(raw) {
 
   return {
     id,
-    setId: raw.Set_ID ?? null,
-    setNum: raw.Set_Num ?? null,
-    cardNum: raw.Card_Num ?? null,
-    name: raw.Name,
-    baseName,
-    subtitle,
-    imageUrl: raw.Image || null,
-    inkable: Boolean(raw.Inkable),
-    colors: splitList(raw.Color),
-    classifications: splitList(raw.Classifications),
-    type: raw.Type ?? null,
-    cost: raw.Cost ?? null,
-    lore: raw.Lore ?? null,
-    willpower: raw.Willpower ?? null,
-    strength: raw.Strength ?? null,
-    rarity: raw.Rarity ?? null,
-    abilities,
-    rulesText: raw.Body_Text ?? null,
-    flavorText: raw.Flavor_Text ?? null,
-    artist: raw.Artist || null,
-    franchise: raw.Franchise || null,
+    setId: raw.setId || raw.Set_ID || null,
+    setNum: raw.setNum || raw.Set_Num || null,
+    cardNum: raw.cardNum || raw.Card_Num || null,
+    name: name,
+    baseName: baseName,
+    subtitle: subtitle,
+    imageUrl: raw.imageUrl || raw.Image || null,
+    inkable: Boolean(raw.inkable || raw.Inkable || false),
+    colors: splitList(raw.colors || raw.Color || ''),
+    classifications: splitList(raw.classifications || raw.Classifications || ''),
+    type: raw.type || raw.Type || null,
+    cost: raw.cost || raw.Cost || 0,
+    lore: raw.lore || raw.Lore || 0,
+    willpower: raw.willpower || raw.Willpower || 0,
+    strength: raw.strength || raw.Strength || 0,
+    rarity: raw.rarity || raw.Rarity || null,
+    abilities: raw.abilities || splitList(raw.Abilities || ''),
+    rulesText: raw.rulesText || raw.Body_Text || '',
+    flavorText: raw.flavorText || raw.Flavor_Text || '',
+    artist: raw.artist || raw.Artist || null,
+    franchise: raw.franchise || raw.Franchise || null,
   };
 }
 
