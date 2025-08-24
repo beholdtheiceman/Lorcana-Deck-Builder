@@ -2805,7 +2805,22 @@ function findCardByName(userLine, cards) {
   }
   console.log(`[findCardByName] No original Name match found`);
 
-  // 4) Try fuzzy matching on the complete card name
+  // 4) Try matching against Lorcast API name + version combination
+  console.log(`[findCardByName] Trying Lorcast name + version match for: "${typed}"`);
+  const lorcastMatch = cards.find(c => {
+    if (c._raw?.name && c._raw?.version) {
+      const fullName = `${c._raw.name} - ${c._raw.version}`;
+      return fullName.toLowerCase() === typed.toLowerCase();
+    }
+    return false;
+  });
+  if (lorcastMatch) {
+    console.log(`[findCardByName] Found Lorcast name + version match: "${lorcastMatch._raw.name} - ${lorcastMatch._raw.version}"`);
+    return lorcastMatch;
+  }
+  console.log(`[findCardByName] No Lorcast name + version match found`);
+
+  // 5) Try fuzzy matching on the complete card name
   let candidates = cards.filter(c => {
     const cardName = (c.name || "").toLowerCase();
     const userFullName = typed.toLowerCase();
@@ -2827,7 +2842,7 @@ function findCardByName(userLine, cards) {
     }
   }
 
-  // 5) No match found
+  // 6) No match found
   console.log(`[findCardByName] No match found for: "${typed}"`);
   return null;
 }
