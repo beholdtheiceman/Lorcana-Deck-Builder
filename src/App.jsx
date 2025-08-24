@@ -5028,8 +5028,9 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     });
   });
   
-  // Calculate ink color distribution
+  // Calculate ink color distribution with dual-ink tracking
   const inkDistribution = {};
+  const dualInkCards = [];
   
   // Debug: log the first card to see what properties it has
   if (entries.length > 0) {
@@ -5045,6 +5046,15 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     console.log(`[Ink Distribution Debug] ${e.card.name}: getInks returned:`, inks);
     
     if (inks.length > 0) {
+      // Track dual-ink cards for special presentation
+      if (inks.length > 1) {
+        dualInkCards.push({
+          name: e.card.name,
+          inks: inks,
+          count: e.count
+        });
+      }
+      
       // Handle dual-ink cards: each ink gets the full count
       inks.forEach(ink => {
         if (ink) {
@@ -5090,6 +5100,16 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       
       if (detectedInks.length > 0) {
         console.log(`[Ink Distribution Debug] Fallback detected inks for ${e.card.name}:`, detectedInks);
+        
+        // Track dual-ink cards from fallback detection too
+        if (detectedInks.length > 1) {
+          dualInkCards.push({
+            name: e.card.name,
+            inks: detectedInks,
+            count: e.count
+          });
+        }
+        
         detectedInks.forEach(ink => {
           inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
         });
@@ -6008,7 +6028,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     dataKey="value"
                     nameKey="name"
                     outerRadius={80}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   >
                     {Object.entries(inkDistribution).map(([ink, count], index) => {
                       const colors = {
@@ -6027,6 +6047,26 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   <Tooltip formatter={(value, name) => [value, name]} />
                   <Legend />
                 </PieChart>
+                
+                {/* Dual-ink cards summary */}
+                {dualInkCards.length > 0 && (
+                  <div className="mt-3 p-3 bg-gray-700 rounded-lg">
+                    <h4 className="text-sm font-medium mb-2 text-center">Dual-Ink Cards</h4>
+                    <div className="text-xs space-y-1">
+                      {dualInkCards.map((card, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className="text-gray-300">{card.name}</span>
+                          <span className="text-gray-400">
+                            {card.inks.join(' + ')} ({card.count}x)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      These cards can be played with either ink color
+                    </p>
+                  </div>
+                )}
               </ResponsiveContainer>
             ) : (
               <div className="text-center text-gray-400 py-8">
