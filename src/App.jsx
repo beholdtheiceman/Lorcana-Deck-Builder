@@ -2490,14 +2490,14 @@ function parseTextImport(text) {
           deck.entries[key] = { card: placeholderCard, count: countNum };
           validCards++;
           notFoundCards.push({ name: `${cardName} — ${subtitle}`, count: countNum });
-                }
+        }
         continue; // Skip to next line
       } else {
         console.warn(`[parseTextImport] Invalid count on line ${index + 1}: "${line}"`);
         skippedLines++;
-      }
-      
-      // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
+    }
+    
+    // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
     const hyphenatedPattern = /^(\d+)\s+(.+?)\s*-\s*(.+)$/;
     const hyphenatedMatch = line.match(hyphenatedPattern);
     if (hyphenatedMatch) {
@@ -2631,43 +2631,43 @@ function parseTextImport(text) {
           
           if (!resolvedCard) {
             // Create placeholder if resolution failed
-            const placeholderCard = {
-              name: `${cardName} - ${subtitle}`,
-              set: 'Multiple',
-              number: 'Multiple',
-              cost: 0,
-              inks: [],
-              type: "Unknown",
-              rarity: "Unknown",
-              text: `Multiple variants found: ${foundCard.candidates.map(c => `${c.name} (${c.setId} #${c.setNum})`).join(', ')}`,
-              classifications: [],
-              keywords: [],
-              image_url: null,
-              _raw: {},
-              _candidates: foundCard.candidates,
-              _needsResolution: true,
-              setCode: 'Multiple',
-              setName: 'Multiple Sets',
-              setNum: 'Multiple',
-              inkable: false,
-              lore: 0,
-              willpower: 0,
-              strength: 0,
-              franchise: "",
-              gamemode: "Lorcana"
-            };
-            
-            const key = deckKey(placeholderCard);
-            deck.entries[key] = { card: placeholderCard, count: countNum };
-            validCards++;
-            notFoundCards.push({ name: `${cardName} - ${subtitle}`, count: countNum, reason: 'ambiguous-needs-resolution' });
+          const placeholderCard = {
+            name: `${cardName} - ${subtitle}`,
+            set: 'Multiple',
+            number: 'Multiple',
+            cost: 0,
+            inks: [],
+            type: "Unknown",
+            rarity: "Unknown",
+            text: `Multiple variants found: ${foundCard.candidates.map(c => `${c.name} (${c.setId} #${c.setNum})`).join(', ')}`,
+            classifications: [],
+            keywords: [],
+            image_url: null,
+            _raw: {},
+            _candidates: foundCard.candidates,
+            _needsResolution: true,
+            setCode: 'Multiple',
+            setName: 'Multiple Sets',
+            setNum: 'Multiple',
+            inkable: false,
+            lore: 0,
+            willpower: 0,
+            strength: 0,
+            franchise: "",
+            gamemode: "Lorcana"
+          };
+          
+          const key = deckKey(placeholderCard);
+          deck.entries[key] = { card: placeholderCard, count: countNum };
+          validCards++;
+          notFoundCards.push({ name: `${cardName} - ${subtitle}`, count: countNum, reason: 'ambiguous-needs-resolution' });
           }
         } else {
           console.log(`[parseTextImport] No card found for hyphenated format: ${cardName} - ${subtitle}`);
           notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-not-found' });
         }
         continue; // Skip to next line
-      }
+    }
     
     // Fallback: Handle old format "4 Rafiki - Mystical Fighter"
     const simpleMatch = line.match(/^(\d+)\s+(.+)$/);
@@ -2808,34 +2808,34 @@ function parseTextImport(text) {
             }
           } else {
             // Create placeholder if no similar cards found
-            const placeholderCard = { 
-              name: cardName.trim(), 
-              set: "Unknown", 
-              number: "?", 
-              cost: 0,
-              inks: [],
-              type: "Unknown",
-              rarity: "Unknown",
-              text: "",
-              classifications: [],
-              keywords: [],
-              image_url: "",
-              _raw: {},
-              // Add these fields to match expected card structure
-              setCode: "Unknown",
-              setName: "Unknown",
-              setNum: "?",
-              inkable: false,
-              lore: 0,
-              willpower: 0,
-              strength: 0,
-              franchise: "",
-              gamemode: "Lorcana"
-            };
-            const key = deckKey(placeholderCard);
-            deck.entries[key] = { card: placeholderCard, count: countNum };
-            validCards++;
-            notFoundCards.push({ name: cardName.trim(), count: countNum });
+          const placeholderCard = { 
+            name: cardName.trim(), 
+            set: "Unknown", 
+            number: "?", 
+            cost: 0,
+            inks: [],
+            type: "Unknown",
+            rarity: "Unknown",
+            text: "",
+            classifications: [],
+            keywords: [],
+            image_url: "",
+            _raw: {},
+            // Add these fields to match expected card structure
+            setCode: "Unknown",
+            setName: "Unknown",
+            setNum: "?",
+            inkable: false,
+            lore: 0,
+            willpower: 0,
+            strength: 0,
+            franchise: "",
+            gamemode: "Lorcana"
+          };
+          const key = deckKey(placeholderCard);
+          deck.entries[key] = { card: placeholderCard, count: countNum };
+          validCards++;
+          notFoundCards.push({ name: cardName.trim(), count: countNum });
           }
         }
       } else {
@@ -7572,7 +7572,7 @@ useEffect(() => {
       </div>
     </ImageCacheProvider>
   </ToastProvider>
-  );
+);
 } // End AppInner function
 
 // -----------------------------------------------------------------------------
@@ -8248,9 +8248,10 @@ function useBatchImageLoader() {
 
 
 // --- Wrapper to ensure ImageCache is available everywhere ---
-const App = (props) => (
-  <ImageCacheProvider>
-    <AppInner {...props} />
-  </ImageCacheProvider>
-);
-export default App;
+export default function App(props) {
+  return (
+    <ImageCacheProvider>
+      <AppInner {...props} />
+    </ImageCacheProvider>
+  );
+}
