@@ -1986,6 +1986,236 @@ function parseTextImport(text) {
   return deck;
 }
 
+
+
+
+// ADVANCED: Deterministic card matching system with clear outcomes
+function matchCard(line, db) {
+  const raw = line.trim();
+  
+  // Normalize function for consistent matching
+  const clean = (s = '') => s.toLowerCase()
+    .normalize('NFKD')
+    .replace(/[–—]/g, '-')     // dash normalize
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const normLine = clean(raw);
+  
+  // Split title into base and subtitle
+  function splitTitle(line) {
+    const m = clean(line).split(/\s-\s/); // tolerant of hyphenated subtitles
+    return { base: m[0], sub: m[1] ?? '' };
+  }
+  
+  // 1) Exact match on full normalized name
+  const exact = db.find(c => clean(c.name) === normLine);
+  if (exact) {
+    console.log(`[matchCard] Exact match found: "${exact.name}"`);
+    return { match: exact, needsConfirmation: false, reason: "exact-name" };
+  }
+  
+  // 2) Name - Subtitle pairing using new normalized fields
+  const { base, sub } = splitTitle(raw);
+  if (sub) {
+    console.log(`[matchCard] Trying subtitle match: base="${base}", sub="${sub}"`);
+    
+    // Use the new normalized fields for more reliable matching
+    const subtitleCandidates = db.filter(c => {
+      // First try the new normalized fields
+      if (c.baseName && c.subname) {
+        return clean(c.baseName) === clean(base) && clean(c.subname) === clean(sub);
+      }
+      // Fallback to parsing the name field (for legacy cards)
+      const [cBase, cSub = ''] = clean(c.name).split(/\s-\s/);
+      return cBase === clean(base) && cSub === clean(sub);
+    });
+    
+    if (subtitleCandidates.length === 1) {
+      console.log(`[matchCard] Single subtitle match: "${subtitleCandidates[0].name}"`);
+      return { match: subtitleCandidates[0], needsConfirmation: false, reason: "name+subtitle" };
+    }
+    if (subtitleCandidates.length > 1) {
+      console.log(`[matchCard] Multiple subtitle matches (${subtitleCandidates.length}), needs confirmation`);
+      return { candidates: subtitleCandidates, needsConfirmation: true, reason: "ambiguous-name+subtitle" };
+    }
+  }
+  
+  // 3) Unique base-name fallback using new normalized fields
+  const baseMatches = db.filter(c => {
+    // First try the new normalized fields
+    if (c.baseName) {
+      return clean(c.baseName) === clean(base);
+    }
+    // Fallback to parsing the name field (for legacy cards)
+    const [cBase] = clean(c.name).split(/\s-\s/);
+    return cBase === clean(base);
+  });
+  
+  if (baseMatches.length === 1) {
+    console.log(`[matchCard] Unique base name match: "${baseMatches[0].name}"`);
+    return { match: baseMatches[0], needsConfirmation: false, reason: "unique-base" };
+  }
+  
+  if (baseMatches.length > 1) {
+    console.log(`[matchCard] Multiple base matches (${baseMatches.length}), applying tiebreakers`);
+    
+    // Apply soft tiebreakers: set, color, inkable
+    const boosted = [...baseMatches].sort((a, b) => {
+      let scoreA = 0, scoreB = 0;
+      if (normLine.includes(clean(String(a.setId)))) scoreA += 3;
+      if (normLine.includes(clean(String(b.setId)))) scoreB += 3;
+      if (normLine.includes(clean(String(a.setNum)))) scoreA += 2;
+      if (normLine.includes(clean(String(b.setNum)))) scoreB += 2;
+      if (normLine.includes(clean(String(a.colors?.[0])))) scoreA += 1;
+      if (normLine.includes(clean(String(b.colors?.[0])))) scoreB += 1;
+      return scoreB - scoreA;
+    });
+    
+    // If the top score is unique & >0, pick it; else ask user
+    const top = boosted[0];
+    const topScore = (() => {
+      let s = 0;
+      if (normLine.includes(clean(String(top.setId)))) s += 3;
+      if (normLine.includes(clean(String(top.setNum)))) s += 2;
+      if (normLine.includes(clean(String(top.colors?.[0])))) s += 1;
+      return s;
+    })();
+    
+    if (topScore > 0 && (boosted.length === 1 || top !== boosted[1])) {
+      console.log(`[matchCard] Tiebreaker resolved: "${top.name}" (score: ${topScore})`);
+      return { match: top, needsConfirmation: false, reason: "base+tiebreak" };
+    }
+    
+    console.log(`[matchCard] Ambiguous base matches, needs confirmation`);
+    return { candidates: baseMatches, needsConfirmation: true, reason: "ambiguous-base" };
+  }
+  
+  // 4) Give up cleanly
+  console.log(`[matchCard] No match found for: "${line}"`);
+  return { candidates: [], needsConfirmation: true, reason: "no-match" };
+}
+
+// UPDATED: Enhanced card finder using the new matching system
+/**
+ * Name resolver used by importer:
+ * 1) try exact full-name equality (dash/space insensitive)
+ * 2) if "Base - Subtitle" was typed, match by baseName + subname
+ * 3) optional: tie-break by set number if present in user line
+ */
+function findCardByName(userLine, cards) {
+  const typed = String(userLine || "");
+  
+  console.log(`[findCardByName] Searching for: "${typed}" (cleaned: "${typed.toLowerCase()}")`);
+  console.log(`[findCardByName] Total cards in database: ${cards.length}`);
+  
+  // DEBUG: Show detailed structure of sample cards
+  console.log(`[findCardByName] Sample cards structure:`, 
+    cards.slice(0, 3).map(c => ({
+      name: c.name,
+      baseName: c.baseName,
+      subname: c.subname,
+      subtitle: c.subtitle,
+      allKeys: Object.keys(c).slice(0, 10), // Show first 10 keys
+      hasRaw: !!c._raw,
+      rawKeys: c._raw ? Object.keys(c._raw).slice(0, 5) : []
+    }))
+  );
+  
+  // DEBUG: Look for cards with similar names to understand the data structure
+  if (typed.includes(" - ")) {
+    const [baseTyped, subTyped] = typed.split(/\s*[-–—]\s*/);
+    const similarCards = cards.filter(c => {
+      const cardName = (c.name || "").toLowerCase();
+      return cardName.startsWith(baseTyped.toLowerCase());
+    }).slice(0, 5);
+    
+    console.log(`[findCardByName] Cards with similar base name "${baseTyped}":`, 
+      similarCards.map(c => ({
+        name: c.name,
+        baseName: c.baseName,
+        subname: c.subname,
+        rawName: c._raw?.Name
+      }))
+    );
+  }
+  
+  // DEBUG: Show what we're searching for
+  console.log(`[findCardByName] Searching for complete card name: "${typed}"`);
+
+  // 1) Try exact match first (case-insensitive)
+  console.log(`[findCardByName] Trying exact match for: "${typed}"`);
+  const exact = cards.find(c => c.name.toLowerCase() === typed.toLowerCase());
+  if (exact) {
+    console.log(`[findCardByName] Found exact match: "${exact.name}"`);
+    return exact;
+  }
+  console.log(`[findCardByName] No exact match found`);
+
+  // 2) Try case-insensitive match with normalized names
+  console.log(`[findCardByName] Trying case-insensitive match for: "${typed.toLowerCase()}"`);
+  const caseInsensitive = cards.find(c => canon(c.name) === canon(typed));
+  if (caseInsensitive) {
+    console.log(`[findCardByName] Found case-insensitive match: "${caseInsensitive.name}"`);
+    return caseInsensitive;
+  }
+  console.log(`[findCardByName] No case-insensitive match found`);
+
+  // 3) Try matching against the original Name field if it exists
+  console.log(`[findCardByName] Trying original Name field match for: "${typed}"`);
+  const originalNameMatch = cards.find(c => {
+    const originalName = c._raw?.Name || c._raw?.name;
+    return originalName && originalName.toLowerCase() === typed.toLowerCase();
+  });
+  if (originalNameMatch) {
+    console.log(`[findCardByName] Found original Name match: "${originalNameMatch._raw?.Name || originalNameMatch._raw?.name}"`);
+    return originalNameMatch;
+  }
+  console.log(`[findCardByName] No original Name match found`);
+
+  // 4) Try matching against Lorcast API name + version combination
+  console.log(`[findCardByName] Trying Lorcast name + version match for: "${typed}"`);
+  const lorcastMatch = cards.find(c => {
+    if (c._raw?.name && c._raw?.version) {
+      const fullName = `${c._raw.name} - ${c._raw.version}`;
+      return fullName.toLowerCase() === typed.toLowerCase();
+    }
+    return false;
+  });
+  if (lorcastMatch) {
+    console.log(`[findCardByName] Found Lorcast name + version match: "${lorcastMatch._raw.name} - ${lorcastMatch._raw.version}"`);
+    return lorcastMatch;
+  }
+  console.log(`[findCardByName] No Lorcast name + version match found`);
+
+  // 5) Try fuzzy matching on the complete card name
+  let candidates = cards.filter(c => {
+    const cardName = (c.name || "").toLowerCase();
+    const userFullName = typed.toLowerCase();
+    
+    // Check if the card name starts with the user's input or vice versa
+    return cardName.startsWith(userFullName) || userFullName.startsWith(cardName);
+  });
+  
+  console.log(`[findCardByName] Found ${candidates.length} fuzzy matches for "${typed}"`);
+  if (candidates.length > 0) {
+    console.log(`[findCardByName] Fuzzy match candidates:`, candidates.slice(0, 3).map(c => ({ name: c.name })));
+    
+    if (candidates.length === 1) {
+      console.log(`[findCardByName] Found single fuzzy match: "${candidates[0].name}"`);
+      return candidates[0];
+    } else {
+      console.log(`[findCardByName] Multiple fuzzy matches found, returning ambiguous result`);
+      return { reason: "ambiguous-base", candidates };
+    }
+  }
+
+  // 6) No match found
+  console.log(`[findCardByName] No match found for: "${typed}"`);
+  return null;
+}
+
+
 // Parse CSV import (basic implementation)
 function parseCSVImport(csv) {
   const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
