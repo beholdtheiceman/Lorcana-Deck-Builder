@@ -1649,37 +1649,39 @@ function normalizeLorcast(c) {
   // Extract abilities using the new helper
   const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
   
-  // Extract baseName and subname from the display name
-  const { baseName, subname } = splitDisplayName(c.name);
-  
-  // Debug: Log the extraction
-  if (subname) {
-    console.log(`[normalizeLorcast] Extracted subtitle for "${c.name}": baseName="${baseName}", subname="${subname}"`);
-  }
-  
-  const result = {
-    id: c.id || c.collector_number || c.name,
-    name: c.name,
-    baseName,                    // <-- New: extracted base name
-    subname,                     // <-- New: extracted subtitle
-    // NORMALIZED set fields using Lorcast's actual model:
-    set: setCode || setName || (setNum != null ? String(setNum) : ""),
-    setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
-    setName: setName,           // nice label ("The First Chapter")
-    setNum: setNum,            // numeric if possible, else null (1, 2, 3...)
-    number: c.collector_number,
-    types: typeList,
-    rarity: c.rarity,
-    cost: c.cost ?? c.ink_cost,
-    inks: inks,
-    text: c.oracle_text || c.text || c.body_text || c.Body_Text || c.rules_text || "",
-    keywords: abilities, // Use the pretty abilities list
-    abilities: abilities, // Use the pretty abilities list
-    _abilitiesIndex: _abilitiesIndex, // Add the normalized index for filtering
-    image,
-    _source: "lorcast",
-    _raw: c,
-  };
+      // Extract baseName and subname from the display name
+    const { baseName, subname } = splitDisplayName(c.name);
+    
+    // Debug: Log the extraction
+    if (subname) {
+      console.log(`[normalizeLorcast] Extracted subtitle for "${c.name}": baseName="${baseName}", subname="${subname}"`);
+    }
+    
+    const result = {
+      id: c.id || c.collector_number || c.name,
+      name: c.name,
+      baseName,                    // <-- New: extracted base name
+      subname,                     // <-- New: extracted subtitle
+      // NORMALIZED set fields using Lorcast's actual model:
+      set: setCode || setName || (setNum != null ? String(setNum) : ""),
+      setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
+      setName: setName,           // nice label ("The First Chapter")
+      setNum: setNum,            // numeric if possible, else null (1, 2, 3...)
+      number: c.collector_number,
+      types: typeList,
+      rarity: c.rarity,
+      cost: c.cost ?? c.ink_cost,
+      inks: inks,
+      text: c.oracle_text || c.text || c.body_text || c.Body_Text || c.rules_text || "",
+      keywords: abilities, // Use the pretty abilities list
+      abilities: abilities, // Use the pretty abilities list
+      _abilitiesIndex: _abilitiesIndex, // Add the normalized index for filtering
+      image,
+      _source: "lorcast",
+      _raw: c,
+      // Preserve inkable flag for proper detection
+      inkable: Boolean(c.inkable ?? c.can_be_ink ?? c.Inkable ?? false),
+    };
   
   console.log('[normalizeLorcast] Normalized result:', {
     name: result.name,
@@ -1980,7 +1982,7 @@ function normalizeCard(raw) {
     // Additional fields
     franchise: raw.franchise || raw.Franchise || "",
     gamemode: raw.gamemode || raw.Gamemode || "",
-    inkable: raw.inkwell || raw.inkable || raw.Inkable || false,
+    inkable: Boolean(raw.inkable ?? raw.can_be_ink ?? raw.Inkable ?? raw.inkwell ?? false),
     lore: raw.lore || raw.Lore || 0,
     willpower: raw.willpower || raw.Willpower || 0,
     strength: raw.strength || raw.Strength || 0,
