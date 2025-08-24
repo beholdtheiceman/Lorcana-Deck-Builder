@@ -2495,6 +2495,8 @@ function parseTextImport(text) {
       } else {
         console.warn(`[parseTextImport] Invalid count on line ${index + 1}: "${line}"`);
         skippedLines++;
+        continue; // Skip to next line
+      }
     }
     
     // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
@@ -2511,14 +2513,14 @@ function parseTextImport(text) {
         // Try to find the card using subtitle matching
         const cards = window.getCurrentCards ? window.getCurrentCards() : [];
         const foundCard = findCardByName(`${cardName.trim()} - ${subtitle.trim()}`, cards);
-        if (foundCard && foundCard.match) {
-          const key = deckKey(foundCard.match);
+        if (foundCard && !foundCard.reason) {
+          const key = deckKey(foundCard);
           
           try {
             // TRANSFORM: Convert to app format for consistent data structure
-            const transformedCard = toAppCard(foundCard.match);
-            console.log(`[parseTextImport] Transformed card for ${foundCard.match.name}:`, {
-              original: foundCard.match.name,
+            const transformedCard = toAppCard(foundCard);
+            console.log(`[parseTextImport] Transformed card for ${foundCard.name}:`, {
+              original: foundCard.name,
               transformed: transformedCard.name,
               inkable: transformedCard.inkable,
               imageUrl: transformedCard.imageUrl
@@ -2577,7 +2579,7 @@ function parseTextImport(text) {
             console.error(`[parseTextImport] Error processing hyphenated format for ${cardName}:`, error);
             notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-error' });
           }
-        } else if (foundCard && foundCard.candidates) {
+        } else if (foundCard && (foundCard.reason === 'ambiguous-base' || foundCard.reason === 'ambiguous-subtitle') && foundCard.candidates) {
           // Handle ambiguous cases by creating a placeholder with candidate info
           console.log(`[parseTextImport] Ambiguous card found for ${cardName} - ${subtitle}, creating placeholder with ${foundCard.candidates.length} candidates`);
           
@@ -2664,9 +2666,10 @@ function parseTextImport(text) {
           }
         } else {
           console.log(`[parseTextImport] No card found for hyphenated format: ${cardName} - ${subtitle}`);
-          notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-not-found' });
+          notFoundCards.push({ name: `${cardName} - ${subtitle}`, count: countNum, reason: 'hyphenated-format-not-found' });
         }
         continue; // Skip to next line
+      }
     }
     
     // Fallback: Handle old format "4 Rafiki - Mystical Fighter"
@@ -2924,8 +2927,7 @@ function parseTextImport(text) {
   
   return deck;
 }
-  }
-}
+
 
 // ADVANCED: Deterministic card matching system with clear outcomes
 function matchCard(line, db) {
@@ -3044,57 +3046,79 @@ function matchCard(line, db) {
 function findCardByName(userLine, cards) {
   const typed = String(userLine || "");
   
-  console.log(`[findCardByName] Searching for: "${typed}"`);
-  console.log(`[findCardByName] Total cards available: ${cards.length}`);
-  console.log(`[findCardByName] Sample cards with baseName/subname:`, 
-    cards.slice(0, 5).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname }))
+  console.log(`[findCardByName] Searching for: "${typed}" (cleaned: "${typed.toLowerCase()}")`);
+  console.log(`[findCardByName] Total cards in database: ${cards.length}`);
+  console.log(`[findCardByName] Sample cards:`, 
+    cards.slice(0, 3).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname }))
   );
 
-  // 1) exact full-name match (tolerant to dash styles & spacing)
-  const exact = cards.find(c => canon(c.name) === canon(typed));
+  // 1) Try exact match first (case-insensitive)
+  console.log(`[findCardByName] Trying exact match for: "${typed}"`);
+  const exact = cards.find(c => c.name.toLowerCase() === typed.toLowerCase());
   if (exact) {
     console.log(`[findCardByName] Found exact match: "${exact.name}"`);
     return exact;
   }
+  console.log(`[findCardByName] No exact match found`);
 
-  // 2) parse "Base - Subtitle" from user line and match using normalized fields
+  // 2) Try case-insensitive match with normalized names
+  console.log(`[findCardByName] Trying case-insensitive match for: "${typed.toLowerCase()}"`);
+  const caseInsensitive = cards.find(c => canon(c.name) === canon(typed));
+  if (caseInsensitive) {
+    console.log(`[findCardByName] Found case-insensitive match: "${caseInsensitive.name}"`);
+    return caseInsensitive;
+  }
+  console.log(`[findCardByName] No case-insensitive match found`);
+
+  // 3) Parse "Base - Subtitle" from user line and match using normalized fields
   const parts = typed.split(/\s*[-–—]\s*/);
-  const baseTyped = (parts[0] || "").trim().toLowerCase();
-  const subTyped  = (parts[1] || null)?.trim().toLowerCase() || null;
+  const baseTyped = (parts[0] || "").trim();
+  const subTyped = (parts[1] || null)?.trim() || null;
   
   console.log(`[findCardByName] Parsed user input: baseTyped="${baseTyped}", subTyped="${subTyped}"`);
 
+  if (subTyped) {
+    // Try to find cards with matching base name and subtitle
+    const subtitleMatches = cards.filter(c => {
+      const baseMatch = (c.baseName || "").toLowerCase() === baseTyped.toLowerCase();
+      const subMatch = (c.subname || "").toLowerCase() === subTyped.toLowerCase();
+      return baseMatch && subMatch;
+    });
+    
+    console.log(`[findCardByName] Found ${subtitleMatches.length} subtitle matches for "${baseTyped}" - "${subTyped}"`);
+    if (subtitleMatches.length > 0) {
+      console.log(`[findCardByName] Subtitle matches:`, subtitleMatches.map(c => c.name));
+      if (subtitleMatches.length === 1) {
+        console.log(`[findCardByName] Single subtitle match found: "${subtitleMatches[0].name}"`);
+        return subtitleMatches[0];
+      } else {
+        console.log(`[findCardByName] Multiple subtitle matches found, returning ambiguous result`);
+        return { reason: "ambiguous-subtitle", candidates: subtitleMatches };
+      }
+    }
+  }
+
+  // 4) Try fuzzy matching on base name only
   let candidates = cards.filter(
-    c => (c.baseName || "").toLowerCase() === baseTyped
+    c => (c.baseName || "").toLowerCase() === baseTyped.toLowerCase()
   );
   
   console.log(`[findCardByName] Found ${candidates.length} candidates with baseName="${baseTyped}"`);
   if (candidates.length > 0) {
-    console.log(`[findCardByName] Sample candidates:`, candidates.slice(0, 3).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname })));
+    console.log(`[findCardByName] Base name candidates:`, candidates.slice(0, 3).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname })));
+    
+    if (candidates.length === 1) {
+      console.log(`[findCardByName] Found fuzzy match: "${candidates[0].name}"`);
+      return candidates[0];
+    } else {
+      console.log(`[findCardByName] Multiple base name matches found, returning ambiguous result`);
+      return { reason: "ambiguous-base", candidates };
+    }
   }
 
-  if (subTyped) {
-    const withSub = candidates.filter(
-      c => (c.subname || "").toLowerCase() === subTyped
-    );
-    if (withSub.length === 1) return withSub[0];
-    if (withSub.length > 1) candidates = withSub; // keep narrowing if multiple
-  }
-
-  // 3) optional tie-break: look for "(#<num>)" anywhere in the user line
-  const numMatch = typed.match(/#\s*(\d{1,4})/);
-  if (numMatch && candidates.length > 1) {
-    const num = Number(numMatch[1]);
-    const byNum = candidates.filter(
-      c => Number(c.collectorNumber || c.number) === num
-    );
-    if (byNum.length === 1) return byNum[0];
-    if (byNum.length > 0) candidates = byNum;
-  }
-
-  // If we got to one, return it; otherwise signal ambiguity for UI to handle.
-  if (candidates.length === 1) return candidates[0];
-  return { reason: "ambiguous-base", candidates };
+  // 5) No match found
+  console.log(`[findCardByName] No match found for: "${typed}"`);
+  return null;
 }
 
 // Parse CSV import (basic implementation)
