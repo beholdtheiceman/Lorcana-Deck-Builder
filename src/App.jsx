@@ -24,6 +24,10 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
 // Icons (lucide-react) - optional; replace with your icon lib || inline SVGs
