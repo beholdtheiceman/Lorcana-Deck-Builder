@@ -4541,8 +4541,10 @@ function DeckStats({ deck }) {
 
       <ChartCard title="Cost Curve">
         <div className="w-full h-56">
-          {console.log('[Chart Debug] Cost curve data:', costCurve)}
-          {console.log('[Chart Debug] Cost curve data structure check:', costCurve.map(item => ({ cost: item.cost, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
+                      {console.log('[Chart Debug] Cost curve data:', costCurve)}
+            {console.log('[Chart Debug] Cost curve data structure check:', costCurve.map(item => ({ cost: item.cost, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
+            {console.log('[Chart Debug] Cost curve first item:', costCurve[0])}
+            {console.log('[Chart Debug] Cost curve first item cards:', costCurve[0]?.cards)}
                       <ResponsiveContainer width="100%" height="100%">
               <BarChart data={costCurve}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -4551,6 +4553,7 @@ function DeckStats({ deck }) {
                 <Bar dataKey="count" name="count" fill="#10b981" />
                 <Tooltip 
                   content={({ active, payload, label }) => {
+                    console.log('[Tooltip Debug] active:', active, 'payload:', payload, 'label:', label);
                     if (active && payload && payload.length > 0) {
                       const data = payload[0].payload;
                       console.log('[Tooltip Active] Data:', data);
@@ -4574,6 +4577,7 @@ function DeckStats({ deck }) {
                         </div>
                       );
                     }
+                    console.log('[Tooltip Debug] Returning null - active:', active, 'payload length:', payload?.length);
                     return null;
                   }}
                 />
@@ -4594,6 +4598,7 @@ function DeckStats({ deck }) {
                 <Bar dataKey="count" name="count" fill="#3b82f6" />
                 <Tooltip 
                   content={({ active, payload, label }) => {
+                    console.log('[Tooltip Debug] Card Types - active:', active, 'payload:', payload, 'label:', label);
                     if (active && payload && payload.length > 0) {
                       const data = payload[0].payload;
                       console.log('[Tooltip Active] Card Types Data:', data);
@@ -4604,9 +4609,11 @@ function DeckStats({ deck }) {
                             <div className="mt-2">
                               <p className="text-gray-300 text-sm">Cards:</p>
                               <div className="max-h-32 overflow-y-auto">
-                                {data.cards.map((card, index) => (
-                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                ))}
+                                <div className="max-h-32 overflow-y-auto">
+                                  {data.cards.map((card, index) => (
+                                    <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           ) : (
@@ -4617,6 +4624,7 @@ function DeckStats({ deck }) {
                         </div>
                       );
                     }
+                    console.log('[Tooltip Debug] Card Types - Returning null - active:', active, 'payload length:', payload?.length);
                     return null;
                   }}
                 />
