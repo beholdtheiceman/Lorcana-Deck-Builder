@@ -24,10 +24,10 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  PieChart,    // ← Add this
-  Pie,         // ← Add this  
-  Cell,        // ← Add this
-  Legend       // ← Add this
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
 // Icons (lucide-react) - optional; replace with your icon lib || inline SVGs
@@ -5028,16 +5028,159 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     });
   });
   
-  // Calculate ink color distribution
+  // Calculate ink color distribution with dual-ink tracking
   const inkDistribution = {};
-  entries.forEach(e => {
-    const inks = Array.isArray(e.card.inks) ? e.card.inks : [e.card.inks];
-    inks.forEach(ink => {
-      if (ink) {
-        inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+  const dualInkCards = [];
+  
+  // Debug: log the first card to see what properties it has
+  if (entries.length > 0) {
+    console.log('[Ink Distribution Debug] First card structure:', {
+      name: entries[0].card.name,
+      card: entries[0].card,
+      raw: entries[0].card._raw
+    });
+    
+    // Also log a few more cards to check for dual-ink patterns
+    console.log('[Ink Distribution Debug] Checking for dual-ink cards...');
+    entries.slice(0, 5).forEach((e, i) => {
+      console.log(`[Ink Distribution Debug] Card ${i + 1}: ${e.card.name}`);
+      if (e.card._raw) {
+        const raw = e.card._raw;
+        console.log(`  - raw.ink: ${raw.ink}`);
+        console.log(`  - raw.Ink: ${raw.Ink}`);
+        console.log(`  - raw.inkColor: ${raw.inkColor}`);
+        console.log(`  - raw.Ink_Color: ${raw.Ink_Color}`);
+        console.log(`  - raw.color: ${raw.color}`);
+        console.log(`  - raw.Color: ${raw.Color}`);
+        console.log(`  - raw.colors: ${JSON.stringify(raw.colors)}`);
+        console.log(`  - raw.Colors: ${JSON.stringify(raw.Colors)}`);
+        console.log(`  - raw.inks: ${JSON.stringify(raw.inks)}`);
+        console.log(`  - raw.inkColors: ${JSON.stringify(raw.inkColors)}`);
+        
+        // Check for any other properties that might contain ink info
+        const inkRelatedProps = Object.keys(raw).filter(key => 
+          key.toLowerCase().includes('ink') || 
+          key.toLowerCase().includes('color') ||
+          key.toLowerCase().includes('colour')
+        );
+        if (inkRelatedProps.length > 0) {
+          console.log(`  - Other ink-related properties:`, inkRelatedProps);
+          inkRelatedProps.forEach(prop => {
+            console.log(`    ${prop}: ${JSON.stringify(raw[prop])}`);
+          });
+        }
       }
     });
+  }
+  
+  entries.forEach(e => {
+    const inks = getInks(e.card);
+    console.log(`[Ink Distribution Debug] ${e.card.name}: getInks returned:`, inks);
+    
+    if (inks.length > 0) {
+      // Track dual-ink cards for special presentation
+      if (inks.length > 1) {
+        dualInkCards.push({
+          name: e.card.name,
+          inks: inks,
+          count: e.count
+        });
+        // Add to dual-ink category instead of both individual colors
+        inkDistribution['Dual-Ink'] = (inkDistribution['Dual-Ink'] || 0) + e.count;
+      } else {
+        // Single ink card: add to its ink color
+        inks.forEach(ink => {
+          if (ink) {
+            inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+          }
+        });
+      }
+    } else {
+      // Enhanced fallback: try to detect ink colors from card properties
+      console.log(`[Ink Distribution Debug] No inks found for ${e.card.name}, trying fallback detection`);
+      
+      // Try to get ink color from various card properties
+      let detectedInks = [];
+      
+      // Check if card has ink-related properties
+      if (e.card._raw) {
+        const raw = e.card._raw;
+        
+        // Debug: log the entire raw object for cards with null ink
+        if (raw.ink === null) {
+          console.log(`[Dual-Ink Debug] ${e.card.name} has null ink, examining full structure:`, raw);
+        }
+        
+        // Try different possible ink color properties
+        if (raw.ink && raw.ink !== null) detectedInks.push(raw.ink);
+        if (raw.Ink && raw.Ink !== null) detectedInks.push(raw.Ink);
+        if (raw.inkColor && raw.inkColor !== null) detectedInks.push(raw.inkColor);
+        if (raw.Ink_Color && raw.Ink_Color !== null) detectedInks.push(raw.Ink_Color);
+        if (raw.color && raw.color !== null) detectedInks.push(raw.color);
+        if (raw.Color && raw.Color !== null) detectedInks.push(raw.Color);
+        
+        // Check for dual-ink specific properties
+        if (raw.inks && Array.isArray(raw.inks)) {
+          detectedInks.push(...raw.inks.filter(ink => ink && ink !== null));
+        }
+        if (raw.inkColors && Array.isArray(raw.inkColors)) {
+          detectedInks.push(...raw.inkColors.filter(ink => ink && ink !== null));
+        }
+        
+        // Check for comma-separated ink strings
+        if (raw.colors) {
+          if (Array.isArray(raw.colors)) {
+            detectedInks.push(...raw.colors.filter(ink => ink && ink !== null));
+          } else if (typeof raw.colors === 'string') {
+            detectedInks.push(...raw.colors.split(',').map(c => c.trim()).filter(ink => ink && ink !== null));
+          }
+        }
+        if (raw.Colors) {
+          if (Array.isArray(raw.Colors)) {
+            detectedInks.push(...raw.Colors.filter(ink => ink && ink !== null));
+          } else if (typeof raw.Colors === 'string') {
+            detectedInks.push(...raw.Colors.split(',').map(c => c.trim()).filter(ink => ink && ink !== null));
+          }
+        }
+        
+        // Special case: check if card has multiple ink-related fields
+        const allInkFields = [raw.ink, raw.Ink, raw.inkColor, raw.Ink_Color, raw.color, raw.Color];
+        const validInks = allInkFields.filter(ink => ink && ink !== null && ink !== 'null');
+        if (validInks.length > 1) {
+          console.log(`[Dual-Ink Debug] ${e.card.name} has multiple ink fields:`, validInks);
+          detectedInks.push(...validInks);
+        }
+      }
+      
+      // Remove duplicates and normalize ink names
+      detectedInks = [...new Set(detectedInks)].filter(ink => ink && ink !== 'undefined');
+      
+      if (detectedInks.length > 0) {
+        console.log(`[Ink Distribution Debug] Fallback detected inks for ${e.card.name}:`, detectedInks);
+        
+        if (detectedInks.length > 1) {
+          // Dual-ink card: add to dual-ink category
+          dualInkCards.push({
+            name: e.card.name,
+            inks: detectedInks,
+            count: e.count
+          });
+          inkDistribution['Dual-Ink'] = (inkDistribution['Dual-Ink'] || 0) + e.count;
+        } else {
+          // Single ink card: add to its ink color
+          detectedInks.forEach(ink => {
+            inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+          });
+        }
+      } else {
+        console.log(`[Ink Distribution Debug] No inks detected for ${e.card.name}, skipping`);
+      }
+    }
   });
+  
+  // Debug: log dual-ink cards found
+  console.log('[Ink Distribution Debug] Dual-ink cards found:', dualInkCards);
+  console.log('[Ink Distribution Debug] Final inkDistribution:', inkDistribution);
   
   // Calculate average cost
   const totalCost = entries.reduce((sum, e) => sum + (getCost(e.card) * e.count), 0);
@@ -5887,24 +6030,43 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
         {/* Cost Curve Chart */}
         <div className="bg-gray-800 rounded-lg p-4">
           <h3 className="text-lg font-semibold mb-4 text-center">Cost Curve</h3>
-          <div className="flex items-end justify-center gap-1 h-32">
-            {Array.from({ length: 11 }, (_, i) => {
-              const count = costCurve[i] || 0;
-              const maxCount = Math.max(...Object.values(costCurve));
-              const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
-              return (
-                <div key={i} className="flex flex-col items-center">
-                  <div 
-                    className="w-8 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-300 hover:from-blue-500 hover:to-blue-300"
-                    style={{ height: `${height}%` }}
-                    title={`Cost ${i === 10 ? '10+' : i}: ${count} cards`}
-                  />
-                  <div className="text-xs text-gray-400 mt-1">{i === 10 ? '10+' : i}</div>
-                  <div className="text-xs font-semibold text-blue-400">{count}</div>
-                </div>
-              );
-            })}
-          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart 
+              data={Array.from({ length: 11 }, (_, i) => ({
+                cost: i === 10 ? '10+' : String(i),
+                count: costCurve[i] || 0
+              }))}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="cost" 
+                stroke="#9CA3AF"
+                fontSize={12}
+              />
+              <YAxis 
+                stroke="#9CA3AF"
+                fontSize={12}
+                allowDecimals={false}
+              />
+              <Tooltip 
+                formatter={(value, name) => [value, 'Cards']}
+                labelFormatter={(label) => `Cost ${label}`}
+                contentStyle={{
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                  color: '#F9FAFB'
+                }}
+              />
+              <Bar 
+                dataKey="count" 
+                fill="#3B82F6"
+                radius={[4, 4, 0, 0]}
+                className="hover:fill-blue-400 transition-colors"
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
         
         {/* Type Distribution Pie Chart */}
@@ -5937,28 +6099,75 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           {/* Ink Color Distribution */}
           <div className="bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
-            <div className="space-y-2">
-              {Object.entries(inkDistribution).map(([ink, count]) => {
-                const percentage = ((count / totalCards) * 100).toFixed(1);
-                const colors = {
-                  'Amber': 'bg-amber-500',
-                  'Amethyst': 'bg-purple-500',
-                  'Emerald': 'bg-green-500',
-                  'Ruby': 'bg-red-500',
-                  'Sapphire': 'bg-blue-500',
-                  'Steel': 'bg-gray-500'
-                };
-                return (
-                  <div key={ink} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${colors[ink] || 'bg-gray-500'}`} />
-                      <span className="text-sm">{ink}</span>
-                    </div>
-                    <div className="text-sm font-semibold">{count} ({percentage}%)</div>
+
+            {Object.keys(inkDistribution).length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={Object.entries(inkDistribution).map(([ink, count]) => ({
+                      name: ink,
+                      value: count
+                    }))}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={80}
+                  >
+                    {Object.entries(inkDistribution).map(([ink, count], index) => {
+                      const colors = {
+                        'Amber': '#f59e0b',
+                        'Amethyst': '#8b5cf6',
+                        'Emerald': '#10b981',
+                        'Ruby': '#ef4444',
+                        'Sapphire': '#3b82f6',
+                        'Steel': '#6b7280',
+                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
+                      };
+                      return (
+                        <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
+                      );
+                    })}
+                  </Pie>
+                  <Tooltip formatter={(value, name) => [value, name]} />
+                  
+                  {/* Custom Legend with Percentages */}
+                  <div className="mt-3 flex justify-center gap-4">
+                    {Object.entries(inkDistribution).map(([ink, count], index) => {
+                      // Calculate percentage based on actual deck size, not inflated ink distribution
+                      const percentage = ((count / totalCards) * 100).toFixed(0);
+                      const colors = {
+                        'Amber': '#f59e0b',
+                        'Amethyst': '#8b5cf6',
+                        'Emerald': '#10b981',
+                        'Ruby': '#ef4444',
+                        'Sapphire': '#3b82f6',
+                        'Steel': '#6b7280',
+                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
+                      };
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: colors[ink] || '#6b7280' }}
+                          />
+                          <span className="text-sm text-gray-300">{ink}</span>
+                          <span className="text-sm font-semibold text-gray-100">{percentage}%</span>
+                          <span className="text-xs text-gray-400">({count})</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </PieChart>
+                
+
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center text-gray-400 py-8">
+                <p>No ink color data available</p>
+                <p className="text-sm mt-2">Debug: inkDistribution = {JSON.stringify(inkDistribution)}</p>
+                <p className="text-sm mt-2">Total cards: {totalCards}</p>
+                <p className="text-sm mt-2">Entries length: {entries?.length || 0}</p>
+              </div>
+            )}
           </div>
         </div>
         
