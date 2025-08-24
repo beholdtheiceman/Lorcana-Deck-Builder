@@ -4416,31 +4416,60 @@ function DeckStats({ deck }) {
 
   const costCurve = useMemo(() => {
     const map = new Map();
+    const costCards = {};
+    
     // Initialize all costs 0-10 with 0
     for (let i = 0; i <= 10; i++) {
       map.set(i, 0);
+      costCards[i] = [];
     }
-    // Add actual counts
+    
+    // Add actual counts and track cards
     for (const e of entries) {
       const cost = getCost(e.card);
       map.set(cost, (map.get(cost) || 0) + e.count);
+      
+      // Track which cards are at each cost
+      for (let i = 0; i < e.count; i++) {
+        costCards[cost].push(e.card.name);
+      }
     }
+    
     return Array.from(map.entries())
-      .map(([cost, count]) => ({ cost, count }));
+      .map(([cost, count]) => ({ 
+        cost, 
+        count,
+        cards: costCards[cost] || []
+      }));
   }, [entries]);
 
   const typeCounts = useMemo(() => {
     const counts = {};
+    const typeCards = {};
+    
     for (const e of entries) {
       const t = e.card.type || "Unknown";
       counts[t] = (counts[t] || 0) + e.count;
+      
+      // Track which cards are in each type
+      if (!typeCards[t]) typeCards[t] = [];
+      for (let i = 0; i < e.count; i++) {
+        typeCards[t].push(e.card.name);
+      }
     }
-    return Object.entries(counts).map(([type, count]) => ({ type, count }));
+    
+    return Object.entries(counts).map(([type, count]) => ({ 
+      type, 
+      count,
+      cards: typeCards[type] || []
+    }));
   }, [entries]);
 
   const inkableCounts = useMemo(() => {
     let inkable = 0;
     let uninkable = 0;
+    const inkableCards = [];
+    const uninkableCards = [];
     
     for (const e of entries) {
       // Use the same inkable detection logic as the main deck view, but prioritize inkwell field
@@ -4448,15 +4477,48 @@ function DeckStats({ deck }) {
       
       if (isInkable) {
         inkable += e.count;
+        for (let i = 0; i < e.count; i++) {
+          inkableCards.push(e.card.name);
+        }
       } else {
         uninkable += e.count;
+        for (let i = 0; i < e.count; i++) {
+          uninkableCards.push(e.card.name);
+        }
       }
     }
     
     return [
-      { category: 'Inkable', count: inkable },
-      { category: 'Uninkable', count: uninkable }
+      { category: 'Inkable', count: inkable, cards: inkableCards },
+      { category: 'Uninkable', count: uninkable, cards: uninkableCards }
     ];
+  }, [entries]);
+
+  // Enhanced ink analysis for competitive play
+  const inkAnalysis = useMemo(() => {
+    const inkCounts = {};
+    const inkCards = {};
+    
+    for (const e of entries) {
+      const inks = e.card.inks || e.card._raw?.inks || [];
+      if (Array.isArray(inks) && inks.length > 0) {
+        inks.forEach(ink => {
+          if (ink) {
+            inkCounts[ink] = (inkCounts[ink] || 0) + e.count;
+            if (!inkCards[ink]) inkCards[ink] = [];
+            for (let i = 0; i < e.count; i++) {
+              inkCards[ink].push(e.card.name);
+            }
+          }
+        });
+      }
+    }
+    
+    return Object.entries(inkCounts).map(([ink, count]) => ({
+      ink,
+      count,
+      cards: inkCards[ink] || []
+    }));
   }, [entries]);
 
 
@@ -4477,7 +4539,29 @@ function DeckStats({ deck }) {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="cost" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip 
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                        <p className="text-white font-semibold">Cost {label}: {data.count} cards</p>
+                        {data.cards && data.cards.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">Cards:</p>
+                            <div className="max-h-32 overflow-y-auto">
+                              {data.cards.map((card, index) => (
+                                <p key={index} className="text-gray-400 text-xs">{card}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
               <Bar dataKey="count" fill="#10b981" />
             </BarChart>
           </ResponsiveContainer>
@@ -4491,7 +4575,29 @@ function DeckStats({ deck }) {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="type" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip 
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                        <p className="text-white font-semibold">{label}: {data.count} cards</p>
+                        {data.cards && data.cards.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">Cards:</p>
+                            <div className="max-h-32 overflow-y-auto">
+                              {data.cards.map((card, index) => (
+                                <p key={index} className="text-gray-400 text-xs">{card}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
               <Bar dataKey="count" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>
@@ -4506,6 +4612,51 @@ function DeckStats({ deck }) {
           <div className="text-3xl font-bold text-red-400">
             {inkableCounts[1]?.count || 0} Uninkable
           </div>
+        </div>
+      </ChartCard>
+
+      <ChartCard title="Ink Distribution">
+        <div className="w-full h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={inkAnalysis}
+                dataKey="count"
+                nameKey="ink"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                label={({ ink, count }) => `${ink}: ${count}`}
+              >
+                {inkAnalysis.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={['#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#3b82f6', '#6b7280'][index % 6]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                        <p className="text-white font-semibold">{data.ink}: {data.count} cards</p>
+                        {data.cards && data.cards.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">Cards:</p>
+                            <div className="max-h-32 overflow-y-auto">
+                              {data.cards.map((card, index) => (
+                                <p key={index} className="text-gray-400 text-xs">{card}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
       </ChartCard>
     </div>
