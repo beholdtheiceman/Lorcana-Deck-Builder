@@ -1505,6 +1505,11 @@ function normalizeLorcast(c) {
   // Extract baseName and subname from the display name
   const { baseName, subname } = splitDisplayName(c.name);
   
+  // Debug: Log the extraction
+  if (subname) {
+    console.log(`[normalizeLorcast] Extracted subtitle for "${c.name}": baseName="${baseName}", subname="${subname}"`);
+  }
+  
   const result = {
     id: c.id || c.collector_number || c.name,
     name: c.name,
@@ -2815,19 +2820,35 @@ function matchCard(line, db) {
  */
 function findCardByName(userLine, cards) {
   const typed = String(userLine || "");
+  
+  console.log(`[findCardByName] Searching for: "${typed}"`);
+  console.log(`[findCardByName] Total cards available: ${cards.length}`);
+  console.log(`[findCardByName] Sample cards with baseName/subname:`, 
+    cards.slice(0, 5).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname }))
+  );
 
   // 1) exact full-name match (tolerant to dash styles & spacing)
   const exact = cards.find(c => canon(c.name) === canon(typed));
-  if (exact) return exact;
+  if (exact) {
+    console.log(`[findCardByName] Found exact match: "${exact.name}"`);
+    return exact;
+  }
 
   // 2) parse "Base - Subtitle" from user line and match using normalized fields
   const parts = typed.split(/\s*[-–—]\s*/);
   const baseTyped = (parts[0] || "").trim().toLowerCase();
   const subTyped  = (parts[1] || null)?.trim().toLowerCase() || null;
+  
+  console.log(`[findCardByName] Parsed user input: baseTyped="${baseTyped}", subTyped="${subTyped}"`);
 
   let candidates = cards.filter(
     c => (c.baseName || "").toLowerCase() === baseTyped
   );
+  
+  console.log(`[findCardByName] Found ${candidates.length} candidates with baseName="${baseTyped}"`);
+  if (candidates.length > 0) {
+    console.log(`[findCardByName] Sample candidates:`, candidates.slice(0, 3).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname })));
+  }
 
   if (subTyped) {
     const withSub = candidates.filter(
