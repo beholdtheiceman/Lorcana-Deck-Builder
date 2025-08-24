@@ -2427,6 +2427,40 @@ function parseTextImport(text) {
             console.error(`[parseTextImport] Error processing hyphenated format for ${cardName}:`, error);
             notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-error' });
           }
+        } else if (foundCard && foundCard.candidates) {
+          // Handle ambiguous cases by creating a placeholder with candidate info
+          console.log(`[parseTextImport] Ambiguous card found for ${cardName} - ${subtitle}, creating placeholder with ${foundCard.candidates.length} candidates`);
+          
+          const placeholderCard = {
+            name: `${cardName} - ${subtitle}`,
+            set: 'Multiple',
+            number: 'Multiple',
+            cost: 0,
+            inks: [],
+            type: "Unknown",
+            rarity: "Unknown",
+            text: `Multiple variants found: ${foundCard.candidates.map(c => `${c.name} (${c.setId} #${c.setNum})`).join(', ')}`,
+            classifications: [],
+            keywords: [],
+            image_url: null,
+            _raw: {},
+            _candidates: foundCard.candidates,
+            _needsResolution: true,
+            setCode: 'Multiple',
+            setName: 'Multiple Sets',
+            setNum: 'Multiple',
+            inkable: false,
+            lore: 0,
+            willpower: 0,
+            strength: 0,
+            franchise: "",
+            gamemode: "Lorcana"
+          };
+          
+          const key = deckKey(placeholderCard);
+          deck.entries[key] = { card: placeholderCard, count: countNum };
+          validCards++;
+          notFoundCards.push({ name: `${cardName} - ${subtitle}`, count: countNum, reason: 'ambiguous-needs-resolution' });
         } else {
           console.log(`[parseTextImport] No card found for hyphenated format: ${cardName} - ${subtitle}`);
           notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-not-found' });
@@ -2606,6 +2640,23 @@ function parseTextImport(text) {
       
       // Use getCardImageUrl to get the best possible URL
       const rawUrl = getCardImageUrl(card);
+      
+      // DEBUG: Log the exact value and type
+      console.log(`[parseTextImport] Prefetch rawUrl details:`, {
+        rawUrl,
+        type: typeof rawUrl,
+        isString: typeof rawUrl === 'string',
+        isObject: typeof rawUrl === 'object',
+        length: rawUrl?.length,
+        keys: typeof rawUrl === 'object' ? Object.keys(rawUrl) : 'N/A'
+      });
+      
+      // GUARD: Ensure rawUrl is a string before calling proxyImageUrl
+      if (typeof rawUrl !== 'string') {
+        console.warn(`[parseTextImport] rawUrl is not a string, skipping proxy:`, rawUrl);
+        return asUrl(rawUrl);
+      }
+      
       console.log(`[parseTextImport] Prefetch call to proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
       const proxied = proxyImageUrl(rawUrl);
       return asUrl(proxied) ?? asUrl(rawUrl);
