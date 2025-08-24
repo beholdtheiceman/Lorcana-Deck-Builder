@@ -15,14 +15,20 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
 
   const fetchHubDecks = async () => {
     try {
+      console.log('🔍 HubDetailModal: Starting to fetch decks for hub:', hub.id);
       setLoading(true);
+      
       const response = await fetch(`/api/hubs/${hub.id}/decks`);
+      console.log('🔍 HubDetailModal: API response status:', response.status);
 
       if (!response.ok) {
         throw new Error('Failed to fetch hub decks');
       }
 
       const decks = await response.json();
+      console.log('🔍 HubDetailModal: Received decks:', decks);
+      console.log('🔍 HubDetailModal: First deck data:', decks[0]);
+      
       setHubDecks(decks);
     } catch (error) {
       console.error('Error fetching hub decks:', error);
