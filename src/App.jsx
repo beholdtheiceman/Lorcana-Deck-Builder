@@ -1,6 +1,5 @@
 // React & ecosystem -----------------------------------------------------------
 import React, {
-  useCallback,
   useEffect,
   useMemo,
   useReducer,
@@ -8134,7 +8133,7 @@ function useBatchImageLoader() {
   
   const { get, put, putFailed } = imageCacheContext;
   
-  const loadImagesInBatch = useCallback(async (cards, onProgress) => {
+  const loadImagesInBatch = async (cards, onProgress) => {
     // Intelligent loading with multiple strategies
     const CONCURRENCY = 10; // Reduced concurrency to avoid overwhelming
     const MAX_RETRIES = 2; // Allow retries for failed images
@@ -8234,7 +8233,7 @@ function useBatchImageLoader() {
     console.log(`[Batch Loader] Completed: ${loaded} loaded, ${failed} failed, ${localGenerated} local`);
     return { loaded, failed, localGenerated };
     
-  }, [get, put, putFailed]);
+  };
   
   return { loadImagesInBatch };
 }
