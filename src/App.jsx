@@ -5030,13 +5030,36 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   
   // Calculate ink color distribution
   const inkDistribution = {};
+  
+  // Debug: log the first card to see what properties it has
+  if (entries.length > 0) {
+    console.log('[Ink Distribution Debug] First card structure:', {
+      name: entries[0].card.name,
+      card: entries[0].card,
+      raw: entries[0].card._raw
+    });
+  }
+  
   entries.forEach(e => {
     const inks = getInks(e.card);
-    inks.forEach(ink => {
-      if (ink) {
-        inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+    console.log(`[Ink Distribution Debug] ${e.card.name}: getInks returned:`, inks);
+    
+    if (inks.length > 0) {
+      inks.forEach(ink => {
+        if (ink) {
+          inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+        }
+      });
+    } else {
+      // Fallback: if no ink colors found, try to determine from card properties
+      // This is a temporary solution for mono-color decks
+      if (e.card.inkable) {
+        // For now, assume mono-color decks are Amber (you can adjust this)
+        const fallbackInk = "Amber";
+        inkDistribution[fallbackInk] = (inkDistribution[fallbackInk] || 0) + e.count;
+        console.log(`[Ink Distribution Debug] Using fallback ink "${fallbackInk}" for ${e.card.name}`);
       }
-    });
+    }
   });
   
   // Calculate average cost
