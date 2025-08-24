@@ -4509,7 +4509,7 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
                  {/* Close Button - positioned over card top right */}
                  <button
                    onClick={onClose}
-                   className="absolute top-2 right-4 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
+                   className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
                  >
                    ×
                  </button>
