@@ -6141,35 +6141,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   </div>
                 </PieChart>
                 
-                {/* Dual-ink cards summary */}
-                {dualInkCards.length > 0 && (
-                  <div className="mt-4 p-4 bg-gray-700 rounded-lg border border-gray-600">
-                    <h4 className="text-sm font-medium mb-3 text-center text-gray-100">Dual-Ink Cards</h4>
-                    <div className="text-xs space-y-2">
-                      {dualInkCards.map((card, index) => (
-                        <div key={index} className="flex justify-between items-center p-2 bg-gray-800 rounded">
-                          <span className="text-gray-200 font-medium">{card.name}</span>
-                          <span className="text-blue-300 font-semibold">
-                            {card.inks.join(' + ')} ({card.count}x)
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-xs text-blue-200">
-                      <p className="text-center">
-                        <strong>Note:</strong> These cards now have their own "Dual-Ink" category 
-                        in the pie chart above, separate from individual ink colors.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Debug: Show dual-ink cards data */}
-                <div className="mt-4 p-3 bg-red-900/20 border border-red-700/30 rounded text-xs text-red-200">
-                  <p className="text-center font-bold">DEBUG: Dual-Ink Cards Data</p>
-                  <p>Total dual-ink cards: {dualInkCards.length}</p>
-                  <p>Dual-ink cards: {JSON.stringify(dualInkCards)}</p>
-                </div>
+
               </ResponsiveContainer>
             ) : (
               <div className="text-center text-gray-400 py-8">
@@ -6204,7 +6176,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             </div>
           </div>
           
-          <div>
+          <div className="bg-gray-800 rounded-lg p-4">
             <h4 className="font-semibold mb-2 text-center">Deck Composition</h4>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
