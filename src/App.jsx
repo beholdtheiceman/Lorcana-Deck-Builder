@@ -4551,7 +4551,29 @@ function DeckStats({ deck }) {
                 <XAxis dataKey="cost" />
                 <YAxis allowDecimals={false} />
                 <Bar dataKey="count" fill="#10b981" />
-                <Tooltip />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                          <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
+                          {data.cards && data.cards.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-gray-300 text-sm">Cards:</p>
+                              <div className="max-h-32 overflow-y-auto">
+                                {data.cards.map((card, index) => (
+                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
         </div>
@@ -4567,7 +4589,29 @@ function DeckStats({ deck }) {
                 <XAxis dataKey="type" />
                 <YAxis allowDecimals={false} />
                 <Bar dataKey="count" fill="#3b82f6" />
-                <Tooltip />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                          <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
+                          {data.cards && data.cards.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-gray-300 text-sm">Cards:</p>
+                              <div className="max-h-32 overflow-y-auto">
+                                {data.cards.map((card, index) => (
+                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
         </div>
