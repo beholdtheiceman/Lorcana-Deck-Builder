@@ -11,8 +11,6 @@ import React, {
   useContext,
 } from "react";
 
-{
-
 console.log('[React Import] React object:', React);
 console.log('[React Import] createContext function:', createContext);
 console.log('[React Import] useContext function:', useContext);
@@ -8256,5 +8254,6 @@ export default function App(props) {
       <AppInner {...props} />
     </ImageCacheProvider>
   );
+}
 }
 }
