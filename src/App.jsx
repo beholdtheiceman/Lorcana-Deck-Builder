@@ -8254,4 +8254,3 @@ const App = (props) => (
   </ImageCacheProvider>
 );
 export default App;
-}
