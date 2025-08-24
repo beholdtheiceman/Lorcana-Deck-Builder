@@ -6030,24 +6030,43 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
         {/* Cost Curve Chart */}
         <div className="bg-gray-800 rounded-lg p-4">
           <h3 className="text-lg font-semibold mb-4 text-center">Cost Curve</h3>
-          <div className="flex items-end justify-center gap-1 h-32">
-            {Array.from({ length: 11 }, (_, i) => {
-              const count = costCurve[i] || 0;
-              const maxCount = Math.max(...Object.values(costCurve));
-              const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
-              return (
-                <div key={i} className="flex flex-col items-center">
-                  <div 
-                    className="w-8 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-300 hover:from-blue-500 hover:to-blue-300"
-                    style={{ height: `${height}%` }}
-                    title={`Cost ${i === 10 ? '10+' : i}: ${count} cards`}
-                  />
-                  <div className="text-xs text-gray-400 mt-1">{i === 10 ? '10+' : i}</div>
-                  <div className="text-xs font-semibold text-blue-400">{count}</div>
-                </div>
-              );
-            })}
-          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart 
+              data={Array.from({ length: 11 }, (_, i) => ({
+                cost: i === 10 ? '10+' : String(i),
+                count: costCurve[i] || 0
+              }))}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="cost" 
+                stroke="#9CA3AF"
+                fontSize={12}
+              />
+              <YAxis 
+                stroke="#9CA3AF"
+                fontSize={12}
+                allowDecimals={false}
+              />
+              <Tooltip 
+                formatter={(value, name) => [value, 'Cards']}
+                labelFormatter={(label) => `Cost ${label}`}
+                contentStyle={{
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                  color: '#F9FAFB'
+                }}
+              />
+              <Bar 
+                dataKey="count" 
+                fill="#3B82F6"
+                radius={[4, 4, 0, 0]}
+                className="hover:fill-blue-400 transition-colors"
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
         
         {/* Type Distribution Pie Chart */}
