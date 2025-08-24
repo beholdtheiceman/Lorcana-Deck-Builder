@@ -116,8 +116,17 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
                           by {deck.user.email}
                         </p>
                         <p className="text-gray-500 text-xs mt-2">
-                          {deck.cards?.length || 0} cards
+                          {deck.cardCount || 0} cards
                         </p>
+                        {deck.sampleCards && deck.sampleCards.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {deck.sampleCards.map((card, index) => (
+                              <div key={index} className="text-xs text-gray-400">
+                                {card.cost} {card.ink} • {card.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -52,7 +52,25 @@ export default async function handler(req, res) {
         orderBy: { updatedAt: 'desc' }
       });
 
-      return res.status(200).json(decks);
+      // Process decks to include card count and basic card info
+      const processedDecks = decks.map(deck => {
+        const deckData = deck.data || {};
+        const cards = deckData.cards || [];
+        
+        return {
+          ...deck,
+          cards: cards,
+          cardCount: cards.length,
+          // Add some basic card info for display
+          sampleCards: cards.slice(0, 3).map(card => ({
+            name: card.name || 'Unknown Card',
+            ink: card.ink || 'Unknown',
+            cost: card.cost || 0
+          }))
+        };
+      });
+
+      return res.status(200).json(processedDecks);
     } catch (error) {
       console.error('Error fetching hub decks:', error);
       return res.status(500).json({ error: 'Internal server error' });
