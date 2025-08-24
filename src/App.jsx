@@ -4474,7 +4474,7 @@ function Modal({ open, onClose, title, children, footer, size = "md" }) {
             Close
           </button>
         </div>
-        <div className="p-4 overflow-y-auto max-h-[calc(95vh-120px)]">{children}</div>
+        <div className="p-4 overflow-y-auto overflow-x-hidden max-h-[calc(95vh-120px)]">{children}</div>
         {footer && <div className="px-4 py-3 border-t border-gray-800">{footer}</div>}
       </div>
     </div>
@@ -4488,10 +4488,11 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   if (!open || !card) return null;
   
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`${card.name} • ${card.set} #${card.number}`}
+          <Modal
+        open={open}
+        onClose={onClose}
+        title={`${card.name} • ${card.setName || card.set}`}
+        size="lg"
       footer={
         <div className="flex items-center justify-end gap-2">
           <button
@@ -4503,11 +4504,11 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         </div>
       }
     >
-      <div className="flex justify-center">
+      <div className="flex justify-center w-full">
         <img 
           src={imgSrc} 
           alt={card.name} 
-          className="max-w-full max-h-[70vh] object-contain rounded-xl border border-gray-800" 
+          className="w-auto h-auto max-w-full max-h-[70vh] object-contain rounded-xl border border-gray-800" 
         />
       </div>
     </Modal>
