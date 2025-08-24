@@ -2339,7 +2339,10 @@ function parseTextImport(text) {
     throw new Error('Invalid text input');
   }
   
-  const lines = text.split('\r?\n').map(line => line.trim()).filter(line => line);
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line);
+  console.log(`[parseTextImport] Split ${lines.length} lines from input`);
+  console.log(`[parseTextImport] First few lines:`, lines.slice(0, 3));
+  
   if (lines.length === 0) {
     throw new Error('No valid lines found in text input');
   }
@@ -2351,12 +2354,12 @@ function parseTextImport(text) {
   let foundCards = [];
   let notFoundCards = [];
   
-  // Looser line format that handles:
+  // Simple, permissive line format that handles:
   // "4 Name - Subtitle (TFC #123)"
   // "4 Name (1 #123)" 
   // "4 Name - Subtitle"
   // "4 Name"
-  const LINE_RE = /^\s*(\d+)\s+(.+?)(?:\s*[-–—]\s*(.+?))?(?:\s*\(\s*([A-Za-z0-9]+)\s*(?:#\s*([A-Za-z0-9]+))?\s*\))?\s*$/;
+  const LINE_RE = /^(\d+)\s+(.+?)(?:\s*[-–—]\s*(.+?))?(?:\s*\(([^)]+)\))?$/;
   
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
