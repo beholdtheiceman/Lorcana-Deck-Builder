@@ -397,8 +397,8 @@ function roleForCard(c) {
     return "Questers";
   }
   
-  console.log('[Role Debug]', c.name, '→ Tech / Utility (default):', debug);
-  return "Tech / Utility";
+  console.log('[Role Debug]', c.name, '→ Utility / Support (default):', debug);
+  return "Utility / Support";
 }
 
 function detectSynergies(cards) {
@@ -6460,11 +6460,11 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               console.log('[Comp Dashboard] Role data:', counts);
               console.log('[Comp Dashboard] Role assignments:', roleAssignments);
               
-              // Special focus on Tech/Utility cards
-              if (roleAssignments['Tech / Utility']) {
-                console.log('[Comp Dashboard] Tech/Utility cards:', roleAssignments['Tech / Utility']);
-                console.log('[Comp Dashboard] Why these are Tech/Utility:');
-                roleAssignments['Tech / Utility'].forEach(cardName => {
+              // Special focus on Utility/Support cards
+              if (roleAssignments['Utility / Support']) {
+                console.log('[Comp Dashboard] Utility/Support cards:', roleAssignments['Utility / Support']);
+                console.log('[Comp Dashboard] Why these are Utility/Support:');
+                roleAssignments['Utility / Support'].forEach(cardName => {
                   const card = cards.find(c => c.name === cardName);
                   if (card) {
                     const cardText = (card.text || card.rulesText || card._raw?.text || card._raw?.rulesText || card._raw?.Body_Text || "").toString().toLowerCase();
