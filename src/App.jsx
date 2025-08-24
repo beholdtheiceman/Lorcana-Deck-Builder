@@ -1765,7 +1765,13 @@ function normalizeCard(raw) {
     imageUrl = raw.Image;
   }
   
-  const name = raw.name || raw.Name || raw.title || raw.Title || "Unknown Card";
+  const displayName = raw.name || raw.Name || raw.title || raw.Title || "Unknown Card";
+  
+  // Extract baseName and subname from display name (split on hyphen/en dash/em dash)
+  const parts = displayName.split(/\s*[-–—]\s*/);
+  const baseName = parts[0]?.trim() || displayName;
+  const subname = parts[1]?.trim() || null;
+  
   const setCode = raw.set?.code || raw.set || raw.set_code || raw.setCode || raw.setName || raw.Set_ID || "Unknown";
   const collectorNo = raw.collector_number || raw.number || raw.no || raw.Card_Num || 0;
   const cost = raw.cost ?? raw.ink_cost ?? raw.inkCost ?? raw.Cost ?? 0;
@@ -1774,11 +1780,13 @@ function normalizeCard(raw) {
   const rarity = raw.rarity || raw.rarityLabel || raw.Rarity || "Unknown";
   const text = raw.text || raw.rules_text || raw.abilityText || raw.rules || raw.abilities || raw.Body_Text || "";
   
-  const id = raw.id || raw._id || raw.Unique_ID || `${setCode}-${collectorNo}-${name}`;
+  const id = raw.id || raw._id || raw.Unique_ID || `${setCode}-${collectorNo}-${displayName}`;
   
   return {
     id,
-    name,
+    name: displayName,        // Keep exact from API
+    baseName,                 // <-- New: extracted base name
+    subname,                  // <-- New: extracted subtitle
     set: setCode,
     setName: raw.set?.name || raw.Set_Name || undefined,
     number: collectorNo,
@@ -2704,11 +2712,18 @@ function matchCard(line, db) {
     return { match: exact, needsConfirmation: false, reason: "exact-name" };
   }
   
-  // 2) Name - Subtitle pairing
+  // 2) Name - Subtitle pairing using new normalized fields
   const { base, sub } = splitTitle(raw);
   if (sub) {
     console.log(`[matchCard] Trying subtitle match: base="${base}", sub="${sub}"`);
+    
+    // Use the new normalized fields for more reliable matching
     const subtitleCandidates = db.filter(c => {
+      // First try the new normalized fields
+      if (c.baseName && c.subname) {
+        return clean(c.baseName) === clean(base) && clean(c.subname) === clean(sub);
+      }
+      // Fallback to parsing the name field (for legacy cards)
       const [cBase, cSub = ''] = clean(c.name).split(/\s-\s/);
       return cBase === clean(base) && cSub === clean(sub);
     });
@@ -2723,8 +2738,13 @@ function matchCard(line, db) {
     }
   }
   
-  // 3) Unique base-name fallback
+  // 3) Unique base-name fallback using new normalized fields
   const baseMatches = db.filter(c => {
+    // First try the new normalized fields
+    if (c.baseName) {
+      return clean(c.baseName) === clean(base);
+    }
+    // Fallback to parsing the name field (for legacy cards)
     const [cBase] = clean(c.name).split(/\s-\s/);
     return cBase === clean(base);
   });
