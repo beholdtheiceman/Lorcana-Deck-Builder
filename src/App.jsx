@@ -4549,32 +4549,36 @@ function DeckStats({ deck }) {
               <XAxis dataKey="cost" />
               <YAxis allowDecimals={false} />
               <Tooltip 
-                formatter={(value, name, props) => {
-                  console.log('[Tooltip Debug] Formatter called:', { value, name, props });
-                  const data = props.payload;
-                  console.log('[Tooltip Debug] Data from props:', data);
+                content={({ active, payload, label }) => {
+                  console.log('[Tooltip Debug] Content called:', { active, payload, label });
                   
-                  return [
-                    <div key="tooltip" className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                      <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
-                      {data.cards && data.cards.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-gray-300 text-sm">Cards:</p>
-                          <div className="max-h-32 overflow-y-auto">
-                            {data.cards.map((card, index) => (
-                              <p key={index} className="text-gray-400 text-xs">{card}</p>
-                            ))}
+                  if (active && payload && payload.length > 0) {
+                    const data = payload[0].payload;
+                    console.log('[Tooltip Debug] Data from payload:', data);
+                    
+                    return (
+                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                        <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
+                        {data.cards && data.cards.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">Cards:</p>
+                            <div className="max-h-32 overflow-y-auto">
+                              {data.cards.map((card, index) => (
+                                <p key={index} className="text-gray-400 text-xs">{card}</p>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {(!data.cards || data.cards.length === 0) && (
-                        <div className="mt-2">
-                          <p className="text-gray-300 text-sm">No card list available</p>
-                          <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
-                        </div>
-                      )}
-                    </div>
-                  ];
+                        )}
+                        {(!data.cards || data.cards.length === 0) && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">No card list available</p>
+                            <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
                 }}
                 cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
               />
@@ -4594,32 +4598,36 @@ function DeckStats({ deck }) {
               <XAxis dataKey="type" />
               <YAxis allowDecimals={false} />
               <Tooltip 
-                formatter={(value, name, props) => {
-                  console.log('[Tooltip Debug] Card Types formatter called:', { value, name, props });
-                  const data = props.payload;
-                  console.log('[Tooltip Debug] Card Types data from props:', data);
+                content={({ active, payload, label }) => {
+                  console.log('[Tooltip Debug] Card Types content called:', { active, payload, label });
                   
-                  return [
-                    <div key="tooltip" className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                      <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
-                      {data.cards && data.cards.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-gray-300 text-sm">Cards:</p>
-                          <div className="max-h-32 overflow-y-auto">
-                            {data.cards.map((card, index) => (
-                              <p key={index} className="text-gray-400 text-xs">{card}</p>
-                            ))}
+                  if (active && payload && payload.length > 0) {
+                    const data = payload[0].payload;
+                    console.log('[Tooltip Debug] Card Types data from payload:', data);
+                    
+                    return (
+                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                        <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
+                        {data.cards && data.cards.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">Cards:</p>
+                            <div className="max-h-32 overflow-y-auto">
+                              {data.cards.map((card, index) => (
+                                <p key={index} className="text-gray-400 text-xs">{card}</p>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {(!data.cards || data.cards.length === 0) && (
-                        <div className="mt-2">
-                          <p className="text-gray-300 text-sm">No card list available</p>
-                          <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
-                        </div>
-                      )}
-                    </div>
-                  ];
+                        )}
+                        {(!data.cards || data.cards.length === 0) && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">No card list available</p>
+                            <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
                 }}
                 cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
               />
