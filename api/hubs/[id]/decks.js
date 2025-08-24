@@ -77,11 +77,22 @@ export default async function handler(req, res) {
           // Try different possible card properties - the actual structure is deck.data.entries
           let cards = deckData.entries || deckData.Entries || deckData.cards || deckData.Cards || deckData.card || deckData.Card || [];
           
+          // If entries is an object, convert it to an array of cards
+          if (cards && typeof cards === 'object' && !Array.isArray(cards)) {
+            console.log('Entries is an object, converting to array...');
+            cards = Object.values(cards);
+            console.log('Converted entries to array, length:', cards.length);
+          }
+          
           // If still no cards, check if it's a string that needs parsing
           if (!cards.length && typeof deckData === 'string') {
             try {
               const parsed = JSON.parse(deckData);
               cards = parsed.entries || parsed.Entries || parsed.cards || parsed.Cards || parsed.card || parsed.Card || [];
+              // Handle case where parsed entries is also an object
+              if (cards && typeof cards === 'object' && !Array.isArray(cards)) {
+                cards = Object.values(cards);
+              }
               console.log('Parsed from string:', parsed);
             } catch (e) {
               console.log('Failed to parse deck data as JSON');
