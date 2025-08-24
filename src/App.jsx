@@ -5264,14 +5264,36 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
         }
         
-        // Draw count indicator
+        // Draw count indicator - Rounded bubble instead of square
         if (entry.count > 1) {
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(x + cardWidth - 25, y, 25, 25);
+          const bubbleSize = 24;
+          const bubbleX = x + cardWidth - bubbleSize - 4;
+          const bubbleY = y + 4;
+          const bubbleRadius = bubbleSize / 2;
+          
+          // Draw rounded rectangle (bubble) with fallback for older browsers
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            // Modern browsers support roundRect
+            ctx.roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, bubbleRadius);
+          } else {
+            // Fallback for older browsers - draw a circle
+            ctx.arc(bubbleX + bubbleRadius, bubbleY + bubbleRadius, bubbleRadius, 0, 2 * Math.PI);
+          }
+          ctx.fillStyle = '#10b981'; // emerald-600
+          ctx.fill();
+          
+          // Draw border
+          ctx.strokeStyle = '#047857'; // emerald-700
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Draw count text
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 16px Arial, sans-serif';
+          ctx.font = 'bold 14px Arial, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(entry.count.toString(), x + cardWidth - 12.5, y + 18);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(entry.count.toString(), bubbleX + bubbleRadius, bubbleY + bubbleRadius);
         }
         
         // Move to next position
