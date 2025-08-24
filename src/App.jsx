@@ -4542,6 +4542,7 @@ function DeckStats({ deck }) {
       <ChartCard title="Cost Curve">
         <div className="w-full h-56">
           {console.log('[Chart Debug] Cost curve data:', costCurve)}
+          {console.log('[Chart Debug] Cost curve data structure check:', costCurve.map(item => ({ cost: item.cost, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={costCurve}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -4577,6 +4578,7 @@ function DeckStats({ deck }) {
                   }
                   return null;
                 }}
+                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
               />
               <Bar dataKey="count" fill="#10b981" />
             </BarChart>
@@ -4587,6 +4589,7 @@ function DeckStats({ deck }) {
       <ChartCard title="Card Types">
         <div className="w-full h-56">
           {console.log('[Chart Debug] Type counts data:', typeCounts)}
+          {console.log('[Chart Debug] Type counts data structure check:', typeCounts.map(item => ({ type: item.type, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={typeCounts}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -4622,6 +4625,7 @@ function DeckStats({ deck }) {
                   }
                   return null;
                 }}
+                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
               />
               <Bar dataKey="count" fill="#3b82f6" />
             </BarChart>
