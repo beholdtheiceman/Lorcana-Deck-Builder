@@ -101,36 +101,46 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {hubDecks.map((deck) => (
-                      <div
-                        key={deck.id}
-                        onClick={() => onDeckClick(deck)}
-                        className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors border border-gray-700 hover:border-purple-500"
-                      >
-                        <div className="aspect-[3/4] bg-gray-700 rounded mb-3 flex items-center justify-center">
-                          <div className="text-gray-400 text-center">
-                            <div className="text-2xl mb-2">🎴</div>
-                            <div className="text-sm">{deck.title}</div>
+                    {hubDecks.map((deck) => {
+                      // Debug: Log the deck structure
+                      console.log('🔍 Deck being rendered:', deck);
+                      console.log('🔍 Deck sample cards:', deck.sampleCards);
+                      if (deck.sampleCards && deck.sampleCards.length > 0) {
+                        console.log('🔍 First sample card:', deck.sampleCards[0]);
+                        console.log('🔍 First sample card keys:', Object.keys(deck.sampleCards[0]));
+                      }
+                      
+                      return (
+                        <div
+                          key={deck.id}
+                          onClick={() => onDeckClick(deck)}
+                          className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors border border-gray-700 hover:border-purple-500"
+                        >
+                          <div className="aspect-[3/4] bg-gray-700 rounded mb-3 flex items-center justify-center">
+                            <div className="text-gray-400 text-center">
+                              <div className="text-2xl mb-2">🎴</div>
+                              <div className="text-sm">{deck.title}</div>
+                            </div>
                           </div>
+                          <h4 className="text-white font-semibold mb-1">{deck.title}</h4>
+                          <p className="text-gray-400 text-sm">
+                            by {deck.user.email}
+                          </p>
+                          <p className="text-gray-500 text-xs mt-2">
+                            {deck.cardCount || 0} cards
+                          </p>
+                          {deck.sampleCards && deck.sampleCards.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {deck.sampleCards.map((card, index) => (
+                                <div key={index} className="text-xs text-gray-400">
+                                  {card.cost} {card.ink} • {card.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <h4 className="text-white font-semibold mb-1">{deck.title}</h4>
-                        <p className="text-gray-400 text-sm">
-                          by {deck.user.email}
-                        </p>
-                        <p className="text-gray-500 text-xs mt-2">
-                          {deck.cardCount || 0} cards
-                        </p>
-                        {deck.sampleCards && deck.sampleCards.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {deck.sampleCards.map((card, index) => (
-                              <div key={index} className="text-xs text-gray-400">
-                                {card.cost} {card.ink} • {card.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
