@@ -4494,27 +4494,27 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="relative flex justify-center w-full">
-                         {/* Card Image */}
-                 <img 
-                   src={imgSrc} 
-                   alt={card.name} 
-                   className="w-auto h-auto max-w-[99.5%] max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
-                 />
-                 
-                 {/* Name Bubble - positioned above the card */}
-                 <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full border border-white/30 shadow-lg">
-                   <span className="text-sm font-medium whitespace-nowrap">{card.subname ? `${card.name} - ${card.subname}` : card.name}</span>
-                 </div>
-                 
-                 {/* Close Button - positioned over card top right */}
-                 <button
-                   onClick={onClose}
-                   className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
-                 >
-                   ×
-                 </button>
+        {/* Card Image Container - this will be the positioning context for the X button */}
+        <div className="relative">
+          <img 
+            src={imgSrc} 
+            alt={card.name} 
+            className="w-auto h-auto max-w-[99.5%] max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
+          />
+          
+          {/* Close Button - positioned relative to the card image */}
+          <button
+            onClick={onClose}
+            className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
+          >
+            ×
+          </button>
+        </div>
         
-
+        {/* Name Bubble - positioned above the card */}
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full border border-white/30 shadow-lg">
+          <span className="text-sm font-medium whitespace-nowrap">{card.subname ? `${card.name} - ${card.subname}` : card.name}</span>
+        </div>
         
         {/* +/- Buttons - centered over card bottom */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3">
