@@ -55,12 +55,31 @@ export default async function handler(req, res) {
       // Process decks to include card count and basic card info
       const processedDecks = decks.map(deck => {
         const deckData = deck.data || {};
-        const cards = deckData.cards || [];
         
-        // Debug logging
-        console.log('Deck:', deck.title, 'Data:', JSON.stringify(deckData, null, 2));
-        console.log('Cards array:', cards);
+        // Debug logging - check all possible card properties
+        console.log('=== DECK DEBUG ===');
+        console.log('Deck ID:', deck.id);
+        console.log('Deck Title:', deck.title);
+        console.log('Full deck data:', JSON.stringify(deck, null, 2));
+        console.log('Deck.data:', JSON.stringify(deckData, null, 2));
+        
+        // Try different possible card properties
+        let cards = deckData.cards || deckData.Cards || deckData.card || deckData.Card || [];
+        
+        // If still no cards, check if it's a string that needs parsing
+        if (!cards.length && typeof deckData === 'string') {
+          try {
+            const parsed = JSON.parse(deckData);
+            cards = parsed.cards || parsed.Cards || parsed.card || parsed.Card || [];
+            console.log('Parsed from string:', parsed);
+          } catch (e) {
+            console.log('Failed to parse deck data as JSON');
+          }
+        }
+        
+        console.log('Final cards array:', cards);
         console.log('Card count:', cards.length);
+        console.log('==================');
         
         return {
           ...deck,
@@ -68,9 +87,9 @@ export default async function handler(req, res) {
           cardCount: cards.length,
           // Add some basic card info for display
           sampleCards: cards.slice(0, 3).map(card => ({
-            name: card.name || 'Unknown Card',
-            ink: card.ink || 'Unknown',
-            cost: card.cost || 0
+            name: card.name || card.Name || 'Unknown Card',
+            ink: card.ink || card.Ink || 'Unknown',
+            cost: card.cost || card.Cost || 0
           }))
         };
       });
