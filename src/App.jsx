@@ -2414,25 +2414,29 @@ function parseTextImport(text) {
       // Card found successfully
       const key = deckKey(foundCard);
       
-      try {
-        const transformedCard = toAppCard(foundCard);
-        const rawUrl = getCardImageUrl(transformedCard);
-        const proxied = lorcanaImageProxyUrl(rawUrl);
-        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
-        
-        if (image_url && typeof image_url !== 'string') {
-          image_url = null;
-        }
-        
-        deck.entries[key] = { 
-          card: {
-            ...transformedCard,
-            image_url,
-            _generatedImageUrl: rawUrl,
-            _proxiedImageUrl: proxied
-          }, 
-          count: countNum 
-        };
+              try {
+          const transformedCard = toAppCard(foundCard);
+          const rawUrl = getCardImageUrl(transformedCard);
+          const proxied = lorcanaImageProxyUrl(rawUrl);
+          let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+          
+          if (image_url && typeof image_url !== 'string') {
+            image_url = null;
+          }
+          
+          // Ensure inkable field is properly preserved from the original card data
+          const inkable = foundCard.inkable ?? foundCard._raw?.inkable ?? foundCard._raw?.can_be_ink ?? foundCard._raw?.Inkable ?? foundCard._raw?.inkwell ?? false;
+          
+          deck.entries[key] = { 
+            card: {
+              ...transformedCard,
+              inkable: Boolean(inkable), // Override with the correct inkable value
+              image_url,
+              _generatedImageUrl: rawUrl,
+              _proxiedImageUrl: proxied
+            }, 
+            count: countNum 
+          };
         
         validCards++;
         foundCards.push({ name: foundCard.name, found: foundCard.name, count: countNum });
@@ -2457,26 +2461,30 @@ function parseTextImport(text) {
       const bestMatch = foundCard.candidates[0];
       const key = deckKey(bestMatch);
       
-      try {
-        const transformedCard = toAppCard(bestMatch);
-        const rawUrl = getCardImageUrl(transformedCard);
-        const proxied = lorcanaImageProxyUrl(rawUrl);
-        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
-        
-        if (image_url && typeof image_url !== 'string') {
-          image_url = null;
-        }
-        
-        deck.entries[key] = { 
-          card: {
-            ...transformedCard,
-            image_url,
-            _generatedImageUrl: rawUrl,
-            _proxiedImageUrl: proxied,
-            _resolvedFromAmbiguous: true
-          }, 
-          count: countNum 
-        };
+              try {
+          const transformedCard = toAppCard(bestMatch);
+          const rawUrl = getCardImageUrl(transformedCard);
+          const proxied = lorcanaImageProxyUrl(rawUrl);
+          let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+          
+          if (image_url && typeof image_url !== 'string') {
+            image_url = null;
+          }
+          
+          // Ensure inkable field is properly preserved from the original card data
+          const inkable = bestMatch.inkable ?? bestMatch._raw?.inkable ?? bestMatch._raw?.can_be_ink ?? bestMatch._raw?.Inkable ?? bestMatch._raw?.inkwell ?? false;
+          
+          deck.entries[key] = { 
+            card: {
+              ...transformedCard,
+              inkable: Boolean(inkable), // Override with the correct inkable value
+              image_url,
+              _generatedImageUrl: rawUrl,
+              _proxiedImageUrl: proxied,
+              _resolvedFromAmbiguous: true
+            }, 
+            count: countNum 
+          };
         
         validCards++;
         foundCards.push({ name: bestMatch.name, found: bestMatch.name, count: countNum, reason: 'resolved-from-ambiguous' });
@@ -4341,12 +4349,8 @@ function DeckStats({ deck }) {
     let uninkable = 0;
     
     for (const e of entries) {
-      // Better inkable detection
-      const isInkable = e.card.text?.toLowerCase().includes('inkable') || 
-                       e.card.type?.toLowerCase() === 'character' ||
-                       e.card.type?.toLowerCase() === 'action' ||
-                       e.card.type?.toLowerCase() === 'item' ||
-                       e.card.type?.toLowerCase() === 'location';
+      // Use the same inkable detection logic as the main deck view
+      const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell;
       
       if (isInkable) {
         inkable += e.count;
