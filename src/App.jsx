@@ -341,8 +341,8 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 // --- Role & text helpers ---
 const rx = (p) => new RegExp(p, "i");
-const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage)");
-const RX_SEARCH = rx("(search your deck|look at the top|reveal .* from your deck)");
+const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage|gain.*card|add.*to.*hand|put.*into.*hand)");
+const RX_SEARCH = rx("(search|look at|reveal|scry|find|choose|select|put.*on top|put.*on bottom|shuffle|arrange)");
 const RX_REMOVAL = rx("(banish|deal \\d+ damage|return .* to (their|its) hand|exert target)");
 const RX_RAMP = rx("(reduce(s)? cost|play .* for free|inkwell|gain ink)");
 const RX_SONG = rx("\\bSong\\b|Action\\s*[-—]\\s*Song");
@@ -354,13 +354,51 @@ const textOf = c => (c?.text || c?.rulesText || c?.Body_Text || "").toString();
 function roleForCard(c) {
   const t = textOf(c);
   const type = (c?.type || "").toLowerCase();
+  const lore = Number(c?.lore || c?._raw?.Lore || c?._raw?.lore || c?._raw?.loreValue || 0);
+  const cost = Number(c?.cost || 0);
 
-  if (RX_REMOVAL.test(t) || type === "action") return "Interaction";
-  if (RX_DRAW.test(t) || RX_SEARCH.test(t)) return "Draw / Dig";
-  if (RX_RAMP.test(t) || RX_SONG.test(t)) return "Ramp / Cost";
-  if ((c?.lore ?? 0) >= 2 && (c?.cost ?? 0) >= 6 || RX_FINISH.test(t)) return "Finisher";
-  if ((c?.lore ?? 0) >= 1 && type.includes("character")) return "Questers";
-  return "Tech / Utility";
+  // Debug role assignment
+  const debug = {
+    name: c.name,
+    type: type,
+    lore: lore,
+    cost: cost,
+    text: t.substring(0, 100) + '...',
+    tests: {
+      removal: RX_REMOVAL.test(t),
+      isAction: type === "action",
+      draw: RX_DRAW.test(t),
+      search: RX_SEARCH.test(t),
+      ramp: RX_RAMP.test(t),
+      song: RX_SONG.test(t),
+      finisher: (lore >= 2 && cost >= 6) || RX_FINISH.test(t),
+      quester: lore >= 1 && type.includes("character")
+    }
+  };
+
+  if (RX_REMOVAL.test(t) || type === "action") {
+    console.log('[Role Debug]', c.name, '→ Interaction:', debug);
+    return "Interaction";
+  }
+  if (RX_DRAW.test(t) || RX_SEARCH.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Draw / Dig:', debug);
+    return "Draw / Dig";
+  }
+  if (RX_RAMP.test(t) || RX_SONG.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Ramp / Cost:', debug);
+    return "Ramp / Cost";
+  }
+  if ((lore >= 2 && cost >= 6) || RX_FINISH.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Finisher:', debug);
+    return "Finisher";
+  }
+  if (lore >= 1 && type.includes("character")) {
+    console.log('[Role Debug]', c.name, '→ Questers:', debug);
+    return "Questers";
+  }
+  
+  console.log('[Role Debug]', c.name, '→ Utility / Support (default):', debug);
+  return "Utility / Support";
 }
 
 function detectSynergies(cards) {
@@ -4378,31 +4416,67 @@ function DeckStats({ deck }) {
 
   const costCurve = useMemo(() => {
     const map = new Map();
+    const costCards = {};
+    
     // Initialize all costs 0-10 with 0
     for (let i = 0; i <= 10; i++) {
       map.set(i, 0);
+      costCards[i] = [];
     }
-    // Add actual counts
+    
+    // Add actual counts and track cards
     for (const e of entries) {
       const cost = getCost(e.card);
       map.set(cost, (map.get(cost) || 0) + e.count);
+      
+      // Track which cards are at each cost
+      for (let i = 0; i < e.count; i++) {
+        costCards[cost].push(e.card.name);
+      }
     }
-    return Array.from(map.entries())
-      .map(([cost, count]) => ({ cost, count }));
+    
+    const result = Array.from(map.entries())
+      .filter(([cost, count]) => count > 0) // Only include costs with cards
+      .map(([cost, count]) => ({ 
+        cost, 
+        count,
+        cards: costCards[cost] || []
+      }));
+    
+    console.log('[Cost Curve Debug] Final result:', result);
+    return result;
   }, [entries]);
 
   const typeCounts = useMemo(() => {
     const counts = {};
+    const typeCards = {};
+    
     for (const e of entries) {
       const t = e.card.type || "Unknown";
       counts[t] = (counts[t] || 0) + e.count;
+      
+      // Track which cards are in each type
+      if (!typeCards[t]) typeCards[t] = [];
+      for (let i = 0; i < e.count; i++) {
+        typeCards[t].push(e.card.name);
+      }
     }
-    return Object.entries(counts).map(([type, count]) => ({ type, count }));
+    
+    const result = Object.entries(counts).map(([type, count]) => ({ 
+      type, 
+      count,
+      cards: typeCards[type] || []
+    }));
+    
+    console.log('[Type Counts Debug] Final result:', result);
+    return result;
   }, [entries]);
 
   const inkableCounts = useMemo(() => {
     let inkable = 0;
     let uninkable = 0;
+    const inkableCards = [];
+    const uninkableCards = [];
     
     for (const e of entries) {
       // Use the same inkable detection logic as the main deck view, but prioritize inkwell field
@@ -4410,75 +4484,49 @@ function DeckStats({ deck }) {
       
       if (isInkable) {
         inkable += e.count;
+        for (let i = 0; i < e.count; i++) {
+          inkableCards.push(e.card.name);
+        }
       } else {
         uninkable += e.count;
+        for (let i = 0; i < e.count; i++) {
+          uninkableCards.push(e.card.name);
+        }
       }
     }
     
     return [
-      { category: 'Inkable', count: inkable },
-      { category: 'Uninkable', count: uninkable }
+      { category: 'Inkable', count: inkable, cards: inkableCards },
+      { category: 'Uninkable', count: uninkable, cards: uninkableCards }
     ];
   }, [entries]);
 
-  // --- Comp Dashboard Memoized Datasets ---
-  const cards = useMemo(() => 
-    Object.values(deck?.entries || {})
-      .filter(e => e.count > 0)
-      .flatMap(e => Array(e.count).fill(e.card))
-  , [deck]);
-
-  // --- Curve (stacked inkable/uninkable) ---
-  const curveData = useMemo(() => {
-    const buckets = {};
-    cards.forEach(c => {
-      const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
-      const key = cost >= 7 ? "7+" : String(cost);
-      if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
-      (c.inkable ? buckets[key].inkable++ : buckets[key].uninkable++);
-    });
-    const order = ["0","1","2","3","4","5","6","7+"];
-    return order.filter(k => buckets[k]).map(k => buckets[k]);
-  }, [cards]);
-
-  // --- Ink pie ---
-  const inkPieData = useMemo(() => {
-    const counts = new Map();
-    cards.forEach(c => (Array.isArray(c.inks)?c.inks:[c.inks].filter(Boolean))
-      .forEach(i => counts.set(i, (counts.get(i)||0)+1)));
-    return [...counts.entries()].map(([name, value]) => ({ name, value }));
-  }, [cards]);
-
-  // --- Draw / consistency ---
-  const drawConsistency = useMemo(() => {
-    let drawCount=0, searchCount=0, rawDrawPieces=0;
-    cards.forEach(c => {
-      const t = textOf(c);
-      if (RX_DRAW.test(t)) { drawCount++; rawDrawPieces++; }
-      if (RX_SEARCH.test(t)) { searchCount++; rawDrawPieces++; }
-    });
-    const density = (rawDrawPieces / Math.max(cards.length,1))*100;
-    return { drawCount, searchCount, density: Number(density.toFixed(1)) };
-  }, [cards]);
-
-  // --- Average lore per card ---
-  const avgLorePerCard = useMemo(() => {
-    const totalLore = cards.reduce((a,c)=>a + Number(c.lore||0), 0);
-    return Number((totalLore / Math.max(cards.length,1)).toFixed(2));
-  }, [cards]);
-
-  // --- Roles breakdown ---
-  const roleData = useMemo(() => {
-    const counts = {};
-    cards.forEach(c => {
-      const r = roleForCard(c);
-      counts[r] = (counts[r]||0)+1;
-    });
-    return Object.entries(counts).map(([role,value])=>({role, value}));
-  }, [cards]);
-
-  // --- Synergies list ---
-  const synergies = useMemo(() => detectSynergies(cards), [cards]);
+  // Enhanced ink analysis for competitive play
+  const inkAnalysis = useMemo(() => {
+    const inkCounts = {};
+    const inkCards = {};
+    
+    for (const e of entries) {
+      const inks = e.card.inks || e.card._raw?.inks || [];
+      if (Array.isArray(inks) && inks.length > 0) {
+        inks.forEach(ink => {
+          if (ink) {
+            inkCounts[ink] = (inkCounts[ink] || 0) + e.count;
+            if (!inkCards[ink]) inkCards[ink] = [];
+            for (let i = 0; i < e.count; i++) {
+              inkCards[ink].push(e.card.name);
+            }
+          }
+        });
+      }
+    }
+    
+    return Object.entries(inkCounts).map(([ink, count]) => ({
+      ink,
+      count,
+      cards: inkCards[ink] || []
+    }));
+  }, [entries]);
 
   const total = entries.reduce((a, b) => a + b.count, 0);
   const avgCost = average(entries, (e) => getCost(e.card)).toFixed(2);
@@ -4491,33 +4539,87 @@ function DeckStats({ deck }) {
 
       <ChartCard title="Cost Curve">
         <div className="w-full h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={costCurve}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="cost" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#10b981" />
-            </BarChart>
-          </ResponsiveContainer>
+                      {console.log('[Chart Debug] Cost curve data:', costCurve)}
+            {console.log('[Chart Debug] Cost curve data structure check:', costCurve.map(item => ({ cost: item.cost, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
+            {console.log('[Chart Debug] Cost curve first item:', costCurve[0])}
+            {console.log('[Chart Debug] Cost curve first item cards:', costCurve[0]?.cards)}
+                      <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={costCurve}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="cost" />
+                <YAxis allowDecimals={false} />
+                <Bar dataKey="count" fill="#10b981" />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    console.log('[Tooltip Debug] Cost Curve Tooltip called:', { active, payload, label });
+                    if (active && payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      console.log('[Tooltip Debug] Cost Curve data:', data);
+                      return (
+                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                          <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
+                          {data.cards && data.cards.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-gray-300 text-sm">Cards:</p>
+                              <div className="max-h-32 overflow-y-auto">
+                                {data.cards.map((card, index) => (
+                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
         </div>
       </ChartCard>
 
       <ChartCard title="Card Types">
         <div className="w-full h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={typeCounts}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="type" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
+          {console.log('[Chart Debug] Type counts data:', typeCounts)}
+          {console.log('[Chart Debug] Type counts data structure check:', typeCounts.map(item => ({ type: item.type, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
+                      <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={typeCounts}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="type" />
+                <YAxis allowDecimals={false} />
+                <Bar dataKey="count" fill="#3b82f6" />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    console.log('[Tooltip Debug] Card Types Tooltip called:', { active, payload, label });
+                    if (active && payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      console.log('[Tooltip Debug] Card Types data:', data);
+                      return (
+                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                          <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
+                          {data.cards && data.cards.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-gray-300 text-sm">Cards:</p>
+                              <div className="max-h-32 overflow-y-auto">
+                                {data.cards.map((card, index) => (
+                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
         </div>
       </ChartCard>
 
-      <ChartCard title="Inkable vs Uninkable">
+            <ChartCard title="Inkable vs Uninkable">
         <div className="flex flex-col items-center justify-center h-56">
           <div className="text-3xl font-bold text-emerald-400 mb-2">
             {inkableCounts[0]?.count || 0} Inkable
@@ -4527,99 +4629,6 @@ function DeckStats({ deck }) {
           </div>
         </div>
       </ChartCard>
-
-      {/* Comp Dashboard */}
-      <div className="border-t border-gray-800 pt-4 mt-4">
-        <h3 className="text-lg font-semibold mb-4 text-emerald-400">Competitive Analysis</h3>
-        
-        {/* Curve & Cost */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Curve (Inkable vs Uninkable)</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={curveData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="cost" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="inkable" stackId="a" fill="#10b981" />
-              <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Ink Colors */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Ink Colors</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={inkPieData} dataKey="value" nameKey="name" outerRadius={80} label />
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Draw / Consistency */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Consistency</h3>
-          <ul className="space-y-1 text-sm">
-            <li><strong>Draw pieces:</strong> {drawConsistency.drawCount}</li>
-            <li><strong>Search/Dig pieces:</strong> {drawConsistency.searchCount}</li>
-            <li><strong>Card advantage density:</strong> {drawConsistency.density}% of deck</li>
-          </ul>
-          <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
-        </div>
-
-        {/* Lore potential */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Lore Efficiency</h3>
-          <div><strong>Avg Lore / Card:</strong> {avgLorePerCard}</div>
-        </div>
-
-        {/* Roles & Synergies */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Roles</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={roleData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="role" interval={0} angle={-10} textAnchor="end" height={60}/>
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#8b5cf6" />
-            </BarChart>
-          </ResponsiveContainer>
-
-          {synergies.length > 0 ? (
-            <div className="mt-3">
-              <h4 className="font-medium mb-1 text-sm">Detected Synergies</h4>
-              <ul className="list-disc ml-5 text-sm">{synergies.map(s=> <li key={s}>{s}</li>)}</ul>
-            </div>
-          ) : <p className="text-sm text-gray-400 mt-3">No obvious synergies detected.</p>}
-        </div>
-
-        {/* Meta Tools (stub) */}
-        <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Meta Tools</h3>
-          <p className="text-sm text-gray-300 mb-2">
-            Tag your deck against common archetypes and add matchup notes. (Hook this to your DB / PlayHub scrape later.)
-          </p>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs uppercase text-gray-400">Archetype tags</label>
-              <input className="w-full bg-gray-800 rounded px-2 py-1 text-sm" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase text-gray-400">Tech slots (notes)</label>
-              <input className="w-full bg-gray-800 rounded px-2 py-1 text-sm" placeholder="e.g., +2 Banish; +1 Evasive hate" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <label className="block text-xs uppercase text-gray-400">Matchup notes</label>
-            <textarea rows={3} className="w-full bg-gray-800 rounded px-2 py-1 text-sm" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -6403,6 +6412,316 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Comp Dashboard - Competitive Analysis */}
+        <div className="bg-gray-800 rounded-lg p-6">
+          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">Competitive Analysis</h3>
+          
+          {/* Comp Dashboard Data Calculations */}
+          {(() => {
+            // Debug: Log deck structure
+            console.log('[Comp Dashboard] Deck object:', deck);
+            console.log('[Comp Dashboard] Deck entries:', deck?.entries);
+            console.log('[Comp Dashboard] Deck entries keys:', Object.keys(deck?.entries || {}));
+            
+            // Create cards array from deck entries
+            const cards = Object.values(deck?.entries || {})
+              .filter(e => e.count > 0)
+              .flatMap(e => Array(e.count).fill(e.card));
+
+            console.log('[Comp Dashboard] Cards array created:', cards.length, 'cards');
+            console.log('[Comp Dashboard] Sample card:', cards[0]);
+            console.log('[Comp Dashboard] Sample card properties:', cards[0] ? Object.keys(cards[0]) : 'No cards');
+            if (cards[0]) {
+              console.log('[Comp Dashboard] Sample card text fields:', {
+                text: cards[0].text,
+                rulesText: cards[0].rulesText,
+                _raw: cards[0]._raw,
+                lore: cards[0].lore,
+                cost: cards[0].cost
+              });
+              console.log('[Comp Dashboard] Sample card full structure:', cards[0]);
+              
+              // Check for any fields that might contain lore values
+              const allCardFields = Object.keys(cards[0]);
+              const loreRelatedFields = allCardFields.filter(field => 
+                field.toLowerCase().includes('lore') || 
+                field.toLowerCase().includes('quest') ||
+                field.toLowerCase().includes('win')
+              );
+              console.log('[Comp Dashboard] Lore-related fields found:', loreRelatedFields);
+              
+              // Check raw fields too
+              if (cards[0]._raw) {
+                const allRawFields = Object.keys(cards[0]._raw);
+                const rawLoreRelatedFields = allRawFields.filter(field => 
+                  field.toLowerCase().includes('lore') || 
+                  field.toLowerCase().includes('quest') ||
+                  field.toLowerCase().includes('win')
+                );
+                console.log('[Comp Dashboard] Raw lore-related fields found:', rawLoreRelatedFields);
+              }
+            }
+
+            // --- Curve (stacked inkable/uninkable) ---
+            const curveData = (() => {
+              const buckets = {};
+              cards.forEach(c => {
+                const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
+                const key = cost >= 7 ? "7+" : String(cost);
+                if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
+                // Check inkable status using the same logic as elsewhere in the component
+                const isInkable = Boolean(c.inkable ?? c._raw?.inkwell ?? c._raw?.inkable ?? c._raw?.can_be_ink ?? c._raw?.Inkable ?? false);
+                if (isInkable) {
+                  buckets[key].inkable++;
+                } else {
+                  buckets[key].uninkable++;
+                }
+              });
+              const order = ["0","1","2","3","4","5","6","7+"];
+              return order.filter(k => buckets[k]).map(k => buckets[k]);
+            })();
+
+            // --- Ink pie ---
+            const inkPieData = (() => {
+              const counts = new Map();
+              cards.forEach(c => {
+                // Use the same ink detection logic as elsewhere
+                const inks = c.inks || c._raw?.inks || [];
+                if (Array.isArray(inks)) {
+                  inks.forEach(i => {
+                    if (i) counts.set(i, (counts.get(i)||0)+1);
+                  });
+                }
+              });
+              return [...counts.entries()].map(([name, value]) => ({ name, value }));
+            })();
+
+            // --- Draw / consistency ---
+            const drawConsistency = (() => {
+              let drawCount=0, searchCount=0, rawDrawPieces=0;
+              const detectedCards = { draw: [], search: [] };
+              
+              cards.forEach(c => {
+                // Get card text from various possible fields
+                const cardText = (c.text || c.rulesText || c._raw?.text || c._raw?.rulesText || c._raw?.Body_Text || "").toString().toLowerCase();
+                console.log('[Comp Dashboard] Card text for', c.name, ':', cardText);
+                
+                if (RX_DRAW.test(cardText)) { 
+                  drawCount++; 
+                  rawDrawPieces++; 
+                  detectedCards.draw.push(c.name);
+                  console.log('[Comp Dashboard] Draw card detected:', c.name);
+                }
+                if (RX_SEARCH.test(cardText)) { 
+                  searchCount++; 
+                  rawDrawPieces++; 
+                  detectedCards.search.push(c.name);
+                  console.log('[Comp Dashboard] Search card detected:', c.name);
+                }
+              });
+              
+              const density = (rawDrawPieces / Math.max(cards.length,1))*100;
+              console.log('[Comp Dashboard] Draw consistency:', { 
+                drawCount, 
+                searchCount, 
+                density, 
+                totalCards: cards.length,
+                detectedDrawCards: detectedCards.draw,
+                detectedSearchCards: detectedCards.search
+              });
+              return { drawCount, searchCount, density: Number(density.toFixed(1)) };
+            })();
+
+            // --- Average lore per card ---
+            const avgLorePerCard = (() => {
+              const totalLore = cards.reduce((a,c) => {
+                // Check multiple possible lore fields
+                const lore = Number(c.lore || c._raw?.Lore || c._raw?.lore || c._raw?.loreValue || 0);
+                console.log('[Comp Dashboard] Card lore for', c.name, ':', {
+                  c_lore: c.lore,
+                  raw_Lore: c._raw?.Lore,
+                  raw_lore: c._raw?.lore,
+                  raw_loreValue: c._raw?.loreValue,
+                  final: lore
+                });
+                
+                // Also check if there are any other lore-related fields
+                const allFields = Object.keys(c).filter(key => key.toLowerCase().includes('lore'));
+                const allRawFields = Object.keys(c._raw || {}).filter(key => key.toLowerCase().includes('lore'));
+                if (allFields.length > 0 || allRawFields.length > 0) {
+                  console.log('[Comp Dashboard] Additional lore fields for', c.name, ':', {
+                    cardFields: allFields,
+                    rawFields: allRawFields
+                  });
+                }
+                
+                return a + lore;
+              }, 0);
+              const result = Number((totalLore / Math.max(cards.length,1)).toFixed(2));
+              console.log('[Comp Dashboard] Lore calculation:', { totalLore, cardsLength: cards.length, result });
+              return result;
+            })();
+
+            // --- Roles breakdown ---
+            const roleData = (() => {
+              const counts = {};
+              const roleAssignments = {};
+              
+              cards.forEach(c => {
+                const r = roleForCard(c);
+                counts[r] = (counts[r]||0)+1;
+                
+                // Track which cards go into which roles
+                if (!roleAssignments[r]) roleAssignments[r] = [];
+                roleAssignments[r].push(c.name);
+              });
+              
+              console.log('[Comp Dashboard] Role data:', counts);
+              console.log('[Comp Dashboard] Role assignments:', roleAssignments);
+              
+              // Special focus on Utility/Support cards
+              if (roleAssignments['Utility / Support']) {
+                console.log('[Comp Dashboard] Utility/Support cards:', roleAssignments['Utility / Support']);
+                console.log('[Comp Dashboard] Why these are Utility/Support:');
+                roleAssignments['Utility / Support'].forEach(cardName => {
+                  const card = cards.find(c => c.name === cardName);
+                  if (card) {
+                    const cardText = (card.text || card.rulesText || card._raw?.text || card._raw?.rulesText || card._raw?.Body_Text || "").toString().toLowerCase();
+                    const cardType = (card?.type || "").toLowerCase();
+                    const cardLore = Number(card.lore || card._raw?.Lore || card._raw?.lore || card._raw?.loreValue || 0);
+                    const cardCost = Number(card.cost || 0);
+                    
+                    console.log(`  ${cardName}:`, {
+                      type: cardType,
+                      lore: cardLore,
+                      cost: cardCost,
+                      text: cardText.substring(0, 100) + '...',
+                      why: 'No specific role detected - falls through to default'
+                    });
+                  }
+                });
+              }
+              
+              return Object.entries(counts).map(([role,value])=>({role, value}));
+            })();
+
+            // --- Synergies list ---
+            const synergies = (() => detectSynergies(cards))();
+
+            return (
+              <div className="space-y-6">
+                {/* Curve & Cost */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-center">Curve (Inkable vs Uninkable)</h4>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={curveData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="cost" stroke="#9CA3AF" />
+                      <YAxis allowDecimals={false} stroke="#9CA3AF" />
+                      <Tooltip 
+                        formatter={(value, name) => [value, name === 'inkable' ? 'Inkable' : 'Uninkable']}
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#F9FAFB'
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="inkable" stackId="a" fill="#10b981" />
+                      <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Draw / Consistency */}
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <h4 className="text-lg font-semibold mb-3 text-center">Consistency</h4>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-blue-400">{drawConsistency.drawCount}</div>
+                      <div className="text-sm text-gray-400">Draw pieces</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-400">{drawConsistency.searchCount}</div>
+                      <div className="text-sm text-gray-400">Search/Dig pieces</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-purple-400">{drawConsistency.density}%</div>
+                      <div className="text-sm text-gray-400">Card advantage density</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3 text-center">Heuristic: scans rules text for draw/search verbs</p>
+                </div>
+
+                {/* Lore Efficiency */}
+                <div className="bg-gray-700 rounded-lg p-4 text-center">
+                  <h4 className="text-lg font-semibold mb-2">Lore Efficiency</h4>
+                  <div className="text-3xl font-bold text-emerald-400">{avgLorePerCard}</div>
+                  <div className="text-sm text-gray-400">Average Lore per Card</div>
+                </div>
+
+                {/* Roles & Synergies */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-center">Card Roles</h4>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={roleData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="role" interval={0} angle={-10} textAnchor="end" height={60} stroke="#9CA3AF" />
+                      <YAxis allowDecimals={false} stroke="#9CA3AF" />
+                      <Tooltip 
+                        formatter={(value, name) => [value, 'Cards']}
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#F9FAFB'
+                        }}
+                      />
+                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {synergies.length > 0 ? (
+                    <div className="mt-4 bg-gray-700 rounded-lg p-4">
+                      <h5 className="font-semibold mb-2 text-center">Detected Synergies</h5>
+                      <ul className="list-disc ml-6 text-sm space-y-1">
+                        {synergies.map(s => <li key={s} className="text-gray-300">{s}</li>)}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="mt-4 bg-gray-700 rounded-lg p-4 text-center">
+                      <p className="text-sm text-gray-400">No obvious synergies detected</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Meta Tools (stub) */}
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <h4 className="text-lg font-semibold mb-3 text-center">Meta Tools</h4>
+                  <p className="text-sm text-gray-300 mb-4 text-center">
+                    Tag your deck against common archetypes and add matchup notes
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs uppercase text-gray-400 mb-1">Archetype tags</label>
+                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase text-gray-400 mb-1">Tech slots (notes)</label>
+                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., +2 Banish; +1 Evasive hate" />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-xs uppercase text-gray-400 mb-1">Matchup notes</label>
+                    <textarea rows={3} className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         
         {/* Action Buttons - Always Visible */}
