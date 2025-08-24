@@ -101,6 +101,17 @@ export default async function handler(req, res) {
           
           console.log('Final cards array length:', cards.length);
           
+          // Debug: Log the first few cards to see their structure
+          if (cards.length > 0) {
+            console.log('First card structure:', cards[0]);
+            console.log('First card keys:', Object.keys(cards[0]));
+            console.log('Sample cards being created:', cards.slice(0, 3).map(card => ({
+              name: card.name || card.Name || 'Unknown Card',
+              ink: card.ink || card.Ink || 'Unknown',
+              cost: card.cost || card.Cost || 0
+            })));
+          }
+          
           return {
             ...deck,
             cards: cards,
