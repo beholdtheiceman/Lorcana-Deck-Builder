@@ -5937,28 +5937,36 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           {/* Ink Color Distribution */}
           <div className="bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
-            <div className="space-y-2">
-              {Object.entries(inkDistribution).map(([ink, count]) => {
-                const percentage = ((count / totalCards) * 100).toFixed(1);
-                const colors = {
-                  'Amber': 'bg-amber-500',
-                  'Amethyst': 'bg-purple-500',
-                  'Emerald': 'bg-green-500',
-                  'Ruby': 'bg-red-500',
-                  'Sapphire': 'bg-blue-500',
-                  'Steel': 'bg-gray-500'
-                };
-                return (
-                  <div key={ink} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${colors[ink] || 'bg-gray-500'}`} />
-                      <span className="text-sm">{ink}</span>
-                    </div>
-                    <div className="text-sm font-semibold">{count} ({percentage}%)</div>
-                  </div>
-                );
-              })}
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={Object.entries(inkDistribution).map(([ink, count]) => ({
+                    name: ink,
+                    value: count
+                  }))}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {Object.entries(inkDistribution).map(([ink, count], index) => {
+                    const colors = {
+                      'Amber': '#f59e0b',
+                      'Amethyst': '#8b5cf6',
+                      'Emerald': '#10b981',
+                      'Ruby': '#ef4444',
+                      'Sapphire': '#3b82f6',
+                      'Steel': '#6b7280'
+                    };
+                    return (
+                      <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
+                    );
+                  })}
+                </Pie>
+                <Tooltip formatter={(value, name) => [value, name]} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
         
