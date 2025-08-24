@@ -2560,7 +2560,6 @@ function parseTextImport(text) {
     
     // REMOVED: Duplicate processing blocks that were causing double processing
     // The main parsing logic above already handles all the formats we need
-    }
   }
   
   if (validCards === 0) {
