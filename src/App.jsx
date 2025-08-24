@@ -5031,7 +5031,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   // Calculate ink color distribution
   const inkDistribution = {};
   entries.forEach(e => {
-    const inks = Array.isArray(e.card.inks) ? e.card.inks : [e.card.inks];
+    const inks = getInks(e.card);
     inks.forEach(ink => {
       if (ink) {
         inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
