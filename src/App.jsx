@@ -2770,16 +2770,17 @@ function findCardByName(userLine, cards) {
   // DEBUG: Look for cards with similar names to understand the data structure
   if (typed.includes(" - ")) {
     const [baseTyped, subTyped] = typed.split(/\s*[-–—]\s*/);
-    const similarCards = cards.filter(c => 
-      (c.baseName || "").toLowerCase() === baseTyped.toLowerCase()
-    ).slice(0, 5);
+    const similarCards = cards.filter(c => {
+      const cardName = (c.Name || c.name || "").toLowerCase();
+      return cardName.startsWith(baseTyped.toLowerCase());
+    }).slice(0, 10);
     
     console.log(`[findCardByName] Cards with baseName="${baseTyped}":`, 
       similarCards.map(c => ({
-        name: c.name,
-        baseName: c.baseName,
-        subname: c.subname,
-        subtitle: c.subtitle
+        Name: c.Name || c.name,
+        Unique_ID: c.Unique_ID,
+        Set_ID: c.Set_ID,
+        Card_Num: c.Card_Num
       }))
     );
   }
@@ -2820,6 +2821,7 @@ function findCardByName(userLine, cards) {
     });
     
     console.log(`[findCardByName] Found ${subtitleMatches.length} exact subtitle matches for "${typed}"`);
+    console.log(`[findCardByName] Looking for exact match: "${typed.toLowerCase()}"`);
     
     if (subtitleMatches.length > 0) {
       console.log(`[findCardByName] Subtitle matches:`, subtitleMatches.map(c => c.Name || c.name));
