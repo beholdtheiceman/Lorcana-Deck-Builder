@@ -63,14 +63,14 @@ export default async function handler(req, res) {
         console.log('Full deck data:', JSON.stringify(deck, null, 2));
         console.log('Deck.data:', JSON.stringify(deckData, null, 2));
         
-        // Try different possible card properties
-        let cards = deckData.cards || deckData.Cards || deckData.card || deckData.Card || [];
+        // Try different possible card properties - the actual structure is deck.data.entries
+        let cards = deckData.entries || deckData.Entries || deckData.cards || deckData.Cards || deckData.card || deckData.Card || [];
         
         // If still no cards, check if it's a string that needs parsing
         if (!cards.length && typeof deckData === 'string') {
           try {
             const parsed = JSON.parse(deckData);
-            cards = parsed.cards || parsed.Cards || parsed.card || parsed.Card || [];
+            cards = parsed.entries || parsed.Entries || parsed.cards || parsed.Cards || parsed.card || parsed.Card || [];
             console.log('Parsed from string:', parsed);
           } catch (e) {
             console.log('Failed to parse deck data as JSON');
