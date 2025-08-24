@@ -5054,6 +5054,21 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
         console.log(`  - raw.Color: ${raw.Color}`);
         console.log(`  - raw.colors: ${JSON.stringify(raw.colors)}`);
         console.log(`  - raw.Colors: ${JSON.stringify(raw.Colors)}`);
+        console.log(`  - raw.inks: ${JSON.stringify(raw.inks)}`);
+        console.log(`  - raw.inkColors: ${JSON.stringify(raw.inkColors)}`);
+        
+        // Check for any other properties that might contain ink info
+        const inkRelatedProps = Object.keys(raw).filter(key => 
+          key.toLowerCase().includes('ink') || 
+          key.toLowerCase().includes('color') ||
+          key.toLowerCase().includes('colour')
+        );
+        if (inkRelatedProps.length > 0) {
+          console.log(`  - Other ink-related properties:`, inkRelatedProps);
+          inkRelatedProps.forEach(prop => {
+            console.log(`    ${prop}: ${JSON.stringify(raw[prop])}`);
+          });
+        }
       }
     });
   }
@@ -5089,26 +5104,49 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       if (e.card._raw) {
         const raw = e.card._raw;
         
+        // Debug: log the entire raw object for cards with null ink
+        if (raw.ink === null) {
+          console.log(`[Dual-Ink Debug] ${e.card.name} has null ink, examining full structure:`, raw);
+        }
+        
         // Try different possible ink color properties
-        if (raw.ink) detectedInks.push(raw.ink);
-        if (raw.Ink) detectedInks.push(raw.Ink);
-        if (raw.inkColor) detectedInks.push(raw.inkColor);
-        if (raw.Ink_Color) detectedInks.push(raw.Ink_Color);
-        if (raw.color) detectedInks.push(raw.color);
-        if (raw.Color) detectedInks.push(raw.Color);
+        if (raw.ink && raw.ink !== null) detectedInks.push(raw.ink);
+        if (raw.Ink && raw.Ink !== null) detectedInks.push(raw.Ink);
+        if (raw.inkColor && raw.inkColor !== null) detectedInks.push(raw.inkColor);
+        if (raw.Ink_Color && raw.Ink_Color !== null) detectedInks.push(raw.Ink_Color);
+        if (raw.color && raw.color !== null) detectedInks.push(raw.color);
+        if (raw.Color && raw.Color !== null) detectedInks.push(raw.Color);
+        
+        // Check for dual-ink specific properties
+        if (raw.inks && Array.isArray(raw.inks)) {
+          detectedInks.push(...raw.inks.filter(ink => ink && ink !== null));
+        }
+        if (raw.inkColors && Array.isArray(raw.inkColors)) {
+          detectedInks.push(...raw.inkColors.filter(ink => ink && ink !== null));
+        }
+        
+        // Check for comma-separated ink strings
         if (raw.colors) {
           if (Array.isArray(raw.colors)) {
-            detectedInks.push(...raw.colors);
+            detectedInks.push(...raw.colors.filter(ink => ink && ink !== null));
           } else if (typeof raw.colors === 'string') {
-            detectedInks.push(...raw.colors.split(',').map(c => c.trim()));
+            detectedInks.push(...raw.colors.split(',').map(c => c.trim()).filter(ink => ink && ink !== null));
           }
         }
         if (raw.Colors) {
           if (Array.isArray(raw.Colors)) {
-            detectedInks.push(...raw.Colors);
+            detectedInks.push(...raw.Colors.filter(ink => ink && ink !== null));
           } else if (typeof raw.Colors === 'string') {
-            detectedInks.push(...raw.Colors.split(',').map(c => c.trim()));
+            detectedInks.push(...raw.Colors.split(',').map(c => c.trim()).filter(ink => ink && ink !== null));
           }
+        }
+        
+        // Special case: check if card has multiple ink-related fields
+        const allInkFields = [raw.ink, raw.Ink, raw.inkColor, raw.Ink_Color, raw.color, raw.Color];
+        const validInks = allInkFields.filter(ink => ink && ink !== null && ink !== 'null');
+        if (validInks.length > 1) {
+          console.log(`[Dual-Ink Debug] ${e.card.name} has multiple ink fields:`, validInks);
+          detectedInks.push(...validInks);
         }
       }
       
