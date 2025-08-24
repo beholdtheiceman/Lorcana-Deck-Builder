@@ -4485,6 +4485,17 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   const imgSrc = getCardImg(card || {});
   if (!open || !card) return null;
   
+  // Debug: Log the card object to see what fields it has
+  console.log('[InspectCardModal] Card object:', {
+    name: card.name,
+    version: card.version,
+    subname: card.subname,
+    subtitle: card.subtitle,
+    setName: card.setName,
+    set: card.set,
+    allKeys: Object.keys(card)
+  });
+  
   return (
     <Modal
       open={open}
