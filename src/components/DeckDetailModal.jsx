@@ -63,8 +63,8 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
       <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
-          <div>
-            <h2 className="text-2xl font-bold text-white">{deck.name}</h2>
+                     <div>
+             <h2 className="text-2xl font-bold text-white">{deck.title}</h2>
             <p className="text-gray-400">
               by {deck.user.email} • {hub?.name} Hub
             </p>
@@ -86,7 +86,7 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
               <div className="aspect-[3/4] bg-gray-700 rounded-lg flex items-center justify-center">
                 <div className="text-gray-400 text-center">
                   <div className="text-6xl mb-4">🎴</div>
-                  <div className="text-lg">{deck.name}</div>
+                                     <div className="text-lg">{deck.title}</div>
                   <div className="text-sm mt-2">
                     {deck.cards?.length || 0} cards
                   </div>
