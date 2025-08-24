@@ -1,5 +1,5 @@
 import { prisma } from '../_lib/db.js';
-import { getUserFromToken } from '../_lib/auth.js';
+import { getSession } from '../_lib/auth.js';
 import { z } from 'zod';
 
 // Validation schemas
@@ -18,13 +18,15 @@ const generateInviteCode = () => {
 
 export async function POST(request) {
   try {
-    const user = await getUserFromToken(request);
-    if (!user) {
+    const session = getSession(request);
+    if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
+    const user = { id: session.uid, email: session.email };
 
     const body = await request.json();
     const { name } = createHubSchema.parse(body);
@@ -78,13 +80,15 @@ export async function POST(request) {
 
 export async function GET(request) {
   try {
-    const user = await getUserFromToken(request);
-    if (!user) {
+    const session = getSession(request);
+    if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
+    const user = { id: session.uid, email: session.email };
 
     // Get all hubs where user is owner or member
     const hubs = await prisma.hub.findMany({

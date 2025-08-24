@@ -1,5 +1,5 @@
 import { prisma } from '../../_lib/db.js';
-import { getUserFromToken } from '../../_lib/auth.js';
+import { getSession } from '../../_lib/auth.js';
 import { z } from 'zod';
 
 const removeMemberSchema = z.object({
@@ -12,13 +12,15 @@ const transferOwnershipSchema = z.object({
 
 export async function DELETE(request, { params }) {
   try {
-    const user = await getUserFromToken(request);
-    if (!user) {
+    const session = getSession(request);
+    if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
+    const user = { id: session.uid, email: session.email };
 
     const { id: hubId } = params;
     const body = await request.json();
@@ -67,13 +69,15 @@ export async function DELETE(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
-    const user = await getUserFromToken(request);
-    if (!user) {
+    const session = getSession(request);
+    if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
+    const user = { id: session.uid, email: session.email };
 
     const { id: hubId } = params;
     const body = await request.json();
