@@ -36,26 +36,26 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-             <div className="bg-gray-900 rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-700">
-          <div>
-            <h2 className="text-2xl font-bold text-white">{hub.name}</h2>
-            <p className="text-gray-400">
-              {hub.members.length + 1} member{(hub.members.length + 1) !== 1 ? 's' : ''} • 
-              Invite Code: <span className="font-mono bg-gray-800 px-2 py-1 rounded">{hub.inviteCode}</span>
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl font-bold"
-          >
-            ×
-          </button>
-        </div>
+                    <div className="bg-gray-900 rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+         {/* Header */}
+         <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
+           <div>
+             <h2 className="text-2xl font-bold text-white">{hub.name}</h2>
+             <p className="text-gray-400">
+               {hub.members.length + 1} member{(hub.members.length + 1) !== 1 ? 's' : ''} • 
+               Invite Code: <span className="font-mono bg-gray-800 px-2 py-1 rounded">{hub.inviteCode}</span>
+             </p>
+           </div>
+           <button
+             onClick={onClose}
+             className="text-gray-400 hover:text-white text-2xl font-bold"
+           >
+             ×
+           </button>
+         </div>
 
-        {/* Content */}
-        <div className="h-full overflow-y-auto p-4">
+                 {/* Content */}
+         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-white">Loading decks...</div>
