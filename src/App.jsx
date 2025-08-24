@@ -2973,15 +2973,14 @@ const initialFilterState = () => {
     rarities: new Set(),
     types: new Set(),
     sets: new Set(),
-    classifications: new Set(),  // Changed from subtypes
+    classifications: new Set(),
     abilities: new Set(),
-    selectedCosts: new Set(), // No costs selected by default - show all cards
+    selectedCosts: new Set(),
     showInkablesOnly: false,
     showUninkablesOnly: false,
     sortBy: "ink-set-number",
     sortDir: "asc",
     showFilterPanel: false,
-    // New filters
     setNumber: "",
     franchise: "",
     gamemode: "",
@@ -2991,7 +2990,7 @@ const initialFilterState = () => {
     willpowerMax: "",
     strengthMin: "",
     strengthMax: "",
-    _resetTimestamp: Date.now(), // Force re-render
+    _resetTimestamp: Date.now(),
   };
   console.log('[initialFilterState] Created default state:', defaultState);
   return defaultState;
@@ -3007,9 +3006,8 @@ function serializeFilterState(state) {
     sets: Array.from(state.sets || []),
     classifications: Array.from(state.classifications || []),
     abilities: Array.from(state.abilities || []),
-    selectedCosts: Array.from(state.selectedCosts || []), // Add missing selectedCosts serialization
+    selectedCosts: Array.from(state.selectedCosts || []),
     showFilterPanel: state.showFilterPanel || false,
-    // New filters
     setNumber: state.setNumber || "",
     franchise: state.franchise || "",
     gamemode: state.gamemode || "",
@@ -3035,9 +3033,8 @@ function hydrateFilterState(raw) {
     sets: new Set(raw.sets || []),
     classifications: new Set(raw.classifications || []),
     abilities: new Set(raw.abilities || []),
-    selectedCosts: new Set(raw.selectedCosts || []), // Add missing selectedCosts hydration
+    selectedCosts: new Set(raw.selectedCosts || []),
     showFilterPanel: raw.showFilterPanel || false,
-    // New filters
     setNumber: raw.setNumber || "",
     franchise: raw.franchise || "",
     gamemode: raw.gamemode || "",
@@ -4488,12 +4485,12 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   if (!open || !card) return null;
   
   return (
-                  <Modal
-          open={open}
-          onClose={onClose}
-          title={`${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''} • ${card.setName || card.set}`}
-          size="md"
-          footer={
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`${card.name}${card.subname ? ` - ${card.subname}` : ''} • ${card.setName || card.set}`}
+      size="lg"
+      footer={
         <div className="flex items-center justify-end gap-2">
           <button
             className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
@@ -4504,13 +4501,13 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         </div>
       }
     >
-                    <div className="flex justify-center w-full px-2">
-                <img 
-                  src={imgSrc} 
-                  alt={card.name} 
-                  className="w-auto h-auto max-w-full max-h-[70vh] object-contain rounded-xl border border-gray-800"
-                />
-              </div>
+      <div className="flex justify-center w-full px-1">
+        <img 
+          src={imgSrc} 
+          alt={card.name} 
+          className="w-auto h-auto max-w-full max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
+        />
+      </div>
     </Modal>
   );
 }
