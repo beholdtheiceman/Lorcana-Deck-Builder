@@ -815,9 +815,10 @@ function asUrl(v) {
 }
 
 // FIXED: Simple, reliable image proxy solution - GUARANTEED to return string | null
-function proxyImageUrl(src) {
-  console.log(`[proxyImageUrl] Called with src:`, { type: typeof src, value: src });
-  console.log(`[proxyImageUrl] Function ID:`, proxyImageUrl.name, proxyImageUrl.toString().slice(0, 50));
+// Using unique name to prevent Vite minification conflicts
+function lorcanaImageProxyUrl(src) {
+  console.log(`[lorcanaImageProxyUrl] Called with src:`, { type: typeof src, value: src });
+  console.log(`[lorcanaImageProxyUrl] Function ID:`, lorcanaImageProxyUrl.name, lorcanaImageProxyUrl.toString().slice(0, 50));
   
   if (!src) return null;  // Return null instead of empty string for consistency
   
@@ -835,11 +836,22 @@ function proxyImageUrl(src) {
   // Use weserv.nl to bypass hotlink/CORS and normalize sizing
   // This is the same approach that works in App (7).jsx
   const result = `https://images.weserv.nl/?url=${encodeURIComponent(srcStr)}&output=jpg`;
-  console.log(`[proxyImageUrl] Returning:`, { type: typeof result, value: result });
+  console.log(`[lorcanaImageProxyUrl] Returning:`, { type: typeof result, value: result });
   
   // CRITICAL FIX: Return the string directly, not wrapped in an object
   return result;  // This fixes the "Returning: Object" bug
 }
+
+// Alias for backward compatibility
+const proxyImageUrl = lorcanaImageProxyUrl;
+
+// DEBUG: Log all function references to identify minification conflicts
+console.log('[DEBUG] Function references:', {
+  lorcanaImageProxyUrl: typeof lorcanaImageProxyUrl,
+  proxyImageUrl: typeof proxyImageUrl,
+  lorcanaImageProxyUrlName: lorcanaImageProxyUrl.name,
+  proxyImageUrlName: proxyImageUrl.name
+});
 
 // HARDENED: Get card image URL - prefer canonical Lorcast ID, fallback to feed Image
 function getCardImageUrl(card) {
