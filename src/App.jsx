@@ -2755,9 +2755,34 @@ function findCardByName(userLine, cards) {
   
   console.log(`[findCardByName] Searching for: "${typed}" (cleaned: "${typed.toLowerCase()}")`);
   console.log(`[findCardByName] Total cards in database: ${cards.length}`);
-  console.log(`[findCardByName] Sample cards:`, 
-    cards.slice(0, 3).map(c => ({ name: c.name, baseName: c.baseName, subname: c.subname }))
+  
+  // DEBUG: Show detailed structure of sample cards
+  console.log(`[findCardByName] Sample cards structure:`, 
+    cards.slice(0, 3).map(c => ({
+      name: c.name,
+      baseName: c.baseName,
+      subname: c.subname,
+      subtitle: c.subtitle,
+      allKeys: Object.keys(c).slice(0, 10) // Show first 10 keys
+    }))
   );
+  
+  // DEBUG: Look for cards with similar names to understand the data structure
+  if (typed.includes(" - ")) {
+    const [baseTyped, subTyped] = typed.split(/\s*[-–—]\s*/);
+    const similarCards = cards.filter(c => 
+      (c.baseName || "").toLowerCase() === baseTyped.toLowerCase()
+    ).slice(0, 5);
+    
+    console.log(`[findCardByName] Cards with baseName="${baseTyped}":`, 
+      similarCards.map(c => ({
+        name: c.name,
+        baseName: c.baseName,
+        subname: c.subname,
+        subtitle: c.subtitle
+      }))
+    );
+  }
 
   // 1) Try exact match first (case-insensitive)
   console.log(`[findCardByName] Trying exact match for: "${typed}"`);
@@ -2793,6 +2818,36 @@ function findCardByName(userLine, cards) {
     });
     
     console.log(`[findCardByName] Found ${subtitleMatches.length} subtitle matches for "${baseTyped}" - "${subTyped}"`);
+    
+    // If no exact subtitle match, try partial subtitle matching
+    if (subtitleMatches.length === 0) {
+      console.log(`[findCardByName] No exact subtitle match, trying partial matching...`);
+      const partialMatches = cards.filter(c => {
+        const baseMatch = (c.baseName || "").toLowerCase() === baseTyped.toLowerCase();
+        const cardName = (c.name || "").toLowerCase();
+        const userFullName = typed.toLowerCase();
+        
+        // Check if the full card name contains the user's input
+        return baseMatch && cardName.includes(userFullName);
+      });
+      
+      console.log(`[findCardByName] Found ${partialMatches.length} partial matches for "${typed}"`);
+      if (partialMatches.length > 0) {
+        console.log(`[findCardByName] Partial matches:`, partialMatches.map(c => c.name));
+        if (partialMatches.length === 1) {
+          console.log(`[findCardByName] Single partial match found: "${partialMatches[0].name}"`);
+          return partialMatches[0];
+        } else {
+          // Find the best partial match by checking which one most closely matches the user's input
+          const bestMatch = partialMatches.find(c => 
+            c.name.toLowerCase() === userFullName
+          ) || partialMatches[0];
+          console.log(`[findCardByName] Using best partial match: "${bestMatch.name}"`);
+          return bestMatch;
+        }
+      }
+    }
+    
     if (subtitleMatches.length > 0) {
       console.log(`[findCardByName] Subtitle matches:`, subtitleMatches.map(c => c.name));
       if (subtitleMatches.length === 1) {
