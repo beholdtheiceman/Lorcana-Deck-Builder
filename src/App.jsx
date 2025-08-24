@@ -4550,37 +4550,8 @@ function DeckStats({ deck }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="cost" />
                 <YAxis allowDecimals={false} />
-                <Bar dataKey="count" name="count" fill="#10b981" />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    console.log('[Tooltip Debug] active:', active, 'payload:', payload, 'label:', label);
-                    if (active && payload && payload.length > 0) {
-                      const data = payload[0].payload;
-                      console.log('[Tooltip Active] Data:', data);
-                      return (
-                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                          <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
-                          {data.cards && data.cards.length > 0 ? (
-                            <div className="mt-2">
-                              <p className="text-gray-300 text-sm">Cards:</p>
-                              <div className="max-h-32 overflow-y-auto">
-                                {data.cards.map((card, index) => (
-                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="mt-2">
-                              <p className="text-gray-300 text-sm">No card list available</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    console.log('[Tooltip Debug] Returning null - active:', active, 'payload length:', payload?.length);
-                    return null;
-                  }}
-                />
+                <Bar dataKey="count" fill="#10b981" />
+                <Tooltip />
               </BarChart>
             </ResponsiveContainer>
         </div>
@@ -4595,39 +4566,8 @@ function DeckStats({ deck }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="type" />
                 <YAxis allowDecimals={false} />
-                <Bar dataKey="count" name="count" fill="#3b82f6" />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    console.log('[Tooltip Debug] Card Types - active:', active, 'payload:', payload, 'label:', label);
-                    if (active && payload && payload.length > 0) {
-                      const data = payload[0].payload;
-                      console.log('[Tooltip Active] Card Types Data:', data);
-                      return (
-                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                          <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
-                          {data.cards && data.cards.length > 0 ? (
-                            <div className="mt-2">
-                              <p className="text-gray-300 text-sm">Cards:</p>
-                              <div className="max-h-32 overflow-y-auto">
-                                <div className="max-h-32 overflow-y-auto">
-                                  {data.cards.map((card, index) => (
-                                    <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="mt-2">
-                              <p className="text-gray-300 text-sm">No card list available</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    console.log('[Tooltip Debug] Card Types - Returning null - active:', active, 'payload length:', payload?.length);
-                    return null;
-                  }}
-                />
+                <Bar dataKey="count" fill="#3b82f6" />
+                <Tooltip />
               </BarChart>
             </ResponsiveContainer>
         </div>
