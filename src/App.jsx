@@ -1665,19 +1665,20 @@ function normalizeLorcast(c) {
   // Extract abilities using the new helper
   const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
   
-      // Extract baseName and subname from the display name
-    const { baseName, subname } = splitDisplayName(c.name);
+      // Use the version field directly from the API for subtitle
+    const baseName = c.name;
+    const subname = c.version;
     
     // Debug: Log the extraction
     if (subname) {
-      console.log(`[normalizeLorcast] Extracted subtitle for "${c.name}": baseName="${baseName}", subname="${subname}"`);
+      console.log(`[normalizeLorcast] Using version for "${c.name}": baseName="${baseName}", subname="${subname}"`);
     }
     
     const result = {
       id: c.id || c.collector_number || c.name,
       name: c.name,
-      baseName,                    // <-- New: extracted base name
-      subname,                     // <-- New: extracted subtitle
+      baseName,                    // <-- Base name (without subtitle)
+      subname,                     // <-- Subtitle from version field
       // NORMALIZED set fields using Lorcast's actual model:
       set: setCode || setName || (setNum != null ? String(setNum) : ""),
       setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
@@ -4488,7 +4489,7 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
     <Modal
       open={open}
       onClose={onClose}
-      title={`${card.name}${card.subname ? ` - ${card.subname}` : ''} • ${card.setName || card.set}`}
+      title={`${card.name}${card.version ? ` - ${card.version}` : ''} • ${card.setName || card.set}`}
       size="lg"
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -4501,7 +4502,7 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         </div>
       }
     >
-      <div className="flex justify-center w-full px-1">
+      <div className="flex justify-center w-full px-0">
         <img 
           src={imgSrc} 
           alt={card.name} 
