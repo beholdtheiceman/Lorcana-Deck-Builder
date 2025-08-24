@@ -786,21 +786,7 @@ const hasSubtitleLike = (card) => {
          /\s[-–]\s/.test((card.name || "").toLowerCase());
 };
 
-// Auth-safe fetch wrapper to prevent 401 spam
-async function authSafeFetch(input, init = {}) {
-  const token = localStorage.getItem("auth_token");
-  if (!token) {
-    // Pretend success for POST/PUT/DELETE to keep UI happy
-    if (init.method && init.method !== "GET") {
-      return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
-    }
-    // For GET, return empty but valid shape your UI expects
-    return new Response(JSON.stringify([]), { status: 200 });
-  }
-  const headers = new Headers(init.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
-  return fetch(input, { ...init, headers });
-}
+
 
 // Transform API card data to app format
 function toAppCard(raw) {
