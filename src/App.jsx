@@ -5259,16 +5259,67 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           }
         }
         
+        // If still no image was drawn, try one more time with a simpler approach
+        if (!imageDrawn) {
+          try {
+            // Try to load image directly from the card data
+            const simpleImageSrc = card.image_url || card.image || card._imageFromAPI;
+            if (simpleImageSrc) {
+              console.log(`[Deck Image] Final attempt with simple image source: ${simpleImageSrc}`);
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
+                img.onload = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Successfully loaded image on final attempt: ${simpleImageSrc}`);
+                  resolve();
+                };
+                img.onerror = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Final image attempt failed: ${simpleImageSrc}`);
+                  reject(new Error('Image failed to load'));
+                };
+                img.src = simpleImageSrc;
+              });
+              
+              // Draw the image
+              const imgAspect = img.width / img.height;
+              const cardAspect = cardWidth / cardHeight;
+              
+              let drawWidth = cardWidth;
+              let drawHeight = cardHeight;
+              let drawX = x;
+              let drawY = y;
+              
+              if (imgAspect > cardAspect) {
+                drawHeight = cardWidth / imgAspect;
+                drawY = y + (cardHeight - drawHeight) / 2;
+              } else {
+                drawWidth = cardHeight * imgAspect;
+                drawX = x + (cardWidth - drawWidth) / 2;
+              }
+              
+              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+              imageDrawn = true;
+              console.log(`[Deck Image] Successfully drew image on final attempt for ${card.name}`);
+            }
+          } catch (error) {
+            console.warn(`[Deck Image] Final image attempt failed for ${card.name}:`, error);
+          }
+        }
+        
         // If still no image was drawn, use fallback
         if (!imageDrawn) {
           drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
         }
         
-        // Draw count indicator - Rounded bubble instead of square
+        // Draw count indicator - Rounded bubble positioned on card corner
         if (entry.count > 1) {
-          const bubbleSize = 24;
-          const bubbleX = x + cardWidth - bubbleSize - 4;
-          const bubbleY = y + 4;
+          const bubbleSize = 20;
+          const bubbleX = x + cardWidth - bubbleSize - 2;
+          const bubbleY = y + 2;
           const bubbleRadius = bubbleSize / 2;
           
           // Draw rounded rectangle (bubble) with fallback for older browsers
@@ -5290,7 +5341,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           
           // Draw count text
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px Arial, sans-serif';
+          ctx.font = 'bold 12px Arial, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(entry.count.toString(), bubbleX + bubbleRadius, bubbleY + bubbleRadius);
@@ -5338,12 +5389,12 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   
   // Helper function to draw fallback card content
   function drawFallbackCard(ctx, x, y, width, height, card) {
-    // Card background
-    ctx.fillStyle = '#2d3748';
+    // Card background - darker to indicate missing image
+    ctx.fillStyle = '#1a202c';
     ctx.fillRect(x, y, width, height);
     
     // Card border
-    ctx.strokeStyle = '#718096';
+    ctx.strokeStyle = '#4a5568';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, width, height);
     
@@ -5372,20 +5423,24 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     }
     ctx.fillText(line, x + width / 2, lineY);
     
+    // Card cost (more prominent)
+    const cost = getCost(card);
+    if (cost !== undefined) {
+      ctx.font = 'bold 14px Arial, sans-serif';
+      ctx.fillStyle = '#10b981';
+      ctx.fillText(`Cost: ${cost}`, x + width / 2, lineY + 25);
+    }
+    
     // Card details
     ctx.font = '10px Arial, sans-serif';
-    ctx.fillStyle = '#cccccc';
+    ctx.fillStyle = '#a0aec0';
     
     if (card.set) {
-      ctx.fillText(`Set: ${card.set}`, x + width / 2, lineY + 20);
+      ctx.fillText(`Set: ${card.set}`, x + width / 2, lineY + 40);
     }
     
     if (card.number) {
-      ctx.fillText(`#${card.number}`, x + width / 2, lineY + 35);
-    }
-    
-    if (card.cost !== undefined) {
-      ctx.fillText(`Cost: ${card.cost}`, x + width / 2, lineY + 50);
+      ctx.fillText(`#${card.number}`, x + width / 2, lineY + 55);
     }
   }
   
