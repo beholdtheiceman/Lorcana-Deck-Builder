@@ -2415,8 +2415,8 @@ function parseTextImport(text) {
       const key = deckKey(foundCard);
       
               try {
-          // Extract inkable information from the original card data BEFORE processing
-          const inkable = foundCard.inkable ?? foundCard._raw?.inkable ?? foundCard._raw?.can_be_ink ?? foundCard._raw?.Inkable ?? false;
+          // Extract inkable information from the original card data BEFORE processing, prioritize inkwell field
+          const inkable = foundCard.inkable ?? foundCard._raw?.inkwell ?? foundCard._raw?.inkable ?? foundCard._raw?.can_be_ink ?? foundCard._raw?.Inkable ?? false;
           
           const transformedCard = toAppCard(foundCard);
           const rawUrl = getCardImageUrl(transformedCard);
@@ -2463,8 +2463,8 @@ function parseTextImport(text) {
       const key = deckKey(bestMatch);
       
               try {
-          // Extract inkable information from the original card data BEFORE processing
-          const inkable = bestMatch.inkable ?? bestMatch._raw?.inkable ?? bestMatch._raw?.can_be_ink ?? bestMatch._raw?.Inkable ?? false;
+          // Extract inkable information from the original card data BEFORE processing, prioritize inkwell field
+          const inkable = bestMatch.inkable ?? bestMatch._raw?.inkwell ?? bestMatch._raw?.inkable ?? bestMatch._raw?.can_be_ink ?? bestMatch._raw?.Inkable ?? false;
           
           const transformedCard = toAppCard(bestMatch);
           const rawUrl = getCardImageUrl(transformedCard);
@@ -4155,8 +4155,8 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
     console.log('[Inkable Detection] Processing entries:', entries.length);
     
     for (const e of entries) {
-      // Use the same inkable detection logic as the import function
-      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
+      // Use the same inkable detection logic as the import function, but prioritize inkwell field
+      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
       
       console.log(`[Inkable Detection] Card: ${e.card.name}, inkable field: ${isInkable}, raw.inkable: ${e.card._raw?.inkable}, raw.inkwell: ${e.card._raw?.inkwell}`);
       
@@ -4351,8 +4351,8 @@ function DeckStats({ deck }) {
     let uninkable = 0;
     
     for (const e of entries) {
-      // Use the same inkable detection logic as the main deck view
-      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
+      // Use the same inkable detection logic as the main deck view, but prioritize inkwell field
+      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
       
       if (isInkable) {
         inkable += e.count;
@@ -4966,7 +4966,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   // Calculate deck statistics
   const totalCards = entries.reduce((sum, e) => sum + e.count, 0);
   const totalInkable = entries.reduce((sum, e) => {
-    const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
+    const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
     return sum + (isInkable ? e.count : 0);
   }, 0);
   const totalUninkable = totalCards - totalInkable;
