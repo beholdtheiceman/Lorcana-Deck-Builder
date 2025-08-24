@@ -4435,12 +4435,16 @@ function DeckStats({ deck }) {
       }
     }
     
-    return Array.from(map.entries())
+    const result = Array.from(map.entries())
+      .filter(([cost, count]) => count > 0) // Only include costs with cards
       .map(([cost, count]) => ({ 
         cost, 
         count,
         cards: costCards[cost] || []
       }));
+    
+    console.log('[Cost Curve Debug] Final result:', result);
+    return result;
   }, [entries]);
 
   const typeCounts = useMemo(() => {
@@ -4458,11 +4462,14 @@ function DeckStats({ deck }) {
       }
     }
     
-    return Object.entries(counts).map(([type, count]) => ({ 
+    const result = Object.entries(counts).map(([type, count]) => ({ 
       type, 
       count,
       cards: typeCards[type] || []
     }));
+    
+    console.log('[Type Counts Debug] Final result:', result);
+    return result;
   }, [entries]);
 
   const inkableCounts = useMemo(() => {
