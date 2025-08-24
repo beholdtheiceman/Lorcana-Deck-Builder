@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const TeamHub = () => {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const [hubs, setHubs] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
