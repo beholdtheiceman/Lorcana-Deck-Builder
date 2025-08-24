@@ -32,6 +32,100 @@ import {
 // Authentication components
 import AuthButton from './components/AuthButton';
 
+// -----------------------------------------------------------------------------
+// Local storage & caching
+// -----------------------------------------------------------------------------
+
+const LS_KEYS = {
+  DECK: "lorcana.deck.v1",
+  DECKS: "lorcana.decks.v2", // New: Multiple decks storage
+  CURRENT_DECK_ID: "lorcana.currentDeckId.v2", // New: Current deck ID
+  FILTERS: "lorcana.filters.v1",
+  CACHE_IMG: "lorcana.imageCache.v1",
+  CACHE_CARDS: "lorcana.cardsCache.v1",
+};
+
+function loadLS(key, fallback) {
+  try {
+    console.log('[loadLS] Loading key:', key);
+    const v = localStorage.getItem(key);
+    console.log('[loadLS] Raw value from localStorage:', v);
+    const result = v ? JSON.parse(v) : fallback;
+    console.log('[loadLS] Parsed result:', result);
+    return result;
+  } catch (error) {
+    console.error('[loadLS] Error loading from localStorage:', error);
+    return fallback;
+  }
+}
+
+function saveLS(key, value) {
+  try {
+    console.log('[saveLS] Saving key:', key, 'with value:', value);
+    localStorage.setItem(key, JSON.stringify(value));
+    console.log('[saveLS] Successfully saved to localStorage');
+  } catch (error) {
+    console.error('[saveLS] Error saving to localStorage:', error);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Card image cache context
+// -----------------------------------------------------------------------------
+
+console.log('[Context] Creating ImageCacheContext...');
+const ImageCacheContext = createContext();
+console.log('[Context] ImageCacheContext created:', ImageCacheContext);
+
+function ImageCacheProvider({ children }) {
+  console.log('[ImageCacheProvider] Initializing...');
+  const [cache, setCache] = useState(() => loadLS(LS_KEYS.CACHE_IMG, {}));
+  const [cacheVersion, setCacheVersion] = useState(0);
+  
+  useEffect(() => {
+    console.log('[ImageCacheProvider] Cache updated, saving to localStorage');
+    saveLS(LS_KEYS.CACHE_IMG, cache);
+  }, [cache]);
+
+  const get = useCallback((key) => cache[key], [cache]);
+  const put = useCallback((key, value) => {
+    setCache((c) => ({ ...c, [key]: value }));
+    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
+  }, []);
+  const putFailed = useCallback((key) => {
+    setCache((c) => ({ ...c, [key]: 'FAILED' }));
+    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
+  }, []);
+
+  const value = useMemo(() => ({ get, put, putFailed, cache, cacheVersion }), [get, put, putFailed, cache, cacheVersion]);
+
+  console.log('[ImageCacheProvider] About to render with value:', value);
+
+  return (
+    <ImageCacheContext.Provider value={value}>
+      {children}
+    </ImageCacheContext.Provider>
+  );
+}
+
+// Debug component to trace context
+function ContextDebugger() {
+  const context = useContext(ImageCacheContext);
+  console.log('[ContextDebugger] Context value:', context);
+  return null; // This component doesn't render anything
+}
+
+function useImageCache() {
+  console.log('[useImageCache] Hook called');
+  const context = useContext(ImageCacheContext);
+  console.log('[useImageCache] Context value:', context);
+  if (!context) {
+    console.error('[useImageCache] Context is null/undefined - this will cause the error');
+    throw new Error('useImageCache must be used within ImageCacheProvider');
+  }
+  return context;
+}
+
 // Ink colors supported by the filters. Feel free to expand.
 const INK_COLORS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"];
 
@@ -725,19 +819,186 @@ async function getWorkingImageUrl(card) {
   return null;
 }
 
-// Simple, reliable image proxy solution (from App (7).jsx)
-function proxyImageUrl(src) {
-  if (!src) return "";
-  try {
-    const u = new URL(src);
-    // Avoid double-proxying
-    if (u.hostname.includes("weserv.nl")) return src;
-  } catch {
-    // ignore bad URLs; still try to proxy
+// Utility to reduce noisy logs in dev (StrictMode double-runs)
+const logged = new Set();
+const logOnce = (key, ...args) => {
+  if (logged.has(key)) return;
+  logged.add(key);
+  console.log(...args);
+};
+
+// Debug sort gating to reduce noise
+const DEBUG_SORT = import.meta.env.DEV && localStorage.getItem("DEBUG_SORT") === "1";
+function sortLog(...args) { 
+  if (DEBUG_SORT) console.log(...args); 
+}
+
+// TODO: Fix favicon 404 - either add /public/vite.svg or change reference in index.html
+// Current error: /vite.svg:1 Failed to load resource: the server responded with a status of 404 ()
+
+/**
+ * Auth-safe fetch wrapper that handles missing tokens gracefully
+ */
+async function authSafeFetch(input, init = {}) {
+  const token = localStorage.getItem("auth_token");
+  if (!token) {
+    if (init.method && init.method !== "GET") {
+      return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
   }
-  // Use weserv.nl to bypass hotlink/CORS and normalize sizing
-  // This is the same approach that works in App (7).jsx
-  return `https://images.weserv.nl/?url=${encodeURIComponent(src)}&output=jpg`;
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
+/**
+ * Normalize display names and comparisons
+ */
+const splitDisplayName = (name) => {
+  const n = String(name || "");
+  // split on hyphen / en dash / em dash, with or without spaces
+  const parts = n.split(/\s*[-–—]\s*/);
+  return {
+    baseName: (parts[0] || "").trim(),
+    subname:  (parts[1] || null)?.trim() || null,
+  };
+};
+
+const canon = (s) =>
+  String(s || "")
+    .toLowerCase()
+    // normalize all dash styles to " - "
+    .replace(/\s*[-–—]\s*/g, " - ")
+    // collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Helper function to detect cards with subtitles (used in multiple places)
+const hasSubtitleLike = (card) => {
+  return !!(card.subname && card.subname.trim()) || 
+         /\s[-–]\s/.test((card.name || "").toLowerCase());
+};
+
+
+
+// Transform API card data to app format
+function toAppCard(raw) {
+  // GUARD: Ensure raw is valid
+  if (!raw || typeof raw !== 'object') {
+    console.warn('[toAppCard] Invalid raw data:', raw);
+    return null;
+  }
+
+  // DEBUG: Log the actual structure of the card data
+  console.log('[toAppCard] Raw card data structure:', {
+    keys: Object.keys(raw),
+    name: raw.name,
+    baseName: raw.baseName,
+    subname: raw.subname,
+    setId: raw.setId,
+    setNum: raw.setNum,
+    cost: raw.cost,
+    type: raw.type,
+    inkable: raw.inkable
+  });
+
+  // Use the actual API structure from your database
+  const id = raw.id || raw.Unique_ID || crypto.randomUUID();
+  const name = raw.Name || raw.name || 'Unknown Card';
+  const baseName = name.split(" - ")[0];
+  const subtitle = name.includes(" - ") ? name.split(" - ")[1] : null;
+
+  const splitList = (s) =>
+    s ? s.split(",").map(x => x.trim()).filter(Boolean) : [];
+
+  const abilities = raw.abilities || splitList(raw.Abilities || '');
+
+  return {
+    id: id,
+    setId: raw.setId || raw.set || raw.Set_ID || null,
+    setNum: raw.setNum || raw.Set_Num || null,
+    cardNum: raw.cardNum || raw.number || raw.Card_Num || null,
+    name: name,
+    baseName: baseName,
+    subtitle: subtitle,
+    imageUrl: raw.imageUrl || raw.image || raw.Image || null,
+    inkable: Boolean(raw.inkable || raw.can_be_ink || raw.Inkable || raw.inkwell || false),
+    colors: splitList(raw.colors || raw.color || raw.Color || ''),
+    classifications: splitList(raw.classifications || raw.Classifications || ''),
+    type: raw.type || raw.Type || null,
+    cost: raw.cost || raw.Cost || 0,
+    lore: raw.lore || raw.Lore || 0,
+    willpower: raw.willpower || raw.Willpower || 0,
+    strength: raw.strength || raw.Strength || 0,
+    rarity: raw.rarity || raw.Rarity || null,
+    abilities: abilities,
+    rulesText: raw.rulesText || raw.bodyText || raw.Body_Text || '',
+    flavorText: raw.flavorText || raw.Flavor_Text || '',
+    artist: raw.artist || raw.Artist || null,
+    franchise: raw.franchise || raw.Franchise || null,
+  };
+}
+
+// Helper function to ensure we always get string URLs - single source of truth
+function asUrl(v) {
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  // tolerate different shapes - extract URL from common object patterns
+  return v.url ?? v.href ?? v.src ?? v.toString?.() ?? null;
+}
+
+/**
+ * Proxy helper MUST return a string URL (logs show an object was returned in build)
+ */
+function lorcanaImageProxyUrl(src){
+  if (!src) return null;
+  const srcStr = String(src);
+  return `https://images.weserv.nl/?url=${encodeURIComponent(srcStr)}&output=jpg`;
+}
+
+// Alias for backward compatibility
+const proxyImageUrl = lorcanaImageProxyUrl;
+
+// DEBUG: Log all function references to identify minification conflicts
+console.log('[DEBUG] Function references:', {
+  lorcanaImageProxyUrl: typeof lorcanaImageProxyUrl,
+  proxyImageUrl: typeof proxyImageUrl,
+  lorcanaImageProxyUrlName: lorcanaImageProxyUrl.name,
+  proxyImageUrlName: proxyImageUrl.name
+});
+
+// HARDENED: Get card image URL - prefer canonical Lorcast ID, fallback to feed Image
+function getCardImageUrl(card) {
+  // GUARD: Handle undefined/null cards gracefully
+  if (!card) {
+    console.warn(`[getCardImageUrl] No card provided, returning placeholder`);
+    return "/img/placeholders/card.avif";
+  }
+  
+  // PREFER: Canonical Lorcast ID (most reliable)
+  if (card?.id?.startsWith("crd_")) {
+    const url = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
+    console.log(`[getCardImageUrl] Using canonical Lorcast ID for ${card.name}:`, url);
+    return url;
+  }
+  
+  // FALLBACK: Accept either imageUrl or image_url (handle both field names)
+  const direct = card.imageUrl || card.image_url;
+  if (typeof direct === 'string' && direct) {
+    console.log(`[getCardImageUrl] Using direct image for ${card.name}:`, direct);
+    return direct;
+  }
+  
+  // LAST RESORT: Generate URL only if absolutely necessary
+  try {
+    const generated = generateLorcastURL(card);
+    console.log(`[getCardImageUrl] Generated fallback URL for ${card.name}:`, generated);
+    return generated;
+  } catch (error) {
+    console.warn(`[getCardImageUrl] Failed to generate URL for ${card.name}:`, error);
+    return "/img/placeholders/card.avif";
+  }
 }
 
 // New approach: Generate local placeholder images with card data
@@ -937,73 +1198,42 @@ function createCanvasImage(imageUrl) {
   });
 }
 
-// New function: Generate clean Lorcast URLs from card data
+// New function: Generate clean Lorcast URLs from card data - UPDATED for transformed cards
 function generateLorcastURL(card) {
+  console.log(`[generateLorcastURL] Called with card:`, { 
+    name: card?.name, 
+    id: card?.id, 
+    setId: card?.setId, 
+    cardNum: card?.cardNum,
+    imageUrl: card?.imageUrl 
+  });
+  
   if (!card || typeof card !== 'object') {
     console.warn(`[URL Generation] Invalid card object:`, card);
     return null;
   }
   
-  // Be more lenient - allow cards without names to still try to generate URLs
-  if (!card.name) {
-    console.warn(`[URL Generation] Card missing name, attempting to generate URL anyway:`, card);
+  // PREFER: Use existing imageUrl from transformed card data
+  if (card.imageUrl && typeof card.imageUrl === 'string' && card.imageUrl.startsWith('http')) {
+    console.log(`[URL Generation] Using existing imageUrl for ${card.name}:`, card.imageUrl);
+    return String(card.imageUrl);
   }
   
-  // Try to use existing _imageFromAPI if it exists and looks valid
-  if (card._imageFromAPI && typeof card._imageFromAPI === 'string' && card._imageFromAPI.startsWith('http')) {
-    // Clean up the existing URL
-    let cleanURL = card._imageFromAPI;
-    
-    // Remove any query parameters
-    cleanURL = cleanURL.split('?')[0];
-    
-    // Clean up common URL issues
-    cleanURL = cleanURL
-      .replace(/\s+/g, '%20')  // Replace spaces with %20
-      .replace(/'/g, '%27')    // Replace apostrophes with %27
-      .replace(/"/g, '%22')    // Replace quotes with %22
-      .replace(/!/g, '%21')    // Replace exclamation marks with %21
-      .replace(/\?/g, '%3F')   // Replace question marks with %3F
-      .replace(/&/g, '%26')    // Replace ampersands with %26
-      .replace(/=/g, '%3D')    // Replace equals with %3D
-      .replace(/#/g, '%23');   // Replace hash with %23
-    
-    console.log(`[URL Generation] Cleaned existing URL for ${card.name}:`, {
-      original: card._imageFromAPI,
-      cleaned: cleanURL
-    });
-    
-    return cleanURL;
+  // FALLBACK: Generate URL using card ID or set/number
+  if (card.id) {
+    const imageUrl = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
+    console.log(`[URL Generation] Generated image URL using card ID for ${card.name}:`, imageUrl);
+    return String(imageUrl);
   }
   
-  // Generate fallback URL from card data using the correct Lorcast API structure
-  if (card.set && card.number) {
-    // According to the official API docs, image URLs should be:
-    // https://cards.lorcast.io/card/digital/{size}/{card_id}.avif
-    // But we need the card ID, not just set/number
+  // LAST RESORT: Try to construct URL using set and number
+  if (card.setId && card.cardNum) {
+    const setCode = card.setId.toString().toUpperCase();
+    const cardNumber = card.cardNum.toString().padStart(3, '0');
     
-    // Try to construct a URL using the card ID if available
-    if (card.id) {
-      const imageUrl = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
-      console.log(`[URL Generation] Generated image URL using card ID for ${card.name}:`, imageUrl);
-      return imageUrl;
-    }
-    
-    // Fallback: try to construct URL using set and number (less reliable)
-    const setCode = card.set.toString().toUpperCase();
-    const cardNumber = card.number.toString().padStart(3, '0');
-    
-    // These are the correct URL patterns according to the API docs
-    const urlPatterns = [
-      `https://cards.lorcast.io/card/digital/large/crd_${setCode}_${cardNumber}.avif`,
-      `https://cards.lorcast.io/card/digital/normal/crd_${setCode}_${cardNumber}.avif`,
-      `https://cards.lorcast.io/card/digital/small/crd_${setCode}_${cardNumber}.avif`
-    ];
-    
-    console.log(`[URL Generation] Generated fallback URLs for ${card.name}:`, urlPatterns);
-    
-    // Return the large size first
-    return urlPatterns[0];
+    const imageUrl = `https://cards.lorcast.io/card/digital/large/crd_${setCode}_${cardNumber}.avif`;
+    console.log(`[URL Generation] Generated fallback URL using set/number for ${card.name}:`, imageUrl);
+    return String(imageUrl);
   }
   
   console.warn(`[URL Generation] Could not generate URL for card: ${card.name}`, card);
@@ -1055,6 +1285,59 @@ function generateAlternativeImageUrls(card) {
   
   console.log(`[Alternative URLs] Generated ${uniqueUrls.length} URLs for ${card.name}:`, uniqueUrls);
   return uniqueUrls;
+}
+
+// Enhanced function to search Lorcast API for card resolution
+async function searchLorcastForCard(cardName, subtitle = null) {
+  try {
+    // Build search query - prefer exact match with quotes
+    let query = cardName;
+    if (subtitle) {
+      query = `"${cardName} - ${subtitle}"`;
+    } else {
+      query = `"${cardName}"`;
+    }
+    
+    console.log(`[LorcastSearch] Searching for: ${query}`);
+    
+    // Make API call to Lorcast search
+    const response = await fetch(`https://api.lorcast.com/v0/cards/search?q=${encodeURIComponent(query)}&unique=cards&per_page=5`);
+    
+    if (!response.ok) {
+      console.warn(`[LorcastSearch] API response not ok:`, response.status, response.statusText);
+      return null;
+    }
+    
+    const data = await response.json();
+    const results = data.results || [];
+    
+    if (results.length === 0) {
+      console.log(`[LorcastSearch] No results found for: ${query}`);
+      return null;
+    }
+    
+    // Find exact match if possible
+    const exactMatch = results.find(card => {
+      const cardNameLower = card.name?.toLowerCase() || '';
+      const searchNameLower = cardName.toLowerCase();
+      return cardNameLower === searchNameLower || 
+             cardNameLower.includes(searchNameLower) ||
+             searchNameLower.includes(cardNameLower);
+    });
+    
+    if (exactMatch) {
+      console.log(`[LorcastSearch] Found exact match:`, exactMatch.name);
+      return exactMatch;
+    }
+    
+    // Return first result as best guess
+    console.log(`[LorcastSearch] Using best match:`, results[0].name);
+    return results[0];
+    
+  } catch (error) {
+    console.warn(`[LorcastSearch] Error searching Lorcast for ${cardName}:`, error);
+    return null;
+  }
 }
 
 // New function: Reset failed image cache entries
@@ -1117,7 +1400,7 @@ function resetFailedImageCache() {
 // Bases + defaults
 const LORCAST_BASE = "https://api.lorcast.com/v0";
 const DEFAULT_Q = "";
-const ALL_QUERY = "ink:amber or ink:amethyst or ink:emerald or ink:ruby or ink:sapphire or ink:steel or ink:colorless"; // Fabled
+const ALL_QUERY = "ink:amber or ink:amethyst or ink:emerald or ink:ruby or ink:sapphire or ink:steel or ink:colorless"; // Working query that returns cards
 const APP_VERSION = "1.0.1-lorcast-monolith+api";
 
 async function apiSearchCards({
@@ -1149,6 +1432,21 @@ async function apiSearchCards({
     const res = await fetch(url, { headers: { Accept: "application/json" }, mode: "cors" });
     if (res.ok) {
       const json = await res.json();
+      
+      // Safe debugging - wrapped in try-catch to prevent any interference
+      try {
+        console.log('[API] Raw API response structure:', {
+          hasData: !!json?.data,
+          dataLength: json?.data?.length,
+          hasResults: !!json?.results,
+          resultsLength: json?.results?.length,
+          totalCards: json?.total_cards,
+          keys: Object.keys(json || {})
+        });
+      } catch (debugError) {
+        console.warn('[API] Debug logging failed:', debugError);
+      }
+      
       const cards = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
       const total = Number(json?.total_cards ?? cards.length);
       const mapped = cards
@@ -1367,27 +1665,39 @@ function normalizeLorcast(c) {
   // Extract abilities using the new helper
   const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
   
-  const result = {
-    id: c.id || c.collector_number || c.name,
-    name: c.name,
-    // NORMALIZED set fields using Lorcast's actual model:
-    set: setCode || setName || (setNum != null ? String(setNum) : ""),
-    setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
-    setName: setName,           // nice label ("The First Chapter")
-    setNum: setNum,            // numeric if possible, else null (1, 2, 3...)
-    number: c.collector_number,
-    types: typeList,
-    rarity: c.rarity,
-    cost: c.cost ?? c.ink_cost,
-    inks: inks,
-    text: c.oracle_text || c.text || c.body_text || c.Body_Text || c.rules_text || "",
-    keywords: abilities, // Use the pretty abilities list
-    abilities: abilities, // Use the pretty abilities list
-    _abilitiesIndex: _abilitiesIndex, // Add the normalized index for filtering
-    image,
-    _source: "lorcast",
-    _raw: c,
-  };
+      // Extract baseName and subname from the display name
+    const { baseName, subname } = splitDisplayName(c.name);
+    
+    // Debug: Log the extraction
+    if (subname) {
+      console.log(`[normalizeLorcast] Extracted subtitle for "${c.name}": baseName="${baseName}", subname="${subname}"`);
+    }
+    
+    const result = {
+      id: c.id || c.collector_number || c.name,
+      name: c.name,
+      baseName,                    // <-- New: extracted base name
+      subname,                     // <-- New: extracted subtitle
+      // NORMALIZED set fields using Lorcast's actual model:
+      set: setCode || setName || (setNum != null ? String(setNum) : ""),
+      setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
+      setName: setName,           // nice label ("The First Chapter")
+      setNum: setNum,            // numeric if possible, else null (1, 2, 3...)
+      number: c.collector_number,
+      types: typeList,
+      rarity: c.rarity,
+      cost: c.cost ?? c.ink_cost,
+      inks: inks,
+      text: c.oracle_text || c.text || c.body_text || c.Body_Text || c.rules_text || "",
+      keywords: abilities, // Use the pretty abilities list
+      abilities: abilities, // Use the pretty abilities list
+      _abilitiesIndex: _abilitiesIndex, // Add the normalized index for filtering
+      image,
+      _source: "lorcast",
+      _raw: c,
+      // Preserve inkable flag for proper detection
+      inkable: Boolean(c.inkable ?? c.can_be_ink ?? c.Inkable ?? false),
+    };
   
   console.log('[normalizeLorcast] Normalized result:', {
     name: result.name,
@@ -1442,13 +1752,27 @@ function normalizeCards(list, source) {
 // ONE definitive fetchAllCards that RETURNS AN ARRAY and uses DEFAULT_Q
 async function fetchAllCards({ signal } = {}) {
   try {
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 100, signal });
+    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
     const normalized = normalizeCards(list, source);
     console.log(`[API] Loaded ${normalized.length}/${total} cards from ${source}`);
+    
+    // Safe debugging: Check if we're getting cards with subnames
+    try {
+      const cardsWithSubnames = normalized.filter(card => card.name && card.name.includes(' - '));
+      console.log(`[API] Cards with subnames found: ${cardsWithSubnames.length}`);
+      if (cardsWithSubnames.length > 0) {
+        console.log('[API] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+      }
+    } catch (debugError) {
+      console.warn('[API] Subname detection debug failed:', debugError);
+    }
     
     const mapped = normalized.map(card => ({
       id: card.id,
       name: card.name,
+      // CRITICAL: Preserve baseName and subname for subtitle matching
+      baseName: card.baseName,
+      subname: card.subname,
       // NORMALIZED set fields you can rely on everywhere:
       set: card.set,           // e.g. "TFC"
       setCode: card.setCode,   // e.g. "TFC"
@@ -1492,6 +1816,14 @@ async function fetchAllCards({ signal } = {}) {
       console.log("[DBG] No cards with set fields found");
     }
     
+    // Debug: Check if baseName and subname are being preserved
+    const subnameSample = mapped.find(x => x.name && x.subname);
+    if (subnameSample) {
+      console.log("[DBG] Subname sample", subnameSample.name, "baseName:", subnameSample.baseName, "subname:", subnameSample.subname);
+    } else {
+      console.log("[DBG] No cards with subname fields found");
+    }
+    
     return mapped;
   } catch (e) {
     console.error("[API] Unified fetch failed:", e);
@@ -1502,13 +1834,16 @@ async function fetchAllCards({ signal } = {}) {
 async function fetchAllCardsFallback({ signal } = {}) {
   try {
     console.log('[API] Fallback using unified fetch...');
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 100, signal });
+    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
     const normalized = normalizeCards(list, source);
     console.log(`[API] Fallback loaded ${normalized.length}/${total} cards from ${source}`);
     
     const mapped = normalized.map(card => ({
       id: card.id,
       name: card.name,
+      // CRITICAL: Preserve baseName and subname for subtitle matching
+      baseName: card.baseName,
+      subname: card.subname,
       // NORMALIZED set fields you can rely on everywhere:
       set: card.set,           // e.g. "TFC"
       setNum: card.setNum,     // numeric series index if present
@@ -1620,81 +1955,58 @@ function normalizeCard(raw) {
   else if (raw.image_url || raw.image) {
     imageUrl = raw.image_url || raw.image;
   }
+  // Try Lorcast API Image field
+  else if (raw.Image) {
+    imageUrl = raw.Image;
+  }
   
-  const name = raw.name || raw.title || "Unknown Card";
-  const setCode = raw.set?.code || raw.set || raw.set_code || raw.setCode || raw.setName || "Unknown";
-  const collectorNo = raw.collector_number || raw.number || raw.no || 0;
-  const cost = raw.cost ?? raw.ink_cost ?? raw.inkCost ?? 0;
-  const inks = raw.ink ? [raw.ink] : [];
-  const type = Array.isArray(raw.type) ? raw.type.join("/") : (raw.type || "Unknown");
-  const rarity = raw.rarity || raw.rarityLabel || "Unknown";
-  const text = raw.text || raw.rules_text || raw.abilityText || raw.rules || raw.abilities || "";
+  const displayName = raw.name || raw.Name || raw.title || raw.Title || "Unknown Card";
   
-  const id = raw.id || raw._id || `${setCode}-${collectorNo}-${name}`;
+  // Extract baseName and subname from display name (split on hyphen/en dash/em dash)
+  const parts = displayName.split(/\s*[-–—]\s*/);
+  const baseName = parts[0]?.trim() || displayName;
+  const subname = parts[1]?.trim() || null;
+  
+  const setCode = raw.set?.code || raw.set || raw.set_code || raw.setCode || raw.setName || raw.Set_ID || "Unknown";
+  const collectorNo = raw.collector_number || raw.number || raw.no || raw.Card_Num || 0;
+  const cost = raw.cost ?? raw.ink_cost ?? raw.inkCost ?? raw.Cost ?? 0;
+  const inks = raw.ink ? [raw.ink] : (raw.Color ? raw.Color.split(',').map(c => c.trim()) : []);
+  const type = Array.isArray(raw.type) ? raw.type.join("/") : (raw.type || raw.Type || "Unknown");
+  const rarity = raw.rarity || raw.rarityLabel || raw.Rarity || "Unknown";
+  const text = raw.text || raw.rules_text || raw.abilityText || raw.rules || raw.abilities || raw.Body_Text || "";
+  
+  const id = raw.id || raw._id || raw.Unique_ID || `${setCode}-${collectorNo}-${displayName}`;
   
   return {
     id,
-    name,
+    name: displayName,        // Keep exact from API
+    baseName,                 // <-- New: extracted base name
+    subname,                  // <-- New: extracted subtitle
     set: setCode,
-    setName: raw.set?.name || undefined,
+    setName: raw.set?.name || raw.Set_Name || undefined,
     number: collectorNo,
     cost,
     inks,
     type,
     rarity,
     text,
-    classifications: raw.classifications || raw.subtypes || [],
-    keywords: raw.keywords || raw.abilities || [],
+    classifications: raw.classifications || raw.Classifications || raw.subtypes || [],
+    keywords: raw.keywords || raw.Abilities || raw.abilities || [],
     // Store the image URL directly without processing
     image_url: imageUrl, // This now handles both API formats
     _raw: raw,
     // Additional fields
     franchise: raw.franchise || raw.Franchise || "",
     gamemode: raw.gamemode || raw.Gamemode || "",
-    inkable: raw.inkwell || raw.inkable || raw.Inkable || false,
+    inkable: Boolean(raw.inkable ?? raw.can_be_ink ?? raw.Inkable ?? raw.inkwell ?? false),
     lore: raw.lore || raw.Lore || 0,
     willpower: raw.willpower || raw.Willpower || 0,
     strength: raw.strength || raw.Strength || 0,
+    setNum: raw.setNum || raw.Set_Num || undefined,
   };
 }
 
-
-// -----------------------------------------------------------------------------
-// Local storage & caching
-// -----------------------------------------------------------------------------
-
-const LS_KEYS = {
-  DECK: "lorcana.deck.v1",
-  DECKS: "lorcana.decks.v2", // New: Multiple decks storage
-  CURRENT_DECK_ID: "lorcana.currentDeckId.v2", // New: Current deck ID
-  FILTERS: "lorcana.filters.v1",
-  CACHE_IMG: "lorcana.imageCache.v1",
-  CACHE_CARDS: "lorcana.cardsCache.v1",
-};
-
-function loadLS(key, fallback) {
-  try {
-    console.log('[loadLS] Loading key:', key);
-    const v = localStorage.getItem(key);
-    console.log('[loadLS] Raw value from localStorage:', v);
-    const result = v ? JSON.parse(v) : fallback;
-    console.log('[loadLS] Parsed result:', result);
-    return result;
-  } catch (error) {
-    console.error('[loadLS] Error loading from localStorage:', error);
-    return fallback;
-  }
-}
-
-function saveLS(key, value) {
-  try {
-    console.log('[saveLS] Saving key:', key, 'with value:', value);
-    localStorage.setItem(key, JSON.stringify(value));
-    console.log('[saveLS] Successfully saved to localStorage');
-  } catch (error) {
-    console.error('[saveLS] Error saving to localStorage:', error);
-  }
-}
+// DUPLICATE SECTION REMOVED - Local storage functions are now at the top of the file
 
 // -----------------------------------------------------------------------------
 // Toasts
@@ -1870,6 +2182,8 @@ function exportDeck(deck, format = 'json') {
       return JSON.stringify(deck, null, 2);
     case 'txt':
       return generateTextExport(deck);
+    case 'simple-txt':
+      return generateSimpleTextExport(deck);
     case 'csv':
       return generateCSVExport(deck);
     default:
@@ -1904,6 +2218,22 @@ function generateTextExport(deck) {
       });
       lines.push('');
     });
+  
+  return lines.join('\n');
+}
+
+// Generate simple text export (matches import format)
+function generateSimpleTextExport(deck) {
+  const lines = [];
+  
+  // Get all entries with count > 0, sorted by card name
+  const entries = Object.values(deck.entries)
+    .filter(e => e.count > 0)
+    .sort((a, b) => a.card.name.localeCompare(b.card.name));
+  
+  entries.forEach(entry => {
+    lines.push(`${entry.count} ${entry.card.name}`);
+  });
   
   return lines.join('\n');
 }
@@ -1966,27 +2296,329 @@ function importDeck(data, format = 'json') {
   }
 }
 
-// Parse text import (basic implementation)
-function parseTextImport(text) {
-  // This is a basic parser - you can enhance it based on your needs
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-  const deck = { entries: {} };
-  
-  lines.forEach(line => {
-    // Look for card lines like "2x Card Name (Set #123)"
-    const match = line.match(/^(\d+)x\s+(.+?)\s+\((.+?)\s+#(\d+)\)$/);
-    if (match) {
-      const [, count, name, set, number] = match;
-      const card = { name, set, number };
-      const key = deckKey(card);
-      deck.entries[key] = { card, count: parseInt(count) };
+// Find card by Lorcanito export format: "Card Name — Subtitle (Set #Number)"
+function findCardByLorcanitoFormat(cardName, subtitle, setId, setNumber) {
+  if (window.getCurrentCards) {
+    const cards = window.getCurrentCards();
+    
+    if (!cards || cards.length === 0) {
+      console.warn('[findCardByLorcanitoFormat] No cards available in database');
+      return null;
     }
-  });
+    
+    console.log(`[findCardByLorcanitoFormat] Searching for: "${cardName} — ${subtitle}" (Set ${setId} #${setNumber})`);
+    
+    // Try exact match first
+    const exactMatch = cards.find(c => 
+      c.name === `${cardName} — ${subtitle}` ||
+      (c.name === cardName && c.subname === subtitle)
+    );
+    
+    if (exactMatch) {
+      console.log(`[findCardByLorcanitoFormat] Exact match found: "${exactMatch.name}"`);
+      return exactMatch;
+    }
+    
+    // Try matching by set and number
+    const setMatch = cards.find(c => 
+      String(c.setId) === String(setId) && 
+      String(c.setNumber) === String(setNumber)
+    );
+    
+    if (setMatch) {
+      console.log(`[findCardByLorcanitoFormat] Set match found: "${setMatch.name}" (Set ${setMatch.setId} #${setMatch.setNumber})`);
+      return setMatch;
+    }
+    
+    // Try fuzzy name matching
+    const fuzzyMatch = cards.find(c => 
+      c.name.toLowerCase().includes(cardName.toLowerCase()) &&
+      c.name.toLowerCase().includes(subtitle.toLowerCase())
+    );
+    
+    if (fuzzyMatch) {
+      console.log(`[findCardByLorcanitoFormat] Fuzzy match found: "${fuzzyMatch.name}"`);
+      return fuzzyMatch;
+    }
+    
+    console.log(`[findCardByLorcanitoFormat] No match found for "${cardName} — ${subtitle}"`);
+    return null;
+  } else {
+    console.warn('[findCardByLorcanitoFormat] getCurrentCards function not available');
+    return null;
+  }
+}
+
+// Parse text import - PERMISSIVE format that handles various deck list styles
+function parseTextImport(text) {
+  if (!text || typeof text !== 'string') {
+    throw new Error('Invalid text input');
+  }
+  
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line);
+  console.log(`[parseTextImport] Split ${lines.length} lines from input`);
+  console.log(`[parseTextImport] First few lines:`, lines.slice(0, 3));
+  
+  if (lines.length === 0) {
+    throw new Error('No valid lines found in text input');
+  }
+  
+  const deck = { entries: {} };
+  let validCards = 0;
+  let totalCards = 0;
+  let skippedLines = 0;
+  let foundCards = [];
+  let notFoundCards = [];
+  
+  // Simple, permissive line format that handles:
+  // "4 Name - Subtitle (TFC #123)"
+  // Parse each line - just count and full card name
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    // Skip empty lines and comments
+    if (!line || line.startsWith('#') || line.startsWith('//')) {
+      skippedLines++;
+      continue;
+    }
+    
+    // DEBUG: Log the actual line content to see what we're parsing
+    console.log(`[parseTextImport] Processing line ${index + 1}: "${line}"`);
+    
+    // Try to parse the line - just count and full card name
+    const match = line.match(/^(\d+)\s+(.+)$/);
+    if (!match) {
+      console.warn(`[parseTextImport] Unrecognized format on line ${index + 1}: "${line}"`);
+      skippedLines++;
+      continue;
+    }
+    
+    const [, count, fullCardName] = match;
+    const countNum = parseInt(count);
+    
+    if (countNum <= 0 || !fullCardName.trim()) {
+      console.warn(`[parseTextImport] Invalid count or card name on line ${index + 1}: "${line}"`);
+      skippedLines++;
+      continue;
+    }
+    
+    totalCards += countNum;
+    const cardName = fullCardName.trim();
+    
+    console.log(`[parseTextImport] Parsed: ${countNum}x "${cardName}"`);
+    
+    // Try to find the card by the complete name
+    const cards = window.getCurrentCards ? window.getCurrentCards() : [];
+    const foundCard = findCardByName(cardName, cards);
+    
+    if (foundCard && !foundCard.reason) {
+      // Card found successfully
+      const key = deckKey(foundCard);
+      
+      try {
+        const transformedCard = toAppCard(foundCard);
+        const rawUrl = getCardImageUrl(transformedCard);
+        const proxied = lorcanaImageProxyUrl(rawUrl);
+        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+        
+        if (image_url && typeof image_url !== 'string') {
+          image_url = null;
+        }
+        
+        deck.entries[key] = { 
+          card: {
+            ...transformedCard,
+            image_url,
+            _generatedImageUrl: rawUrl,
+            _proxiedImageUrl: proxied
+          }, 
+          count: countNum 
+        };
+        
+        validCards++;
+        foundCards.push({ name: foundCard.name, found: foundCard.name, count: countNum });
+        console.log(`[parseTextImport] Successfully imported: ${foundCard.name}`);
+        
+      } catch (error) {
+        console.warn(`[parseTextImport] Error processing card ${foundCard.name}:`, error);
+        // Store the card without image on error
+        deck.entries[key] = { 
+          card: { ...foundCard, image_url: null }, 
+          count: countNum 
+        };
+        validCards++;
+        foundCards.push({ name: foundCard.name, found: foundCard.name, count: countNum });
+      }
+      
+    } else if (foundCard && foundCard.reason === 'ambiguous-base' && foundCard.candidates) {
+      // Handle ambiguous cases
+      console.log(`[parseTextImport] Ambiguous card found for "${cardName}", ${foundCard.candidates.length} candidates`);
+      
+      // Use the first candidate as a best guess
+      const bestMatch = foundCard.candidates[0];
+      const key = deckKey(bestMatch);
+      
+      try {
+        const transformedCard = toAppCard(bestMatch);
+        const rawUrl = getCardImageUrl(transformedCard);
+        const proxied = lorcanaImageProxyUrl(rawUrl);
+        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+        
+        if (image_url && typeof image_url !== 'string') {
+          image_url = null;
+        }
+        
+        deck.entries[key] = { 
+          card: {
+            ...transformedCard,
+            image_url,
+            _generatedImageUrl: rawUrl,
+            _proxiedImageUrl: proxied,
+            _resolvedFromAmbiguous: true
+          }, 
+          count: countNum 
+        };
+        
+        validCards++;
+        foundCards.push({ name: bestMatch.name, found: bestMatch.name, count: countNum, reason: 'resolved-from-ambiguous' });
+        console.log(`[parseTextImport] Used best match: ${bestMatch.name}`);
+        
+      } catch (error) {
+        console.warn(`[parseTextImport] Error processing ambiguous card ${bestMatch.name}:`, error);
+        // Create placeholder
+        const placeholderCard = {
+          name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`,
+          set: cardSet || 'Multiple',
+          number: cardNumber || 'Multiple',
+          cost: 0,
+          inks: [],
+          type: "Unknown",
+          rarity: "Unknown",
+          text: `Multiple variants found: ${foundCard.candidates.map(c => c.name).join(', ')}`,
+          classifications: [],
+          keywords: [],
+          image_url: null,
+          _raw: {},
+          _candidates: foundCard.candidates,
+          _needsResolution: true,
+          setCode: cardSet || 'Multiple',
+          setName: cardSet ? `Set ${cardSet}` : 'Multiple Sets',
+          setNum: cardNumber || 'Multiple',
+          inkable: false,
+          lore: 0,
+          willpower: 0,
+          strength: 0,
+          franchise: "",
+          gamemode: "Lorcana"
+        };
+        
+        const placeholderKey = deckKey(placeholderCard);
+        deck.entries[placeholderKey] = { card: placeholderCard, count: countNum };
+        validCards++;
+        notFoundCards.push({ name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`, count: countNum, reason: 'ambiguous-needs-resolution' });
+      }
+      
+    } else {
+      // No card found, create placeholder
+      console.log(`[parseTextImport] No card found for: "${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}"`);
+      
+      const placeholderCard = {
+        name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`,
+        set: cardSet || "Unknown",
+        number: cardNumber || "?",
+        cost: 0,
+        inks: [],
+        type: "Unknown",
+        rarity: "Unknown",
+        text: "",
+        classifications: [],
+        keywords: [],
+        image_url: null,
+        _raw: {},
+        setCode: cardSet || "Unknown",
+        setName: cardSet ? `Set ${cardSet}` : "Unknown",
+        setNum: cardNumber || "?",
+        inkable: false,
+        lore: 0,
+        willpower: 0,
+        strength: 0,
+        franchise: "",
+        gamemode: "Lorcana"
+      };
+      
+      const key = deckKey(placeholderCard);
+      deck.entries[key] = { card: placeholderCard, count: countNum };
+      validCards++;
+      notFoundCards.push({ name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`, count: countNum, reason: 'not-found' });
+    }
+    
+    // REMOVED: Duplicate processing blocks that were causing double processing
+    // The main parsing logic above already handles all the formats we need
+  }
+  
+  if (validCards === 0) {
+    throw new Error('No valid cards found in text input');
+  }
+  
+  // Ensure the deck has the total count properly set
+  deck.total = totalCards;
+  
+  // Log detailed results for debugging
+  console.log(`[parseTextImport] Successfully parsed ${validCards} unique cards, ${totalCards} total cards (skipped ${skippedLines} lines)`);
+  
+  // Extract all valid image URLs for prefetching (ensuring they're strings)
+  const imageUrlsToPrefetch = Object.values(deck.entries)
+    .map(entry => {
+      const card = entry.card;
+      if (!card) return null;
+      
+      // DEBUG: Log what we're working with
+      console.log(`[parseTextImport] Prefetch processing card:`, {
+        name: card.name,
+        type: typeof card,
+        keys: Object.keys(card),
+        hasImageUrl: !!card.image_url,
+        imageUrlType: typeof card.image_url
+      });
+      
+      // Use getCardImageUrl to get the best possible URL
+      const rawUrl = getCardImageUrl(card);
+      
+      // DEBUG: Log the exact value and type
+      console.log(`[parseTextImport] Prefetch rawUrl details:`, {
+        rawUrl,
+        type: typeof rawUrl,
+        isString: typeof rawUrl === 'string',
+        isObject: typeof rawUrl === 'object',
+        length: rawUrl?.length,
+        keys: typeof rawUrl === 'object' ? Object.keys(rawUrl) : 'N/A'
+      });
+      
+      // GUARD: Ensure rawUrl is a string before calling proxyImageUrl
+      if (typeof rawUrl !== 'string') {
+        console.warn(`[parseTextImport] rawUrl is not a string, skipping proxy:`, rawUrl);
+        return asUrl(rawUrl);
+      }
+      
+      console.log(`[parseTextImport] Prefetch call to lorcanaImageProxyUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof lorcanaImageProxyUrl });
+      const proxied = lorcanaImageProxyUrl(rawUrl);
+      return asUrl(proxied) ?? asUrl(rawUrl);
+    })
+    .filter(url => typeof url === 'string' && url.length > 0);
+  
+  console.log(`[parseTextImport] Extracted ${imageUrlsToPrefetch.length} valid image URLs for prefetching`);
+  if (imageUrlsToPrefetch.length > 0) {
+    console.log(`[parseTextImport] Sample URLs:`, imageUrlsToPrefetch.slice(0, 3));
+  }
+  
+  if (foundCards.length > 0) {
+    console.log('[parseTextImport] Found cards:', foundCards);
+  }
+  if (notFoundCards.length > 0) {
+    console.log('[parseTextImport] Not found cards:', notFoundCards);
+  }
   
   return deck;
 }
-
-
 
 
 // ADVANCED: Deterministic card matching system with clear outcomes
@@ -2214,7 +2846,6 @@ function findCardByName(userLine, cards) {
   console.log(`[findCardByName] No match found for: "${typed}"`);
   return null;
 }
-
 
 // Parse CSV import (basic implementation)
 function parseCSVImport(csv) {
@@ -2574,62 +3205,7 @@ function filterReducer(state, action) {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Card image cache context
-// -----------------------------------------------------------------------------
-
-console.log('[Context] Creating ImageCacheContext...');
-const ImageCacheContext = createContext();
-console.log('[Context] ImageCacheContext created:', ImageCacheContext);
-
-function ImageCacheProvider({ children }) {
-  console.log('[ImageCacheProvider] Initializing...');
-  const [cache, setCache] = useState(() => loadLS(LS_KEYS.CACHE_IMG, {}));
-  const [cacheVersion, setCacheVersion] = useState(0);
-  
-  useEffect(() => {
-    console.log('[ImageCacheProvider] Cache updated, saving to localStorage');
-    saveLS(LS_KEYS.CACHE_IMG, cache);
-  }, [cache]);
-
-  const get = useCallback((key) => cache[key], [cache]);
-  const put = useCallback((key, value) => {
-    setCache((c) => ({ ...c, [key]: value }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
-  const putFailed = useCallback((key) => {
-    setCache((c) => ({ ...c, [key]: 'FAILED' }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
-
-  const value = useMemo(() => ({ get, put, putFailed, cache, cacheVersion }), [get, put, putFailed, cache, cacheVersion]);
-
-  console.log('[ImageCacheProvider] About to render with value:', value);
-
-  return (
-    <ImageCacheContext.Provider value={value}>
-      {children}
-    </ImageCacheContext.Provider>
-  );
-}
-
-// Debug component to trace context
-function ContextDebugger() {
-  const context = useContext(ImageCacheContext);
-  console.log('[ContextDebugger] Context value:', context);
-  return null; // This component doesn't render anything
-}
-
-function useImageCache() {
-  console.log('[useImageCache] Hook called');
-  const context = useContext(ImageCacheContext);
-  console.log('[useImageCache] Context value:', context);
-  if (!context) {
-    console.error('[useImageCache] Context is null/undefined - this will cause the error');
-    throw new Error('useImageCache must be used within ImageCacheProvider');
-  }
-  return context;
-}
+// DUPLICATE SECTION REMOVED - ImageCacheProvider is now only defined at the top of the file
 
 // -----------------------------------------------------------------------------
 // Components
@@ -3263,7 +3839,14 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${exportFormat}`;
+    
+    // Handle file extension for different formats
+    let fileExtension = exportFormat;
+    if (exportFormat === 'simple-txt') {
+      fileExtension = 'txt';
+    }
+    
+    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${fileExtension}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -3275,6 +3858,31 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
     
     try {
       const importedDeck = importDeck(importData, importFormat);
+      onImportDeck(importedDeck);
+      setImportData("");
+      onClose();
+    } catch (error) {
+      alert(`Import failed: ${error.message}`);
+    }
+  };
+  
+  const handleImportWithWarnings = () => {
+    if (!importData.trim()) return;
+    
+    try {
+      const importedDeck = importDeck(importData, importFormat);
+      
+      // Check if any cards were not found in the database
+      const unknownCards = Object.values(importedDeck.entries)
+        .filter(entry => entry.card.set === "Unknown")
+        .map(entry => entry.card.name);
+      
+      let message = `Successfully imported deck with ${importedDeck.total} cards.`;
+      if (unknownCards.length > 0) {
+        message += `\n\nNote: ${unknownCards.length} cards were not found in the database and may need to be loaded first:\n${unknownCards.join(', ')}`;
+      }
+      
+      alert(message);
       onImportDeck(importedDeck);
       setImportData("");
       onClose();
@@ -3438,7 +4046,8 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                         className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
                       >
                         <option value="json">JSON</option>
-                        <option value="txt">Text</option>
+                        <option value="txt">Text (Detailed)</option>
+                        <option value="simple-txt">Text (Simple)</option>
                         <option value="csv">CSV</option>
                       </select>
                       <button
@@ -3462,6 +4071,15 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                         <option value="txt">Text</option>
                         <option value="csv">CSV</option>
                       </select>
+                      {importFormat === 'txt' && (
+                        <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                          <div className="font-medium mb-1">Text format support:</div>
+                          <div>• Simple: "4 Rafiki - Mystical Fighter"</div>
+                          <div>• Legacy: "2x Card Name (Set #123)"</div>
+                          <div>• Comments: Lines starting with # or // are ignored</div>
+                          <div>• Empty lines are automatically skipped</div>
+                        </div>
+                      )}
                       <textarea
                         placeholder="Paste deck data here..."
                         value={importData}
@@ -3469,7 +4087,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                         className="w-full h-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm resize-none"
                       />
                       <button
-                        onClick={handleImport}
+                        onClick={handleImportWithWarnings}
                         className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
                       >
                         Import
@@ -3887,6 +4505,7 @@ return (
 
 function ImportModal({ open, onClose, onImport }) {
   const [text, setText] = useState("");
+  const [importFormat, setImportFormat] = useState("json");
   const [savedDecks, setSavedDecks] = useState([]);
   const [showSavedDecks, setShowSavedDecks] = useState(false);
   
@@ -3976,15 +4595,40 @@ function ImportModal({ open, onClose, onImport }) {
           )}
         </div>
         
-        {/* Import JSON Section */}
+        {/* Import Section */}
         <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-3">Import from JSON</h3>
-          <div className="text-sm text-gray-400 mb-3">
-            Paste deck JSON exported from this app (or adapt from another builder).
+          <h3 className="text-lg font-semibold mb-3">Import Deck</h3>
+          
+          {/* Format Selector */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Import Format:</label>
+            <select
+              value={importFormat}
+              onChange={(e) => {
+                setImportFormat(e.target.value);
+                setText(""); // Clear textarea when format changes
+              }}
+              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm"
+            >
+              <option value="json">JSON</option>
+              <option value="txt">Text</option>
+            </select>
           </div>
+          
+          {/* Format-specific help text */}
+          {importFormat === 'json' && (
+            <div className="text-sm text-gray-400 mb-3">
+              Paste deck JSON exported from this app (or adapt from another builder).
+            </div>
+          )}
+          {importFormat === 'txt' && (
+            <div className="text-sm text-gray-400 mb-3">
+              Paste your deck list with one card per line. Format: "4 Rafiki - Mystical Fighter"
+            </div>
+          )}
           <textarea
             className="w-full h-48 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
-            placeholder='{"name":"My Deck","entries":{...},"total":60}'
+            placeholder={importFormat === 'json' ? '{"name":"My Deck","entries":{...},"total":60}' : '4 Rafiki - Mystical Fighter\n2 The Magic Feather\n4 Sail The Azurite Sea'}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -3992,12 +4636,47 @@ function ImportModal({ open, onClose, onImport }) {
             <button
               className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
               onClick={() => {
+                if (!text.trim()) {
+                  alert("Please enter some text to import");
+                  return;
+                }
+                
                 try {
-                  const obj = JSON.parse(text);
-                  onImport(obj);
+                  let importedDeck;
+                  
+                  if (importFormat === 'json') {
+                    importedDeck = JSON.parse(text);
+                  } else if (importFormat === 'txt') {
+                    // Use the global parseTextImport function
+                    if (typeof window.parseTextImport === 'function') {
+                      importedDeck = window.parseTextImport(text);
+                      
+                      // Check for cards that weren't found and show user feedback
+                      const notFoundCards = Object.values(importedDeck.entries)
+                        .filter(entry => entry.card.set === "Unknown")
+                        .map(entry => entry.card.name);
+                      
+                      if (notFoundCards.length > 0) {
+                        const message = `Import successful! ${importedDeck.total} cards imported.\n\nNote: ${notFoundCards.length} cards were not found in the database:\n${notFoundCards.join(', ')}\n\nThese may need to be loaded first or check spelling.`;
+                        alert(message);
+                      } else {
+                        alert(`Import successful! ${importedDeck.total} cards imported.`);
+                      }
+                    } else {
+                      throw new Error('Text import function not available');
+                    }
+                  } else {
+                    throw new Error(`Unsupported format: ${importFormat}`);
+                  }
+                  
+                  onImport(importedDeck);
                   onClose();
-                } catch {
-                  alert("Invalid JSON");
+                } catch (error) {
+                  if (importFormat === 'json') {
+                    alert("Invalid JSON");
+                  } else {
+                    alert(`Import failed: ${error.message}`);
+                  }
                 }
               }}
             >
@@ -5257,13 +5936,125 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
 // Root App -------------------------------------------------------------------
 
 function AppInner() {
+  console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
+  
+  // Debug: Track component lifecycle
+  console.log('[App] ===== COMPONENT LIFECYCLE DEBUG =====');
+  console.log('[App] Component function starting...');
+  
+  // Debug: Check if allCards has data immediately
+  console.log('[App] ===== COMPONENT STARTUP DEBUG =====');
+  console.log('[App] About to initialize state variables...');
   const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState);
   const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState);
   console.log('[App] Initial filters state:', filters);
+  
+  // Debug: Track when allCards is modified
   const [allCards, setAllCards] = useState([]);
   const [shownCards, setShownCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Debug: Create a custom setAllCards that logs when it's called
+  const setAllCardsWithLogging = useCallback((cards) => {
+    console.log('[App] ===== setAllCards CALLED =====');
+    console.log('[App] Cards being set:', cards?.length || 0);
+    if (cards && cards.length > 0) {
+      console.log('[App] Sample cards being set:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+      const cardsWithSubnames = cards.filter(card => card.name && card.name.includes(' - '));
+      console.log('[App] Cards with subnames in new data:', cardsWithSubnames.length);
+      if (cardsWithSubnames.length > 0) {
+        console.log('[App] Sample subname cards in new data:', cardsWithSubnames.slice(0, 3).map(c => c.name));
+      }
+    }
+    console.log('[App] ===== END setAllCards LOG =====');
+    setAllCards(cards);
+  }, []);
+  
+  // Debug: Check state immediately after initialization
+  console.log('[App] State variables initialized:');
+  console.log('[App] - allCards:', allCards?.length || 0);
+  console.log('[App] - shownCards:', shownCards?.length || 0);
+  console.log('[App] - loading:', loading);
+  
+  // FIXED: IMMEDIATE DETECTION - Accept hyphenated titles, don't force reload unnecessarily
+  console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
+  if (allCards && allCards.length > 0) {
+    const cardsWithSubnames = allCards.filter(hasSubtitleLike);
+    console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames/subtitles found:', cardsWithSubnames.length);
+    
+    if (cardsWithSubnames.length === 0) {
+      console.log('[App] 🚨 IMMEDIATE CHECK: SIMPLIFIED CARDS DETECTED! Need to reload...');
+      // This will trigger our useEffect to reload
+    } else {
+      console.log('[App] ✅ IMMEDIATE CHECK: Cards already have subnames/subtitles, no reload needed');
+    }
+  }
+  
+  // Debug: Check what's actually in allCards
+  if (allCards && allCards.length > 0) {
+    console.log('[App] allCards already has data! Sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+    const cardsWithSubnames = allCards.filter(card => hasSubtitleLike(card));
+    console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
+    if (cardsWithSubnames.length > 0) {
+      console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+    } else {
+      console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
+    }
+    
+    // Debug: Check if this is cached data
+    console.log('[App] ===== INVESTIGATING CARD SOURCE =====');
+    console.log('[App] Checking if cards are from localStorage or other cache...');
+    
+            // Check if there's a localStorage cache
+        try {
+          const cachedCards = localStorage.getItem('lorcana-cards-cache');
+          if (cachedCards) {
+            console.log('[App] Found cached cards in localStorage!');
+            const parsed = JSON.parse(cachedCards);
+            console.log('[App] Cached cards count:', parsed.length);
+            if (parsed.length > 0) {
+              const cachedWithSubnames = parsed.filter(card => hasSubtitleLike(card));
+              console.log('[App] Cached cards with subnames/subtitles:', cachedWithSubnames.length);
+              if (cachedWithSubnames.length > 0) {
+                console.log('[App] Sample cached subname/subtitle cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
+              }
+            }
+          } else {
+            console.log('[App] No cached cards found in localStorage');
+          }
+        } catch (error) {
+          console.log('[App] Error checking localStorage cache:', error);
+        }
+    
+    // Check if there's a sessionStorage cache
+    try {
+      const sessionCards = sessionStorage.getItem('lorcana-cards-session');
+      if (sessionCards) {
+        console.log('[App] Found cards in sessionStorage!');
+        const parsed = JSON.parse(sessionCards);
+        console.log('[App] Session cards count:', parsed.length);
+      } else {
+        console.log('[App] No cards found in sessionStorage');
+      }
+    } catch (error) {
+      console.log('[App] Error checking sessionStorage:', error);
+    }
+    
+    // Check if there are any global variables
+    if (window.lorcanaCards) {
+      console.log('[App] Found global lorcanaCards variable!');
+      console.log('[App] Global cards count:', window.lorcanaCards.length);
+    }
+    
+    if (window.allCards) {
+      console.log('[App] Found global allCards variable!');
+      console.log('[App] Global allCards count:', window.allCards.length);
+    }
+    
+    console.log('[App] ===== END INVESTIGATION =====');
+  }
+  
   const [inspectCard, setInspectCard] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -5366,26 +6157,92 @@ function AppInner() {
     });
   }, [filters]);
 
-  // Load all cards on mount
+  console.log('[App] 📍 CHECKPOINT: About to define card loading useEffect...');
+  
+  // TEST: Simple useEffect to see if any useEffect works
+  console.log('[App] 🧪 About to define TEST useEffect...');
   useEffect(() => {
+    console.log('[App] 🧪 TEST useEffect is running!');
+  }, []);
+  
+  // Load all cards on mount - FORCE reload if simplified cards detected
+  console.log('[App] 🔧 About to define the main card loading useEffect...');
+  
+  // Wrap in try-catch to catch React errors
+  try {
+    useEffect(() => {
+      console.log('[App] ===== CARD LOADING useEffect triggered =====');
+      console.log('[App] 🔄 useEffect is running! allCards state:', allCards?.length || 0);
+    
+    // FIXED: Check if we already have cards with subnames OR subtitles in Name field
+    if (allCards && allCards.length > 0) {
+      const cardsWithSubnames = allCards.filter(hasSubtitleLike);
+      console.log('[App] Existing cards with subnames/subtitles:', cardsWithSubnames.length);
+      
+      if (cardsWithSubnames.length > 0) {
+        console.log('[App] ✅ Already have', cardsWithSubnames.length, 'cards with subnames/subtitles, skipping API call');
+        setLoading(false);
+        return;
+      } else {
+        console.log('[App] ⚠️  DETECTED SIMPLIFIED CARDS - No subnames/subtitles found in', allCards.length, 'cards');
+        console.log('[App] 🔄 FORCING API RELOAD to get cards with subnames/subtitles...');
+      }
+    }
+    
     const loadCards = async () => {
       try {
-        console.log('[App] Loading all cards...');
+        console.log('[App] 📡 Calling fetchAllCards() to get cards with subnames...');
         const cards = await fetchAllCards();
-        console.log('[App] Loaded cards:', cards.length);
-        setAllCards(cards);
-        setLoading(false);
+        console.log('[App] ✅ fetchAllCards() returned:', cards?.length || 0, 'cards');
+        
+        if (cards && cards.length > 0) {
+          // FIXED: Check what cards we actually got (subnames OR subtitles in Name)
+          const cardsWithSubnames = cards.filter(hasSubtitleLike);
+          console.log('[App] 🎯 Cards with subnames/subtitles loaded:', cardsWithSubnames.length);
+          
+          if (cardsWithSubnames.length > 0) {
+            console.log('[App] ✅ SUCCESS! Sample subname/subtitle cards:', cardsWithSubnames.slice(0, 3).map(c => ({ 
+              name: c.name, 
+              subname: c.subname,
+              hasSubtitle: c.name && c.name.includes(' - ')
+            })));
+            setAllCardsWithLogging(cards);
+            setLoading(false);
+          } else {
+            console.log('[App] ❌ STILL NO SUBNAMES/SUBTITLES! Sample cards:', cards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+            // For now, use what we got but log the issue
+            setAllCardsWithLogging(cards);
+            setLoading(false);
+          }
+        } else {
+          console.log('[App] ❌ fetchAllCards returned no cards');
+          setLoading(false);
+        }
       } catch (error) {
-        console.error('[App] Error loading cards:', error);
+        console.error('[App] ❌ Error loading cards:', error);
         setLoading(false);
       }
     };
     
     loadCards();
-  }, []);
+  }, []); // Only run once on mount
+  } catch (error) {
+    console.error('[App] ❌ React error in useEffect definition:', error);
+  }
 
   // Apply filters to cards
   useEffect(() => {
+    console.log('[App] Filtering cards...');
+    console.log('[App] allCards length:', allCards?.length);
+    if (allCards && allCards.length > 0) {
+      console.log('[App] allCards sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+      const cardsWithSubnames = allCards.filter(hasSubtitleLike);
+      console.log('[App] Cards with subnames/subtitles found:', cardsWithSubnames.length);
+      if (cardsWithSubnames.length > 0) {
+        console.log('[App] Sample subname/subtitle cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
+      }
+    }
+    
     if (allCards.length === 0) return;
     
     console.log('[App] Applying filters to cards...');
@@ -5518,18 +6375,10 @@ function AppInner() {
       });
     };
     
-    window.getCurrentCards = () => {
-      console.log('Current cards:', {
-        allCards: allCards.length,
-        shownCards: shownCards.length,
-        deck: deck,
-        filters: filters
-      });
-    };
+    // Removed duplicate window.getCurrentCards exposure - keeping only the one in the later useEffect
     
     return () => {
       delete window.checkCardFields;
-      delete window.getCurrentCards;
     };
     }, [shownCards]);
 
@@ -5600,9 +6449,13 @@ useEffect(() => {
   // Also expose the current card list for debugging
   window.getCurrentCards = () => shownCards || [];
   
+  // Expose the text import function globally
+  window.parseTextImport = parseTextImport;
+  
   return () => {
     delete window.checkCardFields;
     delete window.getCurrentCards;
+    delete window.parseTextImport;
   };
 }, [shownCards]);
 
@@ -5700,7 +6553,7 @@ function handleSaveDeck() {
 // Save deck to cloud database
 async function saveDeckToCloud(deckData) {
   try {
-    const response = await fetch('/api/decks', {
+    const response = await authSafeFetch('/api/decks', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -5725,7 +6578,7 @@ async function saveDeckToCloud(deckData) {
 async function loadDecksFromCloud() {
   try {
     console.log('[loadDecksFromCloud] Attempting to load decks from cloud...');
-    const response = await fetch('/api/decks', {
+    const response = await authSafeFetch('/api/decks', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -6472,6 +7325,7 @@ useEffect(() => {
     </ImageCacheProvider>
   </ToastProvider>
 );
+} // End AppInner function
 
 // -----------------------------------------------------------------------------
 // Filtering + Sorting
@@ -7032,7 +7886,7 @@ function useBatchImageLoader() {
   
   const { get, put, putFailed } = imageCacheContext;
   
-  const loadImagesInBatch = useCallback(async (cards, onProgress) => {
+  const loadImagesInBatch = async (cards, onProgress) => {
     // Intelligent loading with multiple strategies
     const CONCURRENCY = 10; // Reduced concurrency to avoid overwhelming
     const MAX_RETRIES = 2; // Allow retries for failed images
@@ -7132,7 +7986,7 @@ function useBatchImageLoader() {
     console.log(`[Batch Loader] Completed: ${loaded} loaded, ${failed} failed, ${localGenerated} local`);
     return { loaded, failed, localGenerated };
     
-  }, [get, put, putFailed]);
+  };
   
   return { loadImagesInBatch };
 }
@@ -7144,8 +7998,6 @@ function useBatchImageLoader() {
 
 
 
-
-} // Close AppInner function
 
 // --- Wrapper to ensure ImageCache is available everywhere ---
 export default function App(props) {
