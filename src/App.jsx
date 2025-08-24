@@ -923,7 +923,7 @@ function toAppCard(raw) {
     baseName: baseName,
     subtitle: subtitle,
     imageUrl: raw.imageUrl || raw.image || raw.Image || null,
-    inkable: Boolean(raw.inkable || raw.can_be_ink || raw.Inkable || raw.inkwell || false),
+    inkable: Boolean(raw.inkable ?? raw._raw?.inkwell ?? raw._raw?.inkable ?? raw._raw?.can_be_ink ?? raw._raw?.Inkable ?? false),
     colors: splitList(raw.colors || raw.color || raw.Color || ''),
     classifications: splitList(raw.classifications || raw.Classifications || ''),
     type: raw.type || raw.Type || null,
@@ -1695,8 +1695,8 @@ function normalizeLorcast(c) {
       image,
       _source: "lorcast",
       _raw: c,
-      // Preserve inkable flag for proper detection
-      inkable: Boolean(c.inkable ?? c.can_be_ink ?? c.Inkable ?? false),
+      // Preserve inkable flag for proper detection - prioritize inkwell field
+      inkable: Boolean(c.inkable ?? c.inkwell ?? c.can_be_ink ?? c.Inkable ?? false),
     };
   
   console.log('[normalizeLorcast] Normalized result:', {
@@ -4156,9 +4156,20 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
     
     for (const e of entries) {
       // Use the same inkable detection logic as the import function, but prioritize inkwell field
-      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
+      const fallback1 = e.card.inkable;
+      const fallback2 = e.card._raw?.inkwell;
+      const fallback3 = e.card._raw?.inkable;
+      const fallback4 = e.card._raw?.can_be_ink;
+      const fallback5 = e.card._raw?.Inkable;
+      const fallback6 = false;
       
-      console.log(`[Inkable Detection] Card: ${e.card.name}, inkable field: ${isInkable}, raw.inkable: ${e.card._raw?.inkable}, raw.inkwell: ${e.card._raw?.inkwell}`);
+      const isInkable = Boolean(fallback1 ?? fallback2 ?? fallback3 ?? fallback4 ?? fallback5 ?? fallback6);
+      
+      console.log(`[Inkable Detection] Fallbacks for ${e.card.name}:`, {
+        fallback1, fallback2, fallback3, fallback4, fallback5, fallback6, isInkable
+      });
+      
+      console.log(`[Inkable Detection] Card: ${e.card.name}, e.card.inkable: ${e.card.inkable}, raw.inkwell: ${e.card._raw?.inkwell}, raw.inkable: ${e.card._raw?.inkable}, calculated isInkable: ${isInkable}`);
       
       if (isInkable) {
         inkable += e.count;
