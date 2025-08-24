@@ -4491,25 +4491,44 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
     <Modal
       open={open}
       onClose={onClose}
-      title={`${card.name}${card.subname ? ` - ${card.subname}` : ''} • ${card.setName || card.set}`}
       size="md"
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <button
-            className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
-            onClick={() => onAdd(card)}
-          >
-            Add to Deck
-          </button>
-        </div>
-      }
     >
-      <div className="flex justify-center w-full">
+      <div className="relative flex justify-center w-full">
+        {/* Card Image */}
         <img 
           src={imgSrc} 
           alt={card.name} 
           className="w-auto h-auto max-w-[99.5%] max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
         />
+        
+        {/* Close Button - positioned over card top right */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
+        >
+          ×
+        </button>
+        
+        {/* Card Title - centered over card */}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/30">
+          {card.name}{card.subname ? ` - ${card.subname}` : ''} • {card.setName || card.set}
+        </div>
+        
+        {/* +/- Buttons - centered over card bottom */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3">
+          <button
+            onClick={() => onAdd(card)}
+            className="w-10 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center text-xl font-bold border-2 border-emerald-400 hover:border-emerald-300 transition-colors shadow-lg"
+          >
+            +
+          </button>
+          <button
+            onClick={() => onAdd(card)}
+            className="w-10 h-10 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xl font-bold border-2 border-red-400 hover:border-red-300 transition-colors shadow-lg"
+          >
+            −
+          </button>
+        </div>
       </div>
     </Modal>
   );
