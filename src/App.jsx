@@ -2748,9 +2748,29 @@ function findCardByName(userLine, cards) {
       baseName: c.baseName,
       subname: c.subname,
       subtitle: c.subtitle,
-      allKeys: Object.keys(c).slice(0, 10) // Show first 10 keys
+      allKeys: Object.keys(c).slice(0, 10), // Show first 10 keys
+      hasRaw: !!c._raw,
+      rawKeys: c._raw ? Object.keys(c._raw).slice(0, 5) : []
     }))
   );
+  
+  // DEBUG: Look for cards with similar names to understand the data structure
+  if (typed.includes(" - ")) {
+    const [baseTyped, subTyped] = typed.split(/\s*[-–—]\s*/);
+    const similarCards = cards.filter(c => {
+      const cardName = (c.name || "").toLowerCase();
+      return cardName.startsWith(baseTyped.toLowerCase());
+    }).slice(0, 5);
+    
+    console.log(`[findCardByName] Cards with similar base name "${baseTyped}":`, 
+      similarCards.map(c => ({
+        name: c.name,
+        baseName: c.baseName,
+        subname: c.subname,
+        rawName: c._raw?.Name
+      }))
+    );
+  }
   
   // DEBUG: Show what we're searching for
   console.log(`[findCardByName] Searching for complete card name: "${typed}"`);
@@ -2773,9 +2793,21 @@ function findCardByName(userLine, cards) {
   }
   console.log(`[findCardByName] No case-insensitive match found`);
 
-  // 3) Try fuzzy matching on the complete card name
+  // 3) Try matching against the original Name field if it exists
+  console.log(`[findCardByName] Trying original Name field match for: "${typed}"`);
+  const originalNameMatch = cards.find(c => {
+    const originalName = c._raw?.Name || c._raw?.name;
+    return originalName && originalName.toLowerCase() === typed.toLowerCase();
+  });
+  if (originalNameMatch) {
+    console.log(`[findCardByName] Found original Name match: "${originalNameMatch._raw?.Name || originalNameMatch._raw?.name}"`);
+    return originalNameMatch;
+  }
+  console.log(`[findCardByName] No original Name match found`);
+
+  // 4) Try fuzzy matching on the complete card name
   let candidates = cards.filter(c => {
-    const cardName = (c.Name || c.name || "").toLowerCase();
+    const cardName = (c.name || "").toLowerCase();
     const userFullName = typed.toLowerCase();
     
     // Check if the card name starts with the user's input or vice versa
@@ -2784,10 +2816,10 @@ function findCardByName(userLine, cards) {
   
   console.log(`[findCardByName] Found ${candidates.length} fuzzy matches for "${typed}"`);
   if (candidates.length > 0) {
-    console.log(`[findCardByName] Fuzzy match candidates:`, candidates.slice(0, 3).map(c => ({ name: c.Name || c.name })));
+    console.log(`[findCardByName] Fuzzy match candidates:`, candidates.slice(0, 3).map(c => ({ name: c.name })));
     
     if (candidates.length === 1) {
-      console.log(`[findCardByName] Found single fuzzy match: "${candidates[0].Name || candidates[0].name}"`);
+      console.log(`[findCardByName] Found single fuzzy match: "${candidates[0].name}"`);
       return candidates[0];
     } else {
       console.log(`[findCardByName] Multiple fuzzy matches found, returning ambiguous result`);
