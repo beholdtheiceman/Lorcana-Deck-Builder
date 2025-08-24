@@ -4485,9 +4485,13 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   const imgSrc = getCardImg(card || {});
   if (!open || !card) return null;
   
-
+  // Debug log to see card structure
+  console.log('[InspectCardModal] Card object:', card);
+  console.log('[InspectCardModal] Card name:', card.name);
+  console.log('[InspectCardModal] Card subname:', card.subname);
+  console.log('[InspectCardModal] Card version:', card.version);
   
-    return (
+  return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="relative flex justify-center w-full">
                          {/* Card Image */}
@@ -4499,13 +4503,13 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
                  
                  {/* Name Bubble - positioned above the card */}
                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full border border-white/30 shadow-lg">
-                   <span className="text-sm font-medium whitespace-nowrap">{card.name}</span>
+                   <span className="text-sm font-medium whitespace-nowrap">{card.subname ? `${card.name} - ${card.subname}` : card.name}</span>
                  </div>
                  
                  {/* Close Button - positioned over card top right */}
                  <button
                    onClick={onClose}
-                   className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
+                   className="absolute top-2 -right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
                  >
                    ×
                  </button>
