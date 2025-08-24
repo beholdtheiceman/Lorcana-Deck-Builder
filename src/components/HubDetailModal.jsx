@@ -16,11 +16,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
   const fetchHubDecks = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/hubs/${hub.id}/decks`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch(`/api/hubs/${hub.id}/decks`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch hub decks');
