@@ -4544,40 +4544,60 @@ function DeckStats({ deck }) {
           {console.log('[Chart Debug] Cost curve data:', costCurve)}
           {console.log('[Chart Debug] Cost curve data structure check:', costCurve.map(item => ({ cost: item.cost, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={costCurve}>
+            <BarChart 
+              data={costCurve}
+              onMouseMove={(e) => {
+                if (e && e.activeCoordinate && e.activePayload && e.activePayload.length > 0) {
+                  const data = e.activePayload[0].payload;
+                  console.log('[Chart MouseMove] Data:', data);
+                  
+                  // Remove existing tooltip
+                  const existingTooltip = document.getElementById('custom-tooltip');
+                  if (existingTooltip) {
+                    existingTooltip.remove();
+                  }
+                  
+                  // Create new tooltip
+                  const tooltip = document.createElement('div');
+                  tooltip.id = 'custom-tooltip';
+                  tooltip.className = 'fixed bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg z-50';
+                  tooltip.innerHTML = `
+                    <p class="text-white font-semibold">Cost ${data.cost}: ${data.count} cards</p>
+                    ${data.cards && data.cards.length > 0 ? `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">Cards:</p>
+                        <div class="max-h-32 overflow-y-auto">
+                          ${data.cards.map(card => `<p class="text-gray-400 text-xs">${card}</p>`).join('')}
+                        </div>
+                      </div>
+                    ` : `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">No card list available</p>
+                      </div>
+                    `}
+                  `;
+                  
+                  // Position the tooltip
+                  tooltip.style.left = e.activeCoordinate.x + 10 + 'px';
+                  tooltip.style.top = e.activeCoordinate.y - 10 + 'px';
+                  
+                  // Add to DOM
+                  document.body.appendChild(tooltip);
+                }
+              }}
+              onMouseLeave={() => {
+                // Remove tooltip when leaving chart
+                const tooltip = document.getElementById('custom-tooltip');
+                if (tooltip) {
+                  tooltip.remove();
+                }
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="cost" />
               <YAxis allowDecimals={false} />
-                            <Bar dataKey="count" name="count" fill="#10b981" />
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    console.log('[Tooltip Active] Data:', data);
-                    return (
-                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                        <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
-                        {data.cards && data.cards.length > 0 ? (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">Cards:</p>
-                            <div className="max-h-32 overflow-y-auto">
-                              {data.cards.map((card, index) => (
-                                <p key={index} className="text-gray-400 text-xs">{card}</p>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">No card list available</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              </BarChart>
+              <Bar dataKey="count" name="count" fill="#10b981" />
+            </BarChart>
             </ResponsiveContainer>
         </div>
       </ChartCard>
@@ -4587,40 +4607,60 @@ function DeckStats({ deck }) {
           {console.log('[Chart Debug] Type counts data:', typeCounts)}
           {console.log('[Chart Debug] Type counts data structure check:', typeCounts.map(item => ({ type: item.type, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={typeCounts}>
+            <BarChart 
+              data={typeCounts}
+              onMouseMove={(e) => {
+                if (e && e.activeCoordinate && e.activePayload && e.activePayload.length > 0) {
+                  const data = e.activePayload[0].payload;
+                  console.log('[Chart MouseMove] Card Types Data:', data);
+                  
+                  // Remove existing tooltip
+                  const existingTooltip = document.getElementById('custom-tooltip-types');
+                  if (existingTooltip) {
+                    existingTooltip.remove();
+                  }
+                  
+                  // Create new tooltip
+                  const tooltip = document.createElement('div');
+                  tooltip.id = 'custom-tooltip-types';
+                  tooltip.className = 'fixed bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg z-50';
+                  tooltip.innerHTML = `
+                    <p class="text-white font-semibold">${data.type}: ${data.count} cards</p>
+                    ${data.cards && data.cards.length > 0 ? `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">Cards:</p>
+                        <div class="max-h-32 overflow-y-auto">
+                          ${data.cards.map(card => `<p class="text-gray-400 text-xs">${card}</p>`).join('')}
+                        </div>
+                      </div>
+                    ` : `
+                      <div class="mt-2">
+                        <p class="text-gray-300 text-sm">No card list available</p>
+                      </div>
+                    `}
+                  `;
+                  
+                  // Position the tooltip
+                  tooltip.style.left = e.activeCoordinate.x + 10 + 'px';
+                  tooltip.style.top = e.activeCoordinate.y - 10 + 'px';
+                  
+                  // Add to DOM
+                  document.body.appendChild(tooltip);
+                }
+              }}
+              onMouseLeave={() => {
+                // Remove tooltip when leaving chart
+                const tooltip = document.getElementById('custom-tooltip-types');
+                if (tooltip) {
+                  tooltip.remove();
+                }
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="type" />
               <YAxis allowDecimals={false} />
-                            <Bar dataKey="count" name="count" fill="#3b82f6" />
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    console.log('[Tooltip Active] Card Types Data:', data);
-                    return (
-                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                        <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
-                        {data.cards && data.cards.length > 0 ? (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">Cards:</p>
-                            <div className="max-h-32 overflow-y-auto">
-                              {data.cards.map((card, index) => (
-                                <p key={index} className="text-gray-400 text-xs">{card}</p>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2">
-                            <p className="text-gray-300 text-sm">No card list available</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              </BarChart>
+              <Bar dataKey="count" name="count" fill="#3b82f6" />
+            </BarChart>
             </ResponsiveContainer>
         </div>
       </ChartCard>
