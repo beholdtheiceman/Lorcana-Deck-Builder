@@ -4504,15 +4504,12 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         {/* Close Button - positioned over card top right */}
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
         >
           ×
         </button>
         
-        {/* Card Title - above the card */}
-        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/30">
-          {card.name}{card.subname ? ` - ${card.subname}` : ''} • {card.setName || card.set}
-        </div>
+
         
         {/* +/- Buttons - centered over card bottom */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3">
