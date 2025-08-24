@@ -5045,19 +5045,56 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     console.log(`[Ink Distribution Debug] ${e.card.name}: getInks returned:`, inks);
     
     if (inks.length > 0) {
+      // Handle dual-ink cards: each ink gets the full count
       inks.forEach(ink => {
         if (ink) {
           inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
         }
       });
     } else {
-      // Fallback: if no ink colors found, try to determine from card properties
-      // This is a temporary solution for mono-color decks
-      if (e.card.inkable) {
-        // For now, assume mono-color decks are Amber (you can adjust this)
-        const fallbackInk = "Amber";
-        inkDistribution[fallbackInk] = (inkDistribution[fallbackInk] || 0) + e.count;
-        console.log(`[Ink Distribution Debug] Using fallback ink "${fallbackInk}" for ${e.card.name}`);
+      // Enhanced fallback: try to detect ink colors from card properties
+      console.log(`[Ink Distribution Debug] No inks found for ${e.card.name}, trying fallback detection`);
+      
+      // Try to get ink color from various card properties
+      let detectedInks = [];
+      
+      // Check if card has ink-related properties
+      if (e.card._raw) {
+        const raw = e.card._raw;
+        
+        // Try different possible ink color properties
+        if (raw.ink) detectedInks.push(raw.ink);
+        if (raw.Ink) detectedInks.push(raw.Ink);
+        if (raw.inkColor) detectedInks.push(raw.inkColor);
+        if (raw.Ink_Color) detectedInks.push(raw.Ink_Color);
+        if (raw.color) detectedInks.push(raw.color);
+        if (raw.Color) detectedInks.push(raw.Color);
+        if (raw.colors) {
+          if (Array.isArray(raw.colors)) {
+            detectedInks.push(...raw.colors);
+          } else if (typeof raw.colors === 'string') {
+            detectedInks.push(...raw.colors.split(',').map(c => c.trim()));
+          }
+        }
+        if (raw.Colors) {
+          if (Array.isArray(raw.Colors)) {
+            detectedInks.push(...raw.Colors);
+          } else if (typeof raw.Colors === 'string') {
+            detectedInks.push(...raw.Colors.split(',').map(c => c.trim()));
+          }
+        }
+      }
+      
+      // Remove duplicates and normalize ink names
+      detectedInks = [...new Set(detectedInks)].filter(ink => ink && ink !== 'undefined');
+      
+      if (detectedInks.length > 0) {
+        console.log(`[Ink Distribution Debug] Fallback detected inks for ${e.card.name}:`, detectedInks);
+        detectedInks.forEach(ink => {
+          inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
+        });
+      } else {
+        console.log(`[Ink Distribution Debug] No inks detected for ${e.card.name}, skipping`);
       }
     }
   });
