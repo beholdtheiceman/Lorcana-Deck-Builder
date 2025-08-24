@@ -6282,6 +6282,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 lore: cards[0].lore,
                 cost: cards[0].cost
               });
+              console.log('[Comp Dashboard] Sample card full structure:', cards[0]);
             }
 
             // --- Curve (stacked inkable/uninkable) ---
@@ -6357,7 +6358,15 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             // --- Average lore per card ---
             const avgLorePerCard = (() => {
               const totalLore = cards.reduce((a,c) => {
-                const lore = Number(c.lore || c._raw?.Lore || 0);
+                // Check multiple possible lore fields
+                const lore = Number(c.lore || c._raw?.Lore || c._raw?.lore || c._raw?.loreValue || 0);
+                console.log('[Comp Dashboard] Card lore for', c.name, ':', {
+                  c_lore: c.lore,
+                  raw_Lore: c._raw?.Lore,
+                  raw_lore: c._raw?.lore,
+                  raw_loreValue: c._raw?.loreValue,
+                  final: lore
+                });
                 return a + lore;
               }, 0);
               const result = Number((totalLore / Math.max(cards.length,1)).toFixed(2));
