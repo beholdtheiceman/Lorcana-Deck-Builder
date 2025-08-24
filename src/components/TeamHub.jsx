@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import HubDetailModal from './HubDetailModal';
-import DeckDetailModal from './DeckDetailModal';
 
 const TeamHub = () => {
   const { user } = useAuth();
@@ -13,8 +12,6 @@ const TeamHub = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showHubDetail, setShowHubDetail] = useState(false);
-  const [showDeckDetail, setShowDeckDetail] = useState(false);
-  const [selectedDeck, setSelectedDeck] = useState(null);
 
   // Form states
   const [hubName, setHubName] = useState('');
@@ -423,24 +420,13 @@ const TeamHub = () => {
             setSelectedHub(null);
           }}
           onDeckClick={(deck) => {
-            setSelectedDeck(deck);
-            setShowDeckDetail(true);
-            setShowHubDetail(false);
+            // The new approach handles deck detail directly in HubDetailModal
+            // No additional state management needed here
           }}
         />
       )}
 
-      {/* Deck Detail Modal */}
-      {showDeckDetail && selectedDeck && (
-        <DeckDetailModal
-          deck={selectedDeck}
-          hub={selectedHub}
-          onClose={() => {
-            setShowDeckDetail(false);
-            setSelectedDeck(null);
-          }}
-        />
-      )}
+      {/* The new approach handles deck viewing directly in HubDetailModal */}
     </div>
   );
 };
