@@ -50,7 +50,6 @@ export default async function handler(req, res) {
       console.log('Member IDs:', memberIds);
 
       // Get all decks from hub members
-      console.log('Fetching decks for members...');
       const decks = await prisma.deck.findMany({
         where: {
           userId: { in: memberIds }
@@ -62,80 +61,26 @@ export default async function handler(req, res) {
         },
         orderBy: { updatedAt: 'desc' }
       });
-      console.log('Found decks:', decks.length);
 
-      // Process decks to include card count and basic card info
-      console.log('Processing deck data...');
-      const processedDecks = decks.map((deck, index) => {
-        try {
-          console.log(`Processing deck ${index + 1}/${decks.length}:`, deck.id);
-          
-          const deckData = deck.data || {};
-          console.log('Deck data type:', typeof deckData);
-          console.log('Deck data keys:', Object.keys(deckData));
-          
-          // Try different possible card properties - the actual structure is deck.data.entries
-          let cards = deckData.entries || deckData.Entries || deckData.cards || deckData.Cards || deckData.card || deckData.Card || [];
-          
-          // If entries is an object, convert it to an array of cards
-          if (cards && typeof cards === 'object' && !Array.isArray(cards)) {
-            console.log('Entries is an object, converting to array...');
-            cards = Object.values(cards);
-            console.log('Converted entries to array, length:', cards.length);
-          }
-          
-          // If still no cards, check if it's a string that needs parsing
-          if (!cards.length && typeof deckData === 'string') {
-            try {
-              const parsed = JSON.parse(deckData);
-              cards = parsed.entries || parsed.Entries || parsed.cards || parsed.Cards || parsed.card || parsed.Card || [];
-              // Handle case where parsed entries is also an object
-              if (cards && typeof cards === 'object' && !Array.isArray(cards)) {
-                cards = Object.values(cards);
-              }
-              console.log('Parsed from string:', parsed);
-            } catch (e) {
-              console.log('Failed to parse deck data as JSON');
-            }
-          }
-          
-          console.log('Final cards array length:', cards.length);
-          
-          // Debug: Log the first few cards to see their structure
-          if (cards.length > 0) {
-            console.log('First card structure:', cards[0]);
-            console.log('First card keys:', Object.keys(cards[0]));
-            console.log('Sample cards being created:', cards.slice(0, 3).map(card => ({
-              name: card.name || card.Name || 'Unknown Card',
-              ink: card.ink || card.Ink || 'Unknown',
-              cost: card.cost || card.Cost || 0
-            })));
-          }
-          
-          return {
-            ...deck,
-            cards: cards,
-            cardCount: cards.length,
-            // Add some basic card info for display
-            sampleCards: cards.slice(0, 3).map(card => ({
-              name: card.name || card.Name || 'Unknown Card',
-              ink: card.ink || card.Ink || 'Unknown',
-              cost: card.cost || card.Cost || 0
-            }))
-          };
-        } catch (deckError) {
-          console.error('Error processing deck:', deck.id, deckError);
-          // Return a safe fallback for this deck
-          return {
-            ...deck,
-            cards: [],
-            cardCount: 0,
-            sampleCards: []
-          };
+      // Process decks to include basic info
+      const processedDecks = decks.map((deck) => {
+        const deckData = deck.data || {};
+        
+        // Get card count from deck data
+        let cardCount = 0;
+        if (deckData.entries && typeof deckData.entries === 'object') {
+          cardCount = Object.keys(deckData.entries).length;
+        } else if (deckData.total) {
+          cardCount = deckData.total;
         }
+        
+        return {
+          ...deck,
+          cardCount: cardCount
+        };
       });
 
-      console.log('=== HUB DECKS API SUCCESS ===');
+      console.log('Returning processed decks:', processedDecks.length);
       return res.status(200).json(processedDecks);
     } catch (error) {
       console.error('=== HUB DECKS API ERROR ===');
