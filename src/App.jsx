@@ -5937,36 +5937,45 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           {/* Ink Color Distribution */}
           <div className="bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={Object.entries(inkDistribution).map(([ink, count]) => ({
-                    name: ink,
-                    value: count
-                  }))}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={80}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {Object.entries(inkDistribution).map(([ink, count], index) => {
-                    const colors = {
-                      'Amber': '#f59e0b',
-                      'Amethyst': '#8b5cf6',
-                      'Emerald': '#10b981',
-                      'Ruby': '#ef4444',
-                      'Sapphire': '#3b82f6',
-                      'Steel': '#6b7280'
-                    };
-                    return (
-                      <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
-                    );
-                  })}
-                </Pie>
-                <Tooltip formatter={(value, name) => [value, name]} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {Object.keys(inkDistribution).length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={Object.entries(inkDistribution).map(([ink, count]) => ({
+                      name: ink,
+                      value: count
+                    }))}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={80}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {Object.entries(inkDistribution).map(([ink, count], index) => {
+                      const colors = {
+                        'Amber': '#f59e0b',
+                        'Amethyst': '#8b5cf6',
+                        'Emerald': '#10b981',
+                        'Ruby': '#ef4444',
+                        'Sapphire': '#3b82f6',
+                        'Steel': '#6b7280'
+                      };
+                      return (
+                        <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
+                      );
+                    })}
+                  </Pie>
+                  <Tooltip formatter={(value, name) => [value, name]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center text-gray-400 py-8">
+                <p>No ink color data available</p>
+                <p className="text-sm mt-2">Debug: inkDistribution = {JSON.stringify(inkDistribution)}</p>
+                <p className="text-sm mt-2">Total cards: {totalCards}</p>
+                <p className="text-sm mt-2">Entries length: {entries?.length || 0}</p>
+              </div>
+            )}
           </div>
         </div>
         
