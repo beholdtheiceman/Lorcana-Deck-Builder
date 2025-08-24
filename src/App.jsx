@@ -4582,7 +4582,7 @@ function DeckStats({ deck }) {
                 }}
                 cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
               />
-              <Bar dataKey="count" fill="#10b981" />
+              <Bar dataKey="count" name="count" fill="#10b981" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -4631,7 +4631,7 @@ function DeckStats({ deck }) {
                 }}
                 cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
               />
-              <Bar dataKey="count" fill="#3b82f6" />
+              <Bar dataKey="count" name="count" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>
         </div>
