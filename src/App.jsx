@@ -4421,64 +4421,7 @@ function DeckStats({ deck }) {
     ];
   }, [entries]);
 
-  // --- Comp Dashboard Memoized Datasets ---
-  const cards = useMemo(() => 
-    Object.values(deck?.entries || {})
-      .filter(e => e.count > 0)
-      .flatMap(e => Array(e.count).fill(e.card))
-  , [deck]);
 
-  // --- Curve (stacked inkable/uninkable) ---
-  const curveData = useMemo(() => {
-    const buckets = {};
-    cards.forEach(c => {
-      const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
-      const key = cost >= 7 ? "7+" : String(cost);
-      if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
-      (c.inkable ? buckets[key].inkable++ : buckets[key].uninkable++);
-    });
-    const order = ["0","1","2","3","4","5","6","7+"];
-    return order.filter(k => buckets[k]).map(k => buckets[k]);
-  }, [cards]);
-
-  // --- Ink pie ---
-  const inkPieData = useMemo(() => {
-    const counts = new Map();
-    cards.forEach(c => (Array.isArray(c.inks)?c.inks:[c.inks].filter(Boolean))
-      .forEach(i => counts.set(i, (counts.get(i)||0)+1)));
-    return [...counts.entries()].map(([name, value]) => ({ name, value }));
-  }, [cards]);
-
-  // --- Draw / consistency ---
-  const drawConsistency = useMemo(() => {
-    let drawCount=0, searchCount=0, rawDrawPieces=0;
-    cards.forEach(c => {
-      const t = textOf(c);
-      if (RX_DRAW.test(t)) { drawCount++; rawDrawPieces++; }
-      if (RX_SEARCH.test(t)) { searchCount++; rawDrawPieces++; }
-    });
-    const density = (rawDrawPieces / Math.max(cards.length,1))*100;
-    return { drawCount, searchCount, density: Number(density.toFixed(1)) };
-  }, [cards]);
-
-  // --- Average lore per card ---
-  const avgLorePerCard = useMemo(() => {
-    const totalLore = cards.reduce((a,c)=>a + Number(c.lore||0), 0);
-    return Number((totalLore / Math.max(cards.length,1)).toFixed(2));
-  }, [cards]);
-
-  // --- Roles breakdown ---
-  const roleData = useMemo(() => {
-    const counts = {};
-    cards.forEach(c => {
-      const r = roleForCard(c);
-      counts[r] = (counts[r]||0)+1;
-    });
-    return Object.entries(counts).map(([role,value])=>({role, value}));
-  }, [cards]);
-
-  // --- Synergies list ---
-  const synergies = useMemo(() => detectSynergies(cards), [cards]);
 
   const total = entries.reduce((a, b) => a + b.count, 0);
   const avgCost = average(entries, (e) => getCost(e.card)).toFixed(2);
@@ -4517,7 +4460,7 @@ function DeckStats({ deck }) {
         </div>
       </ChartCard>
 
-      <ChartCard title="Inkable vs Uninkable">
+            <ChartCard title="Inkable vs Uninkable">
         <div className="flex flex-col items-center justify-center h-56">
           <div className="text-3xl font-bold text-emerald-400 mb-2">
             {inkableCounts[0]?.count || 0} Inkable
@@ -4527,99 +4470,6 @@ function DeckStats({ deck }) {
           </div>
         </div>
       </ChartCard>
-
-      {/* Comp Dashboard */}
-      <div className="border-t border-gray-800 pt-4 mt-4">
-        <h3 className="text-lg font-semibold mb-4 text-emerald-400">Competitive Analysis</h3>
-        
-        {/* Curve & Cost */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Curve (Inkable vs Uninkable)</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={curveData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="cost" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="inkable" stackId="a" fill="#10b981" />
-              <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Ink Colors */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Ink Colors</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={inkPieData} dataKey="value" nameKey="name" outerRadius={80} label />
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Draw / Consistency */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Consistency</h3>
-          <ul className="space-y-1 text-sm">
-            <li><strong>Draw pieces:</strong> {drawConsistency.drawCount}</li>
-            <li><strong>Search/Dig pieces:</strong> {drawConsistency.searchCount}</li>
-            <li><strong>Card advantage density:</strong> {drawConsistency.density}% of deck</li>
-          </ul>
-          <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
-        </div>
-
-        {/* Lore potential */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Lore Efficiency</h3>
-          <div><strong>Avg Lore / Card:</strong> {avgLorePerCard}</div>
-        </div>
-
-        {/* Roles & Synergies */}
-        <div className="p-4 mb-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Roles</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={roleData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="role" interval={0} angle={-10} textAnchor="end" height={60}/>
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#8b5cf6" />
-            </BarChart>
-          </ResponsiveContainer>
-
-          {synergies.length > 0 ? (
-            <div className="mt-3">
-              <h4 className="font-medium mb-1 text-sm">Detected Synergies</h4>
-              <ul className="list-disc ml-5 text-sm">{synergies.map(s=> <li key={s}>{s}</li>)}</ul>
-            </div>
-          ) : <p className="text-sm text-gray-400 mt-3">No obvious synergies detected.</p>}
-        </div>
-
-        {/* Meta Tools (stub) */}
-        <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
-          <h3 className="mb-2 text-sm font-medium">Meta Tools</h3>
-          <p className="text-sm text-gray-300 mb-2">
-            Tag your deck against common archetypes and add matchup notes. (Hook this to your DB / PlayHub scrape later.)
-          </p>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs uppercase text-gray-400">Archetype tags</label>
-              <input className="w-full bg-gray-800 rounded px-2 py-1 text-sm" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase text-gray-400">Tech slots (notes)</label>
-              <input className="w-full bg-gray-800 rounded px-2 py-1 text-sm" placeholder="e.g., +2 Banish; +1 Evasive hate" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <label className="block text-xs uppercase text-gray-400">Matchup notes</label>
-            <textarea rows={3} className="w-full bg-gray-800 rounded px-2 py-1 text-sm" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -6403,6 +6253,182 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Comp Dashboard - Competitive Analysis */}
+        <div className="bg-gray-800 rounded-lg p-6">
+          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">Competitive Analysis</h3>
+          
+          {/* Comp Dashboard Memoized Datasets */}
+          {(() => {
+            const cards = Object.values(deck?.entries || {})
+              .filter(e => e.count > 0)
+              .flatMap(e => Array(e.count).fill(e.card));
+
+            // --- Curve (stacked inkable/uninkable) ---
+            const curveData = (() => {
+              const buckets = {};
+              cards.forEach(c => {
+                const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
+                const key = cost >= 7 ? "7+" : String(cost);
+                if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
+                (c.inkable ? buckets[key].inkable++ : buckets[key].uninkable++);
+              });
+              const order = ["0","1","2","3","4","5","6","7+"];
+              return order.filter(k => buckets[k]).map(k => buckets[k]);
+            })();
+
+            // --- Ink pie ---
+            const inkPieData = (() => {
+              const counts = new Map();
+              cards.forEach(c => (Array.isArray(c.inks)?c.inks:[c.inks].filter(Boolean))
+                .forEach(i => counts.set(i, (counts.get(i)||0)+1)));
+              return [...counts.entries()].map(([name, value]) => ({ name, value }));
+            })();
+
+            // --- Draw / consistency ---
+            const drawConsistency = (() => {
+              let drawCount=0, searchCount=0, rawDrawPieces=0;
+              cards.forEach(c => {
+                const t = textOf(c);
+                if (RX_DRAW.test(t)) { drawCount++; rawDrawPieces++; }
+                if (RX_SEARCH.test(t)) { searchCount++; rawDrawPieces++; }
+              });
+              const density = (rawDrawPieces / Math.max(cards.length,1))*100;
+              return { drawCount, searchCount, density: Number(density.toFixed(1)) };
+            })();
+
+            // --- Average lore per card ---
+            const avgLorePerCard = (() => {
+              const totalLore = cards.reduce((a,c)=>a + Number(c.lore||0), 0);
+              return Number((totalLore / Math.max(cards.length,1)).toFixed(2));
+            })();
+
+            // --- Roles breakdown ---
+            const roleData = (() => {
+              const counts = {};
+              cards.forEach(c => {
+                const r = roleForCard(c);
+                counts[r] = (counts[r]||0)+1;
+              });
+              return Object.entries(counts).map(([role,value])=>({role, value}));
+            })();
+
+            // --- Synergies list ---
+            const synergies = (() => detectSynergies(cards))();
+
+            return (
+              <div className="space-y-6">
+                {/* Curve & Cost */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-center">Curve (Inkable vs Uninkable)</h4>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={curveData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="cost" stroke="#9CA3AF" />
+                      <YAxis allowDecimals={false} stroke="#9CA3AF" />
+                      <Tooltip 
+                        formatter={(value, name) => [value, name === 'inkable' ? 'Inkable' : 'Uninkable']}
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#F9FAFB'
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="inkable" stackId="a" fill="#10b981" />
+                      <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Draw / Consistency */}
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <h4 className="text-lg font-semibold mb-3 text-center">Consistency</h4>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-blue-400">{drawConsistency.drawCount}</div>
+                      <div className="text-sm text-gray-400">Draw pieces</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-400">{drawConsistency.searchCount}</div>
+                      <div className="text-sm text-gray-400">Search/Dig pieces</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-purple-400">{drawConsistency.density}%</div>
+                      <div className="text-sm text-gray-400">Card advantage density</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3 text-center">Heuristic: scans rules text for draw/search verbs</p>
+                </div>
+
+                {/* Lore Efficiency */}
+                <div className="bg-gray-700 rounded-lg p-4 text-center">
+                  <h4 className="text-lg font-semibold mb-2">Lore Efficiency</h4>
+                  <div className="text-3xl font-bold text-emerald-400">{avgLorePerCard}</div>
+                  <div className="text-sm text-gray-400">Average Lore per Card</div>
+                </div>
+
+                {/* Roles & Synergies */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-center">Card Roles</h4>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={roleData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="role" interval={0} angle={-10} textAnchor="end" height={60} stroke="#9CA3AF" />
+                      <YAxis allowDecimals={false} stroke="#9CA3AF" />
+                      <Tooltip 
+                        formatter={(value, name) => [value, 'Cards']}
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#F9FAFB'
+                        }}
+                      />
+                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {synergies.length > 0 ? (
+                    <div className="mt-4 bg-gray-700 rounded-lg p-4">
+                      <h5 className="font-semibold mb-2 text-center">Detected Synergies</h5>
+                      <ul className="list-disc ml-6 text-sm space-y-1">
+                        {synergies.map(s => <li key={s} className="text-gray-300">{s}</li>)}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="mt-4 bg-gray-700 rounded-lg p-4 text-center">
+                      <p className="text-sm text-gray-400">No obvious synergies detected</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Meta Tools (stub) */}
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <h4 className="text-lg font-semibold mb-3 text-center">Meta Tools</h4>
+                  <p className="text-sm text-gray-300 mb-4 text-center">
+                    Tag your deck against common archetypes and add matchup notes
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs uppercase text-gray-400 mb-1">Archetype tags</label>
+                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase text-gray-400 mb-1">Tech slots (notes)</label>
+                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., +2 Banish; +1 Evasive hate" />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-xs uppercase text-gray-400 mb-1">Matchup notes</label>
+                    <textarea rows={3} className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         
         {/* Action Buttons - Always Visible */}
