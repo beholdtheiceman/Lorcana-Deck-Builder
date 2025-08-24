@@ -6259,11 +6259,30 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
         <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">Competitive Analysis</h3>
           
-          {/* Comp Dashboard Memoized Datasets */}
+          {/* Comp Dashboard Data Calculations */}
           {(() => {
+            // Debug: Log deck structure
+            console.log('[Comp Dashboard] Deck object:', deck);
+            console.log('[Comp Dashboard] Deck entries:', deck?.entries);
+            console.log('[Comp Dashboard] Deck entries keys:', Object.keys(deck?.entries || {}));
+            
+            // Create cards array from deck entries
             const cards = Object.values(deck?.entries || {})
               .filter(e => e.count > 0)
               .flatMap(e => Array(e.count).fill(e.card));
+
+            console.log('[Comp Dashboard] Cards array created:', cards.length, 'cards');
+            console.log('[Comp Dashboard] Sample card:', cards[0]);
+            console.log('[Comp Dashboard] Sample card properties:', cards[0] ? Object.keys(cards[0]) : 'No cards');
+            if (cards[0]) {
+              console.log('[Comp Dashboard] Sample card text fields:', {
+                text: cards[0].text,
+                rulesText: cards[0].rulesText,
+                _raw: cards[0]._raw,
+                lore: cards[0].lore,
+                cost: cards[0].cost
+              });
+            }
 
             // --- Curve (stacked inkable/uninkable) ---
             const curveData = (() => {
@@ -6272,7 +6291,13 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
                 const key = cost >= 7 ? "7+" : String(cost);
                 if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
-                (c.inkable ? buckets[key].inkable++ : buckets[key].uninkable++);
+                // Check inkable status using the same logic as elsewhere in the component
+                const isInkable = Boolean(c.inkable ?? c._raw?.inkwell ?? c._raw?.inkable ?? c._raw?.can_be_ink ?? c._raw?.Inkable ?? false);
+                if (isInkable) {
+                  buckets[key].inkable++;
+                } else {
+                  buckets[key].uninkable++;
+                }
               });
               const order = ["0","1","2","3","4","5","6","7+"];
               return order.filter(k => buckets[k]).map(k => buckets[k]);
@@ -6281,8 +6306,15 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             // --- Ink pie ---
             const inkPieData = (() => {
               const counts = new Map();
-              cards.forEach(c => (Array.isArray(c.inks)?c.inks:[c.inks].filter(Boolean))
-                .forEach(i => counts.set(i, (counts.get(i)||0)+1)));
+              cards.forEach(c => {
+                // Use the same ink detection logic as elsewhere
+                const inks = c.inks || c._raw?.inks || [];
+                if (Array.isArray(inks)) {
+                  inks.forEach(i => {
+                    if (i) counts.set(i, (counts.get(i)||0)+1);
+                  });
+                }
+              });
               return [...counts.entries()].map(([name, value]) => ({ name, value }));
             })();
 
@@ -6290,18 +6322,35 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             const drawConsistency = (() => {
               let drawCount=0, searchCount=0, rawDrawPieces=0;
               cards.forEach(c => {
-                const t = textOf(c);
-                if (RX_DRAW.test(t)) { drawCount++; rawDrawPieces++; }
-                if (RX_SEARCH.test(t)) { searchCount++; rawDrawPieces++; }
+                // Get card text from various possible fields
+                const cardText = (c.text || c.rulesText || c._raw?.text || c._raw?.rulesText || c._raw?.Body_Text || "").toString().toLowerCase();
+                console.log('[Comp Dashboard] Card text for', c.name, ':', cardText);
+                
+                if (RX_DRAW.test(cardText)) { 
+                  drawCount++; 
+                  rawDrawPieces++; 
+                  console.log('[Comp Dashboard] Draw card detected:', c.name);
+                }
+                if (RX_SEARCH.test(cardText)) { 
+                  searchCount++; 
+                  rawDrawPieces++; 
+                  console.log('[Comp Dashboard] Search card detected:', c.name);
+                }
               });
               const density = (rawDrawPieces / Math.max(cards.length,1))*100;
+              console.log('[Comp Dashboard] Draw consistency:', { drawCount, searchCount, density, totalCards: cards.length });
               return { drawCount, searchCount, density: Number(density.toFixed(1)) };
             })();
 
             // --- Average lore per card ---
             const avgLorePerCard = (() => {
-              const totalLore = cards.reduce((a,c)=>a + Number(c.lore||0), 0);
-              return Number((totalLore / Math.max(cards.length,1)).toFixed(2));
+              const totalLore = cards.reduce((a,c) => {
+                const lore = Number(c.lore || c._raw?.Lore || 0);
+                return a + lore;
+              }, 0);
+              const result = Number((totalLore / Math.max(cards.length,1)).toFixed(2));
+              console.log('[Comp Dashboard] Lore calculation:', { totalLore, cardsLength: cards.length, result });
+              return result;
             })();
 
             // --- Roles breakdown ---
@@ -6311,6 +6360,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 const r = roleForCard(c);
                 counts[r] = (counts[r]||0)+1;
               });
+              console.log('[Comp Dashboard] Role data:', counts);
               return Object.entries(counts).map(([role,value])=>({role, value}));
             })();
 
