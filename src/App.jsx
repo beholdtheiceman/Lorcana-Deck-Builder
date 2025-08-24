@@ -923,7 +923,7 @@ function toAppCard(raw) {
     baseName: baseName,
     subtitle: subtitle,
     imageUrl: raw.imageUrl || raw.image || raw.Image || null,
-    inkable: Boolean(raw.inkable || raw.can_be_ink || raw.Inkable || raw.inkwell || false),
+    inkable: Boolean(raw.inkable ?? raw._raw?.inkwell ?? raw._raw?.inkable ?? raw._raw?.can_be_ink ?? raw._raw?.Inkable ?? false),
     colors: splitList(raw.colors || raw.color || raw.Color || ''),
     classifications: splitList(raw.classifications || raw.Classifications || ''),
     type: raw.type || raw.Type || null,
@@ -1695,8 +1695,8 @@ function normalizeLorcast(c) {
       image,
       _source: "lorcast",
       _raw: c,
-      // Preserve inkable flag for proper detection
-      inkable: Boolean(c.inkable ?? c.can_be_ink ?? c.Inkable ?? false),
+      // Preserve inkable flag for proper detection - prioritize inkwell field
+      inkable: Boolean(c.inkable ?? c.inkwell ?? c.can_be_ink ?? c.Inkable ?? false),
     };
   
   console.log('[normalizeLorcast] Normalized result:', {
@@ -2414,25 +2414,30 @@ function parseTextImport(text) {
       // Card found successfully
       const key = deckKey(foundCard);
       
-      try {
-        const transformedCard = toAppCard(foundCard);
-        const rawUrl = getCardImageUrl(transformedCard);
-        const proxied = lorcanaImageProxyUrl(rawUrl);
-        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
-        
-        if (image_url && typeof image_url !== 'string') {
-          image_url = null;
-        }
-        
-        deck.entries[key] = { 
-          card: {
-            ...transformedCard,
-            image_url,
-            _generatedImageUrl: rawUrl,
-            _proxiedImageUrl: proxied
-          }, 
-          count: countNum 
-        };
+              try {
+          // Extract inkable information from the original card data BEFORE processing, prioritize inkwell field
+          const inkable = foundCard.inkable ?? foundCard._raw?.inkwell ?? foundCard._raw?.inkable ?? foundCard._raw?.can_be_ink ?? foundCard._raw?.Inkable ?? false;
+          
+          const transformedCard = toAppCard(foundCard);
+          const rawUrl = getCardImageUrl(transformedCard);
+          const proxied = lorcanaImageProxyUrl(rawUrl);
+          let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+          
+          if (image_url && typeof image_url !== 'string') {
+            image_url = null;
+          }
+          
+          deck.entries[key] = { 
+            card: {
+              ...transformedCard,
+              inkable: Boolean(inkable), // Use the extracted inkable value
+              _raw: foundCard._raw, // Preserve the original raw data
+              image_url,
+              _generatedImageUrl: rawUrl,
+              _proxiedImageUrl: proxied
+            }, 
+            count: countNum 
+          };
         
         validCards++;
         foundCards.push({ name: foundCard.name, found: foundCard.name, count: countNum });
@@ -2457,26 +2462,31 @@ function parseTextImport(text) {
       const bestMatch = foundCard.candidates[0];
       const key = deckKey(bestMatch);
       
-      try {
-        const transformedCard = toAppCard(bestMatch);
-        const rawUrl = getCardImageUrl(transformedCard);
-        const proxied = lorcanaImageProxyUrl(rawUrl);
-        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
-        
-        if (image_url && typeof image_url !== 'string') {
-          image_url = null;
-        }
-        
-        deck.entries[key] = { 
-          card: {
-            ...transformedCard,
-            image_url,
-            _generatedImageUrl: rawUrl,
-            _proxiedImageUrl: proxied,
-            _resolvedFromAmbiguous: true
-          }, 
-          count: countNum 
-        };
+              try {
+          // Extract inkable information from the original card data BEFORE processing, prioritize inkwell field
+          const inkable = bestMatch.inkable ?? bestMatch._raw?.inkwell ?? bestMatch._raw?.inkable ?? bestMatch._raw?.can_be_ink ?? bestMatch._raw?.Inkable ?? false;
+          
+          const transformedCard = toAppCard(bestMatch);
+          const rawUrl = getCardImageUrl(transformedCard);
+          const proxied = lorcanaImageProxyUrl(rawUrl);
+          let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+          
+          if (image_url && typeof image_url !== 'string') {
+            image_url = null;
+          }
+          
+          deck.entries[key] = { 
+            card: {
+              ...transformedCard,
+              inkable: Boolean(inkable), // Use the extracted inkable value
+              _raw: bestMatch._raw, // Preserve the original raw data
+              image_url,
+              _generatedImageUrl: rawUrl,
+              _proxiedImageUrl: proxied,
+              _resolvedFromAmbiguous: true
+            }, 
+            count: countNum 
+          };
         
         validCards++;
         foundCards.push({ name: bestMatch.name, found: bestMatch.name, count: countNum, reason: 'resolved-from-ambiguous' });
@@ -3697,10 +3707,10 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
   );
 }
 
-// Simple image function that works exactly like App (7).jsx
+// Enhanced image function that supports multiple image sources
 function getCardImg(card) {
-  // Use the normalized image field (as suggested by ChatGPT)
-  const u = card.image || card.image_url || "";
+  // Use multiple image sources for better compatibility
+  const u = card.image_url || card._imageFromAPI || card.image || "";
   return u; // or: `https://images.weserv.nl/?url=${encodeURIComponent(u)}&output=jpg`;
 }
 
@@ -3717,8 +3727,8 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
     );
   }
   
-  // Use the simple image approach like the HTML file
-  const img = card.image_url; // Direct access, no complex processing
+  // Use multiple image sources for better compatibility
+  const img = card.image_url || card._imageFromAPI || card.image;
   
   return (
     <div className="group relative overflow-hidden hover:scale-105 transition-all duration-200 cursor-pointer w-full h-64">
@@ -3739,7 +3749,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         </div>
       )}
       
-      {/* Count bubble in top-right corner */}
+      {/* Card count bubble - positioned at top-right corner */}
       {deckCount > 0 && (
         <div className="absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
           {deckCount}
@@ -3748,6 +3758,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
       
       {/* Add/Remove buttons - always visible to prevent layout shifts */}
       <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-2">
+        
         <button
           className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center transition-colors"
           onClick={(e) => { e.stopPropagation(); onAdd(card, 1); }}
@@ -4144,10 +4155,21 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
     console.log('[Inkable Detection] Processing entries:', entries.length);
     
     for (const e of entries) {
-      // Use the actual inkable field from Lorcast API
-      const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell;
+      // Use the same inkable detection logic as the import function, but prioritize inkwell field
+      const fallback1 = e.card.inkable;
+      const fallback2 = e.card._raw?.inkwell;
+      const fallback3 = e.card._raw?.inkable;
+      const fallback4 = e.card._raw?.can_be_ink;
+      const fallback5 = e.card._raw?.Inkable;
+      const fallback6 = false;
       
-      console.log(`[Inkable Detection] Card: ${e.card.name}, inkable field: ${isInkable}, raw.inkable: ${e.card._raw?.inkable}, raw.inkwell: ${e.card._raw?.inkwell}`);
+      const isInkable = Boolean(fallback1 ?? fallback2 ?? fallback3 ?? fallback4 ?? fallback5 ?? fallback6);
+      
+      console.log(`[Inkable Detection] Fallbacks for ${e.card.name}:`, {
+        fallback1, fallback2, fallback3, fallback4, fallback5, fallback6, isInkable
+      });
+      
+      console.log(`[Inkable Detection] Card: ${e.card.name}, e.card.inkable: ${e.card.inkable}, raw.inkwell: ${e.card._raw?.inkwell}, raw.inkable: ${e.card._raw?.inkable}, calculated isInkable: ${isInkable}`);
       
       if (isInkable) {
         inkable += e.count;
@@ -4233,8 +4255,38 @@ function DeckRow({ entry, onSetCount, onRemove }) {
   const imgSrc = getCardImg(c);
 
   return (
-    <div className="flex items-center gap-2 p-2">
-      <img src={imgSrc} alt={c.name} className="w-10 h-14 object-cover rounded-md" />
+    <div className="flex items-center gap-3 p-3 relative">
+      {/* Enhanced Card Image with Count Bubble */}
+      <div className="relative">
+        {imgSrc ? (
+          <img 
+            src={imgSrc} 
+            alt={c.name} 
+            className="w-16 h-22 object-cover rounded-lg border border-gray-700 hover:border-gray-600 transition-colors" 
+            onError={(e) => {
+              // Fallback to text display if image fails to load
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        {/* Fallback display when no image */}
+        <div 
+          className={`w-16 h-22 bg-gray-800 rounded-lg border border-gray-700 flex items-center justify-center ${
+            imgSrc ? 'hidden' : 'flex'
+          }`}
+        >
+          <div className="text-center text-gray-400">
+            <div className="text-xs mb-1">No image</div>
+            <div className="text-xs font-medium">{c.name}</div>
+          </div>
+        </div>
+        
+        {/* Rounded Count Bubble - positioned at top-right corner of image */}
+        <div className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
+          {entry.count}
+        </div>
+      </div>
       <div className="flex-1">
         <div className="text-sm font-semibold">{c.name}</div>
         <div className="text-xs text-gray-400">
@@ -4310,12 +4362,8 @@ function DeckStats({ deck }) {
     let uninkable = 0;
     
     for (const e of entries) {
-      // Better inkable detection
-      const isInkable = e.card.text?.toLowerCase().includes('inkable') || 
-                       e.card.type?.toLowerCase() === 'character' ||
-                       e.card.type?.toLowerCase() === 'action' ||
-                       e.card.type?.toLowerCase() === 'item' ||
-                       e.card.type?.toLowerCase() === 'location';
+      // Use the same inkable detection logic as the main deck view, but prioritize inkwell field
+      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
       
       if (isInkable) {
         inkable += e.count;
@@ -4715,7 +4763,7 @@ function PrintableSheet({ deck, onClose }) {
               </div>
                               {/* Count bubble */}
                 <div 
-                  className="absolute bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg"
+                  className="absolute bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-emerald-700 shadow-lg"
                   style={{ top: '8px', right: '8px' }}
                 >
                   {e.count}
@@ -4929,7 +4977,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   // Calculate deck statistics
   const totalCards = entries.reduce((sum, e) => sum + e.count, 0);
   const totalInkable = entries.reduce((sum, e) => {
-    const isInkable = e.card.inkable || e.card._raw?.inkable || e.card._raw?.inkwell || /inkable/i.test(e.card.text || "");
+    const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
     return sum + (isInkable ? e.count : 0);
   }, 0);
   const totalUninkable = totalCards - totalInkable;
@@ -5228,19 +5276,92 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           }
         }
         
+        // If still no image was drawn, try one more time with a simpler approach
+        if (!imageDrawn) {
+          try {
+            // Try to load image directly from the card data
+            const simpleImageSrc = card.image_url || card.image || card._imageFromAPI;
+            if (simpleImageSrc) {
+              console.log(`[Deck Image] Final attempt with simple image source: ${simpleImageSrc}`);
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
+                img.onload = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Successfully loaded image on final attempt: ${simpleImageSrc}`);
+                  resolve();
+                };
+                img.onerror = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Final image attempt failed: ${simpleImageSrc}`);
+                  reject(new Error('Image failed to load'));
+                };
+                img.src = simpleImageSrc;
+              });
+              
+              // Draw the image
+              const imgAspect = img.width / img.height;
+              const cardAspect = cardWidth / cardHeight;
+              
+              let drawWidth = cardWidth;
+              let drawHeight = cardHeight;
+              let drawX = x;
+              let drawY = y;
+              
+              if (imgAspect > cardAspect) {
+                drawHeight = cardWidth / imgAspect;
+                drawY = y + (cardHeight - drawHeight) / 2;
+              } else {
+                drawWidth = cardHeight * imgAspect;
+                drawX = x + (cardWidth - drawWidth) / 2;
+              }
+              
+              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+              imageDrawn = true;
+              console.log(`[Deck Image] Successfully drew image on final attempt for ${card.name}`);
+            }
+          } catch (error) {
+            console.warn(`[Deck Image] Final image attempt failed for ${card.name}:`, error);
+          }
+        }
+        
         // If still no image was drawn, use fallback
         if (!imageDrawn) {
           drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
         }
         
-        // Draw count indicator
+        // Draw count indicator - Rounded bubble positioned exactly on card corner
         if (entry.count > 1) {
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(x + cardWidth - 25, y, 25, 25);
+          const bubbleSize = 20;
+          const bubbleX = x + cardWidth - bubbleSize;
+          const bubbleY = y;
+          const bubbleRadius = bubbleSize / 2;
+          
+          // Draw rounded rectangle (bubble) with fallback for older browsers
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            // Modern browsers support roundRect
+            ctx.roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, bubbleRadius);
+          } else {
+            // Fallback for older browsers - draw a circle
+            ctx.arc(bubbleX + bubbleRadius, bubbleY + bubbleRadius, bubbleRadius, 0, 2 * Math.PI);
+          }
+          ctx.fillStyle = '#10b981'; // emerald-600
+          ctx.fill();
+          
+          // Draw border
+          ctx.strokeStyle = '#047857'; // emerald-700
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Draw count text
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 16px Arial, sans-serif';
+          ctx.font = 'bold 12px Arial, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(entry.count.toString(), x + cardWidth - 12.5, y + 18);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(entry.count.toString(), bubbleX + bubbleRadius, bubbleY + bubbleRadius);
         }
         
         // Move to next position
@@ -5285,12 +5406,12 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   
   // Helper function to draw fallback card content
   function drawFallbackCard(ctx, x, y, width, height, card) {
-    // Card background
-    ctx.fillStyle = '#2d3748';
+    // Card background - darker to indicate missing image
+    ctx.fillStyle = '#1a202c';
     ctx.fillRect(x, y, width, height);
     
     // Card border
-    ctx.strokeStyle = '#718096';
+    ctx.strokeStyle = '#4a5568';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, width, height);
     
@@ -5319,20 +5440,24 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     }
     ctx.fillText(line, x + width / 2, lineY);
     
+    // Card cost (more prominent)
+    const cost = getCost(card);
+    if (cost !== undefined) {
+      ctx.font = 'bold 14px Arial, sans-serif';
+      ctx.fillStyle = '#10b981';
+      ctx.fillText(`Cost: ${cost}`, x + width / 2, lineY + 25);
+    }
+    
     // Card details
     ctx.font = '10px Arial, sans-serif';
-    ctx.fillStyle = '#cccccc';
+    ctx.fillStyle = '#a0aec0';
     
     if (card.set) {
-      ctx.fillText(`Set: ${card.set}`, x + width / 2, lineY + 20);
+      ctx.fillText(`Set: ${card.set}`, x + width / 2, lineY + 40);
     }
     
     if (card.number) {
-      ctx.fillText(`#${card.number}`, x + width / 2, lineY + 35);
-    }
-    
-    if (card.cost !== undefined) {
-      ctx.fillText(`Cost: ${card.cost}`, x + width / 2, lineY + 50);
+      ctx.fillText(`#${card.number}`, x + width / 2, lineY + 55);
     }
   }
   
