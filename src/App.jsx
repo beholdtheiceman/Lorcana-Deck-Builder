@@ -742,6 +742,28 @@ function sortLog(...args) {
 // TODO: Fix favicon 404 - either add /public/vite.svg or change reference in index.html
 // Current error: /vite.svg:1 Failed to load resource: the server responded with a status of 404 ()
 
+/**
+ * Normalize display names and comparisons
+ */
+const splitDisplayName = (name) => {
+  const n = String(name || "");
+  // split on hyphen / en dash / em dash, with or without spaces
+  const parts = n.split(/\s*[-–—]\s*/);
+  return {
+    baseName: (parts[0] || "").trim(),
+    subname:  (parts[1] || null)?.trim() || null,
+  };
+};
+
+const canon = (s) =>
+  String(s || "")
+    .toLowerCase()
+    // normalize all dash styles to " - "
+    .replace(/\s*[-–—]\s*/g, " - ")
+    // collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+
 // Helper function to detect cards with subtitles (used in multiple places)
 const hasSubtitleLike = (card) => {
   return !!(card.subname && card.subname.trim()) || 
@@ -814,32 +836,13 @@ function asUrl(v) {
   return v.url ?? v.href ?? v.src ?? v.toString?.() ?? null;
 }
 
-// FIXED: Simple, reliable image proxy solution - GUARANTEED to return string | null
-// Using unique name to prevent Vite minification conflicts
-function lorcanaImageProxyUrl(src) {
-  console.log(`[lorcanaImageProxyUrl] Called with src:`, { type: typeof src, value: src });
-  console.log(`[lorcanaImageProxyUrl] Function ID:`, lorcanaImageProxyUrl.name, lorcanaImageProxyUrl.toString().slice(0, 50));
-  
-  if (!src) return null;  // Return null instead of empty string for consistency
-  
-  // Ensure src is a string
+/**
+ * Proxy helper MUST return a string URL (logs show an object was returned in build)
+ */
+function lorcanaImageProxyUrl(src){
+  if (!src) return null;
   const srcStr = String(src);
-  
-  try {
-    const u = new URL(srcStr);
-    // Avoid double-proxying
-    if (u.hostname.includes("weserv.nl")) return srcStr;
-  } catch {
-    // ignore bad URLs; still try to proxy
-  }
-  
-  // Use weserv.nl to bypass hotlink/CORS and normalize sizing
-  // This is the same approach that works in App (7).jsx
-  const result = `https://images.weserv.nl/?url=${encodeURIComponent(srcStr)}&output=jpg`;
-  console.log(`[lorcanaImageProxyUrl] Returning:`, { type: typeof result, value: result });
-  
-  // CRITICAL FIX: Return the string directly, not wrapped in an object
-  return result;  // This fixes the "Returning: Object" bug
+  return `https://images.weserv.nl/?url=${encodeURIComponent(srcStr)}&output=jpg`;
 }
 
 // Alias for backward compatibility
@@ -1496,9 +1499,14 @@ function normalizeLorcast(c) {
   // Extract abilities using the new helper
   const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
   
+  // Extract baseName and subname from the display name
+  const { baseName, subname } = splitDisplayName(c.name);
+  
   const result = {
     id: c.id || c.collector_number || c.name,
     name: c.name,
+    baseName,                    // <-- New: extracted base name
+    subname,                     // <-- New: extracted subtitle
     // NORMALIZED set fields using Lorcast's actual model:
     set: setCode || setName || (setNum != null ? String(setNum) : ""),
     setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
@@ -2368,7 +2376,8 @@ function parseTextImport(text) {
         console.log(`[parseTextImport] Parsed hyphenated format: ${countNum}x "${cardName} - ${subtitle}"`);
         
         // Try to find the card using subtitle matching
-        const foundCard = findCardByName(`${cardName.trim()} - ${subtitle.trim()}`);
+        const cards = window.getCurrentCards ? window.getCurrentCards() : [];
+        const foundCard = findCardByName(`${cardName.trim()} - ${subtitle.trim()}`, cards);
         if (foundCard && foundCard.match) {
           const key = deckKey(foundCard.match);
           
@@ -2488,7 +2497,8 @@ function parseTextImport(text) {
         console.log(`[parseTextImport] Fallback parsing: ${countNum}x "${cardName}"`);
         
         // Try to find the card in the current card database
-        const foundCard = findCardByName(cardName.trim());
+        const cards = window.getCurrentCards ? window.getCurrentCards() : [];
+        const foundCard = findCardByName(cardName.trim(), cards);
         if (foundCard) {
           const key = deckKey(foundCard);
           
@@ -2794,39 +2804,50 @@ function matchCard(line, db) {
 }
 
 // UPDATED: Enhanced card finder using the new matching system
-function findCardByName(cardName) {
-  // This will be populated when cards are loaded
-  if (window.getCurrentCards) {
-    const cards = window.getCurrentCards();
-    
-    if (!cards || cards.length === 0) {
-      console.warn('[findCardByName] No cards available in database');
-      return null;
-    }
-    
-    console.log(`[findCardByName] Searching for: "${cardName}"`);
-    console.log(`[findCardByName] Total cards in database: ${cards.length}`);
-    
-    // Use the new matching system
-    const outcome = matchCard(cardName, cards);
-    
-    if ("match" in outcome) {
-      console.log(`[findCardByName] Found match: "${outcome.match.name}" (reason: ${outcome.reason})`);
-      return outcome.match;
-    } else {
-      console.log(`[findCardByName] Needs confirmation or no match:`, outcome.reason);
-      if (outcome.candidates.length > 0) {
-        console.log(`[findCardByName] Candidates:`, outcome.candidates.map(c => c.name));
-        // For now, return the first candidate (you can enhance this with a UI later)
-        return outcome.candidates[0];
-      }
-      return null;
-    }
-  } else {
-    console.warn('[findCardByName] getCurrentCards function not available');
+/**
+ * Name resolver used by importer:
+ * 1) try exact full-name equality (dash/space insensitive)
+ * 2) if "Base - Subtitle" was typed, match by baseName + subname
+ * 3) optional: tie-break by set number if present in user line
+ */
+function findCardByName(userLine, cards) {
+  const typed = String(userLine || "");
+
+  // 1) exact full-name match (tolerant to dash styles & spacing)
+  const exact = cards.find(c => canon(c.name) === canon(typed));
+  if (exact) return exact;
+
+  // 2) parse "Base - Subtitle" from user line and match using normalized fields
+  const parts = typed.split(/\s*[-–—]\s*/);
+  const baseTyped = (parts[0] || "").trim().toLowerCase();
+  const subTyped  = (parts[1] || null)?.trim().toLowerCase() || null;
+
+  let candidates = cards.filter(
+    c => (c.baseName || "").toLowerCase() === baseTyped
+  );
+
+  if (subTyped) {
+    const withSub = candidates.filter(
+      c => (c.subname || "").toLowerCase() === subTyped
+    );
+    if (withSub.length === 1) return withSub[0];
+    if (withSub.length > 1) candidates = withSub; // keep narrowing if multiple
   }
-  
-  return null;
+
+  // 3) optional tie-break: look for "(#<num>)" anywhere in the user line
+  const numMatch = typed.match(/#\s*(\d{1,4})/);
+  if (numMatch && candidates.length > 1) {
+    const num = Number(numMatch[1]);
+    const byNum = candidates.filter(
+      c => Number(c.collectorNumber || c.number) === num
+    );
+    if (byNum.length === 1) return byNum[0];
+    if (byNum.length > 0) candidates = byNum;
+  }
+
+  // If we got to one, return it; otherwise signal ambiguity for UI to handle.
+  if (candidates.length === 1) return candidates[0];
+  return { reason: "ambiguous-base", candidates };
 }
 
 // Parse CSV import (basic implementation)
