@@ -8248,12 +8248,10 @@ function useBatchImageLoader() {
 
 
 // --- Wrapper to ensure ImageCache is available everywhere ---
-export default function App(props) {
-  return (
-    <ImageCacheProvider>
-      <AppInner {...props} />
-    </ImageCacheProvider>
-  );
-}
-}
+const App = (props) => (
+  <ImageCacheProvider>
+    <AppInner {...props} />
+  </ImageCacheProvider>
+);
+export default App;
 }
