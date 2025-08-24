@@ -341,8 +341,8 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 // --- Role & text helpers ---
 const rx = (p) => new RegExp(p, "i");
-const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage)");
-const RX_SEARCH = rx("(search your deck|look at the top|reveal .* from your deck)");
+const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage|gain.*card|add.*to.*hand|put.*into.*hand)");
+const RX_SEARCH = rx("(search|look at|reveal|scry|find|choose|select|put.*on top|put.*on bottom|shuffle|arrange)");
 const RX_REMOVAL = rx("(banish|deal \\d+ damage|return .* to (their|its) hand|exert target)");
 const RX_RAMP = rx("(reduce(s)? cost|play .* for free|inkwell|gain ink)");
 const RX_SONG = rx("\\bSong\\b|Action\\s*[-—]\\s*Song");
@@ -6321,6 +6321,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             // --- Draw / consistency ---
             const drawConsistency = (() => {
               let drawCount=0, searchCount=0, rawDrawPieces=0;
+              const detectedCards = { draw: [], search: [] };
+              
               cards.forEach(c => {
                 // Get card text from various possible fields
                 const cardText = (c.text || c.rulesText || c._raw?.text || c._raw?.rulesText || c._raw?.Body_Text || "").toString().toLowerCase();
@@ -6329,16 +6331,26 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 if (RX_DRAW.test(cardText)) { 
                   drawCount++; 
                   rawDrawPieces++; 
+                  detectedCards.draw.push(c.name);
                   console.log('[Comp Dashboard] Draw card detected:', c.name);
                 }
                 if (RX_SEARCH.test(cardText)) { 
                   searchCount++; 
                   rawDrawPieces++; 
+                  detectedCards.search.push(c.name);
                   console.log('[Comp Dashboard] Search card detected:', c.name);
                 }
               });
+              
               const density = (rawDrawPieces / Math.max(cards.length,1))*100;
-              console.log('[Comp Dashboard] Draw consistency:', { drawCount, searchCount, density, totalCards: cards.length });
+              console.log('[Comp Dashboard] Draw consistency:', { 
+                drawCount, 
+                searchCount, 
+                density, 
+                totalCards: cards.length,
+                detectedDrawCards: detectedCards.draw,
+                detectedSearchCards: detectedCards.search
+              });
               return { drawCount, searchCount, density: Number(density.toFixed(1)) };
             })();
 
