@@ -6076,6 +6076,9 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           {/* Ink Color Distribution */}
           <div className="bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
+            <div className="text-xs text-gray-400 text-center mb-3 p-2 bg-gray-700 rounded">
+              <strong>Note:</strong> Dual-ink cards are counted in both colors, so totals may exceed deck size
+            </div>
             {Object.keys(inkDistribution).length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
@@ -6107,6 +6110,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   {/* Custom Legend with Percentages */}
                   <div className="mt-3 flex justify-center gap-4">
                     {Object.entries(inkDistribution).map(([ink, count], index) => {
+                      // Calculate percentage based on actual deck size, not inflated ink distribution
                       const percentage = ((count / totalCards) * 100).toFixed(0);
                       const colors = {
                         'Amber': '#f59e0b',
@@ -6124,6 +6128,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                           />
                           <span className="text-sm text-gray-300">{ink}</span>
                           <span className="text-sm font-semibold text-gray-100">{percentage}%</span>
+                          <span className="text-xs text-gray-400">({count})</span>
                         </div>
                       );
                     })}
@@ -6132,21 +6137,24 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 
                 {/* Dual-ink cards summary */}
                 {dualInkCards.length > 0 && (
-                  <div className="mt-3 p-3 bg-gray-700 rounded-lg">
-                    <h4 className="text-sm font-medium mb-2 text-center">Dual-Ink Cards</h4>
-                    <div className="text-xs space-y-1">
+                  <div className="mt-4 p-4 bg-gray-700 rounded-lg border border-gray-600">
+                    <h4 className="text-sm font-medium mb-3 text-center text-gray-100">Dual-Ink Cards</h4>
+                    <div className="text-xs space-y-2">
                       {dualInkCards.map((card, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span className="text-gray-300">{card.name}</span>
-                          <span className="text-gray-400">
+                        <div key={index} className="flex justify-between items-center p-2 bg-gray-800 rounded">
+                          <span className="text-gray-200 font-medium">{card.name}</span>
+                          <span className="text-blue-300 font-semibold">
                             {card.inks.join(' + ')} ({card.count}x)
                           </span>
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      These cards can be played with either ink color
-                    </p>
+                    <div className="mt-3 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-xs text-blue-200">
+                      <p className="text-center">
+                        <strong>Note:</strong> These cards are counted in both ink colors above, 
+                        which is why the total exceeds your 60-card deck size.
+                      </p>
+                    </div>
                   </div>
                 )}
               </ResponsiveContainer>
