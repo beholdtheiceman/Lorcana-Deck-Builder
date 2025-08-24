@@ -2201,7 +2201,8 @@ function parseTextImport(text) {
   let notFoundCards = [];
   
   // Parse Lorcanito export format: "4 Card Name — Subtitle (Set #Number)"
-  const lorcanitoPattern = /^(\d+)\s+(.+?)\s*—\s*(.+?)\s*\((\d+)\s*#(\d+)\)$/;
+  // Also handle regular hyphens for compatibility: "4 Card Name - Subtitle"
+  const lorcanitoPattern = /^(\d+)\s+(.+?)\s*[—–-]\s*(.+?)\s*\((\d+)\s*#(\d+)\)$/;
   
   lines.forEach((line, index) => {
     // Skip empty lines and comments
@@ -2344,6 +2345,93 @@ function parseTextImport(text) {
       } else {
         console.warn(`[parseTextImport] Invalid count on line ${index + 1}: "${line}"`);
         skippedLines++;
+      }
+    }
+    
+    // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
+    const hyphenatedPattern = /^(\d+)\s+(.+?)\s*-\s*(.+)$/;
+    const hyphenatedMatch = line.match(hyphenatedPattern);
+    if (hyphenatedMatch) {
+      const [, count, cardName, subtitle] = hyphenatedMatch;
+      const countNum = parseInt(count);
+      
+      if (countNum > 0 && cardName.trim()) {
+        totalCards += countNum;
+        console.log(`[parseTextImport] Parsed hyphenated format: ${countNum}x "${cardName} - ${subtitle}"`);
+        
+        // Try to find the card using subtitle matching
+        const foundCard = findCardByName(`${cardName.trim()} - ${subtitle.trim()}`);
+        if (foundCard && foundCard.match) {
+          const key = deckKey(foundCard.match);
+          
+          try {
+            // TRANSFORM: Convert to app format for consistent data structure
+            const transformedCard = toAppCard(foundCard.match);
+            console.log(`[parseTextImport] Transformed card for ${foundCard.match.name}:`, {
+              original: foundCard.match.name,
+              transformed: transformedCard.name,
+              inkable: transformedCard.inkable,
+              imageUrl: transformedCard.imageUrl
+            });
+            
+            // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
+            const rawUrl = getCardImageUrl(transformedCard);         // string | null
+            console.log(`[parseTextImport] About to call proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
+            const proxied = proxyImageUrl(rawUrl);                   // string | null
+            
+            // Single source of truth: normalize to string | null
+            let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+            
+            // Runtime guard - if anything weird slips through:
+            if (image_url && typeof image_url !== 'string') {
+              console.log('[parseTextImport] non-string image_url; clearing', image_url);
+              image_url = null;
+            }
+            
+            console.log(`[parseTextImport] Image URLs for ${transformedCard.name}:`, {
+              raw: rawUrl,
+              proxied: proxied,
+              final: image_url,
+              rawType: typeof rawUrl,
+              proxiedType: typeof proxied,
+              finalType: typeof image_url
+            });
+            
+            // Store the TRANSFORMED card with enhanced image data - NEVER store objects
+            deck.entries[key] = { 
+              card: {
+                ...transformedCard,  // Use transformed data structure
+                image_url,           // 🚨 This is now guaranteed to be string | null
+                _generatedImageUrl: rawUrl,    // Keep original for debugging
+                _proxiedImageUrl: proxied      // Keep proxied for debugging
+              }, 
+              count: countNum 
+            };
+            
+            // FINAL GUARD: Ensure image_url is never an object
+            if (deck.entries[key].card.image_url && typeof deck.entries[key].card.image_url !== 'string') {
+              console.warn('[parseTextImport] CRITICAL: image_url is still an object! Clearing it:', deck.entries[key].card.image_url);
+              deck.entries[key].card.image_url = null;
+            }
+            
+            console.log(`[parseTextImport] Stored transformed card with image_url:`, {
+              name: transformedCard.name,
+              image_url: deck.entries[key].card.image_url,
+              type: typeof deck.entries[key].card.image_url,
+              inkable: transformedCard.inkable
+            });
+            
+            validCards++;
+            foundCards.push({ name: transformedCard.name, count: countNum, reason: 'hyphenated-format' });
+          } catch (error) {
+            console.error(`[parseTextImport] Error processing hyphenated format for ${cardName}:`, error);
+            notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-error' });
+          }
+        } else {
+          console.log(`[parseTextImport] No card found for hyphenated format: ${cardName} - ${subtitle}`);
+          notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-not-found' });
+        }
+        return; // Skip to next line
       }
     }
     
