@@ -3699,8 +3699,8 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
 
 // Simple image function that works exactly like App (7).jsx
 function getCardImg(card) {
-  // Use the normalized image field (as suggested by ChatGPT)
-  const u = card.image || card.image_url || "";
+  // Use multiple image sources for better compatibility
+  const u = card.image_url || card._imageFromAPI || card.image || "";
   return u; // or: `https://images.weserv.nl/?url=${encodeURIComponent(u)}&output=jpg`;
 }
 
@@ -3717,8 +3717,8 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
     );
   }
   
-  // Use the simple image approach like the HTML file
-  const img = card.image_url; // Direct access, no complex processing
+  // Use multiple image sources for better compatibility
+  const img = card.image_url || card._imageFromAPI || card.image;
   
   return (
     <div className="group relative overflow-hidden hover:scale-105 transition-all duration-200 cursor-pointer w-full h-64">
@@ -3729,15 +3729,24 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
           className="w-full h-full object-contain rounded-lg hover:shadow-lg transition-all duration-200"
           loading="lazy"
           onClick={onInspect}
+          onError={(e) => {
+            // Fallback to text display if image fails to load
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }}
         />
-      ) : (
-        <div className="w-full h-full bg-gray-800 rounded-lg flex items-center justify-center">
-          <div className="text-center text-gray-400">
-            <div className="text-xs mb-2">No image</div>
-            <div className="text-xs">{card.name}</div>
-          </div>
+      ) : null}
+      {/* Fallback display when no image or image fails to load */}
+      <div 
+        className={`w-full h-full bg-gray-800 rounded-lg flex items-center justify-center ${
+          img ? 'hidden' : 'flex'
+        }`}
+      >
+        <div className="text-center text-gray-400">
+          <div className="text-xs mb-2">No image</div>
+          <div className="text-xs">{card.name}</div>
         </div>
-      )}
+      </div>
       
       {/* Card count bubble - positioned at top-right corner */}
       {deckCount > 0 && (
@@ -4131,6 +4140,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 // Deck panel -----------------------------------------------------------------
 
 function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPresentation }) {
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
     () => groupBy(entries, (e) => getCost(e.card)),
@@ -4204,26 +4214,61 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
         </div>
       </div>
 
-      <div className="space-y-3 overflow-auto pr-1">
-        {Object.keys(groupedByCost)
-          .sort((a, b) => parseInt(a) - parseInt(b))
-          .map((cost) => (
-            <div key={cost} className="bg-gray-900 rounded-xl border border-gray-800">
-              <div className="px-3 py-2 font-semibold border-b border-gray-800">
-                Cost {cost}
-              </div>
-              <div className="divide-y divide-gray-800">
-                {groupedByCost[cost].map((e) => (
-                  <DeckRow
-                    key={deckKey(e.card)}
-                    entry={e}
-                    onSetCount={(c) => onSetCount(e.card, c)}
-                    onRemove={() => onRemove(e.card)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+      {/* View Mode Toggle */}
+      <div className="flex items-center justify-center gap-2">
+        <button
+          className={`px-3 py-1.5 rounded-xl border text-sm transition-colors ${
+            viewMode === 'grid'
+              ? "bg-emerald-900/80 border-emerald-700 text-emerald-100"
+              : "bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700"
+          }`}
+          onClick={() => setViewMode('grid')}
+        >
+          Grid View
+        </button>
+        <button
+          className={`px-3 py-1.5 rounded-xl border text-sm transition-colors ${
+            viewMode === 'list'
+              ? "bg-emerald-900/80 border-emerald-700 text-emerald-100"
+              : "bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700"
+          }`}
+          onClick={() => setViewMode('list')}
+        >
+          List View
+        </button>
+      </div>
+
+      {/* Deck Content */}
+      <div className="flex-1 overflow-auto pr-1">
+        {viewMode === 'grid' ? (
+          <DeckGridView
+            deck={deck}
+            onSetCount={onSetCount}
+            onRemove={onRemove}
+          />
+        ) : (
+          <div className="space-y-3">
+            {Object.keys(groupedByCost)
+              .sort((a, b) => parseInt(a) - parseInt(b))
+              .map((cost) => (
+                <div key={cost} className="bg-gray-900 rounded-xl border border-gray-800">
+                  <div className="px-3 py-2 font-semibold border-b border-gray-800">
+                    Cost {cost}
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                    {groupedByCost[cost].map((e) => (
+                      <DeckRow
+                        key={deckKey(e.card)}
+                        entry={e}
+                        onSetCount={(c) => onSetCount(e.card, c)}
+                        onRemove={() => onRemove(e.card)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -4279,6 +4324,108 @@ function DeckRow({ entry, onSetCount, onRemove }) {
     </div>
   );
 }
+
+// New Deck Grid View Component
+function DeckGridView({ deck, onSetCount, onRemove }) {
+  const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
+  
+  if (entries.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-400">
+        <div className="text-lg mb-2">No cards in deck</div>
+        <div className="text-sm">Add some cards to get started</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2 grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8">
+        {entries.map((entry) => (
+          <div key={deckKey(entry.card)} className="relative group">
+            <div className="relative overflow-hidden rounded-lg border border-gray-700 hover:border-gray-600 transition-all duration-200 cursor-pointer">
+              {/* Card Image */}
+              {(entry.card.image_url || entry.card._imageFromAPI || entry.card.image) ? (
+                <img
+                  src={entry.card.image_url || entry.card._imageFromAPI || entry.card.image}
+                  alt={entry.card.name}
+                  className="w-full h-auto object-cover rounded-lg"
+                  loading="lazy"
+                  onError={(e) => {
+                    // Fallback to text display if image fails to load
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              {/* Fallback display when no image or image fails to load */}
+              <div 
+                className={`w-full h-32 bg-gray-800 rounded-lg flex items-center justify-center ${
+                  (entry.card.image_url || entry.card._imageFromAPI || entry.card.image) ? 'hidden' : 'flex'
+                }`}
+              >
+                <div className="text-center text-gray-400">
+                  <div className="text-xs mb-1">No image</div>
+                  <div className="text-xs font-medium">{entry.card.name}</div>
+                </div>
+              </div>
+              
+              {/* Card Count Bubble - Rounded bubble with number */}
+              <div className="absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
+                {entry.count}
+              </div>
+              
+              {/* Card Info Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                <div className="text-xs font-medium text-white truncate">{entry.card.name}</div>
+                <div className="text-xs text-gray-300">Cost: {getCost(entry.card)}</div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <div className="flex flex-col gap-1">
+                  <button
+                    className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center transition-colors"
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      onSetCount(Math.min(DECK_RULES.MAX_COPIES, entry.count + 1)); 
+                    }}
+                    title="Add one more"
+                  >
+                    +
+                  </button>
+                  <button
+                    className="w-6 h-6 rounded-full bg-red-900/90 border border-red-700 text-red-100 text-xs hover:bg-red-800 flex items-center justify-center transition-colors"
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      onSetCount(Math.max(0, entry.count - 1)); 
+                    }}
+                    title="Remove one"
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+              
+              {/* Remove All Button */}
+              <button
+                className="absolute top-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-2 py-1 rounded-md bg-red-900/80 border border-red-700 hover:bg-red-800 text-xs text-white"
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  onRemove(entry.card); 
+                }}
+                title="Remove all copies"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DeckStats({ deck }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
 
@@ -7169,13 +7316,10 @@ useEffect(() => {
 
   {/* Deck column */}
   <div className="border-l border-gray-800 min-h-[60vh]">
-    <DeckPanel
+    <DeckGridView
       deck={deck}
       onSetCount={handleSetCount}
       onRemove={handleRemove}
-      onExport={() => setExportOpen(true)}
-      onImport={() => setImportOpen(true)}
-      onDeckPresentation={handleDeckPresentation}
     />
     <DeckStats deck={deck} />
     <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
