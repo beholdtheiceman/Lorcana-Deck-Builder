@@ -42,7 +42,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
           <div>
             <h2 className="text-2xl font-bold text-white">{hub.name}</h2>
             <p className="text-gray-400">
-              {hub.members.length} member{hub.members.length !== 1 ? 's' : ''} • 
+              {hub.members.length + 1} member{(hub.members.length + 1) !== 1 ? 's' : ''} • 
               Invite Code: <span className="font-mono bg-gray-800 px-2 py-1 rounded">{hub.inviteCode}</span>
             </p>
           </div>
@@ -68,17 +68,17 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
               <div className="mb-6 p-4 bg-gray-800 rounded-lg">
                 <h3 className="text-lg font-semibold text-white mb-2">Hub Members</h3>
                 <div className="flex flex-wrap gap-2">
+                  {/* Owner */}
+                  <span className="px-3 py-1 rounded-full text-sm bg-purple-600 text-white">
+                    {hub.owner.email} (Owner)
+                  </span>
+                  {/* Members */}
                   {hub.members.map((member) => (
                     <span
                       key={member.user.id}
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        member.user.id === hub.owner.id
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-700 text-gray-300'
-                      }`}
+                      className="px-3 py-1 rounded-full text-sm bg-gray-700 text-gray-300"
                     >
                       {member.user.email}
-                      {member.user.id === hub.owner.id && ' (Owner)'}
                     </span>
                   ))}
                 </div>
@@ -104,10 +104,10 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
                         <div className="aspect-[3/4] bg-gray-700 rounded mb-3 flex items-center justify-center">
                           <div className="text-gray-400 text-center">
                             <div className="text-2xl mb-2">🎴</div>
-                            <div className="text-sm">{deck.name}</div>
+                            <div className="text-sm">{deck.title}</div>
                           </div>
                         </div>
-                        <h4 className="text-white font-semibold mb-1">{deck.name}</h4>
+                        <h4 className="text-white font-semibold mb-1">{deck.title}</h4>
                         <p className="text-gray-400 text-sm">
                           by {deck.user.email}
                         </p>

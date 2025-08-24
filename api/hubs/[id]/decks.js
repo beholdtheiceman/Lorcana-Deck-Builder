@@ -57,6 +57,11 @@ export default async function handler(req, res) {
         const deckData = deck.data || {};
         const cards = deckData.cards || [];
         
+        // Debug logging
+        console.log('Deck:', deck.title, 'Data:', JSON.stringify(deckData, null, 2));
+        console.log('Cards array:', cards);
+        console.log('Card count:', cards.length);
+        
         return {
           ...deck,
           cards: cards,
