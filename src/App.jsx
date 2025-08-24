@@ -1400,7 +1400,7 @@ function resetFailedImageCache() {
 // Bases + defaults
 const LORCAST_BASE = "https://api.lorcast.com/v0";
 const DEFAULT_Q = "";
-const ALL_QUERY = "ink:amber or ink:amethyst or ink:emerald or ink:ruby or ink:sapphire or ink:steel or ink:colorless"; // Fabled
+const ALL_QUERY = "ink:amber or ink:amethyst or ink:emerald or ink:ruby or ink:sapphire or ink:steel or ink:colorless"; // Working query that returns cards
 const APP_VERSION = "1.0.1-lorcast-monolith+api";
 
 async function apiSearchCards({
