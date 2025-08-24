@@ -29,11 +29,7 @@ const TeamHub = () => {
   const fetchHubs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/hubs', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch('/api/hubs');
       
       if (response.ok) {
         const data = await response.json();
@@ -57,8 +53,7 @@ const TeamHub = () => {
       const response = await fetch('/api/hubs', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ name: hubName })
       });
@@ -89,8 +84,7 @@ const TeamHub = () => {
       const response = await fetch('/api/hubs/join', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ inviteCode: inviteCode.toUpperCase() })
       });
@@ -116,11 +110,7 @@ const TeamHub = () => {
 
   const fetchHubDecks = async (hubId) => {
     try {
-      const response = await fetch(`/api/hubs/${hubId}/decks`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch(`/api/hubs/${hubId}/decks`);
       
       if (response.ok) {
         const data = await response.json();
@@ -136,8 +126,7 @@ const TeamHub = () => {
       const response = await fetch(`/api/hubs/${hubId}/members`, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId })
       });
@@ -156,8 +145,7 @@ const TeamHub = () => {
       const response = await fetch(`/api/hubs/${hubId}/members`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ newOwnerId })
       });

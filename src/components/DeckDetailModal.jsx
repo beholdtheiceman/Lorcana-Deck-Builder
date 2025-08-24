@@ -16,11 +16,7 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
 
   const fetchComments = async () => {
     try {
-      const response = await fetch(`/api/decks/${deck.id}/comments`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch(`/api/decks/${deck.id}/comments`);
 
       if (response.ok) {
         const data = await response.json();
@@ -40,8 +36,7 @@ const DeckDetailModal = ({ deck, hub, onClose }) => {
       const response = await fetch(`/api/decks/${deck.id}/comments`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ content: newComment })
       });
