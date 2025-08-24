@@ -4155,8 +4155,8 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
     console.log('[Inkable Detection] Processing entries:', entries.length);
     
     for (const e of entries) {
-      // Use the actual inkable data from the API, no fallbacks
-      const isInkable = Boolean(e.card.inkable);
+      // Use the same inkable detection logic as the import function
+      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
       
       console.log(`[Inkable Detection] Card: ${e.card.name}, inkable field: ${isInkable}, raw.inkable: ${e.card._raw?.inkable}, raw.inkwell: ${e.card._raw?.inkwell}`);
       
@@ -4351,8 +4351,8 @@ function DeckStats({ deck }) {
     let uninkable = 0;
     
     for (const e of entries) {
-      // Use the same simplified inkable detection logic as the main deck view
-      const isInkable = Boolean(e.card.inkable);
+      // Use the same inkable detection logic as the main deck view
+      const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
       
       if (isInkable) {
         inkable += e.count;
@@ -4966,7 +4966,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   // Calculate deck statistics
   const totalCards = entries.reduce((sum, e) => sum + e.count, 0);
   const totalInkable = entries.reduce((sum, e) => {
-    const isInkable = Boolean(e.card.inkable);
+    const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
     return sum + (isInkable ? e.count : 0);
   }, 0);
   const totalUninkable = totalCards - totalInkable;
