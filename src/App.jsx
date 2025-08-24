@@ -2371,15 +2371,6 @@ function parseTextImport(text) {
     
     // Try to parse the line with the new permissive regex
     const match = line.match(LINE_RE);
-    if (lorcanitoMatch) {
-      console.log(`[parseTextImport] ✅ Lorcanito pattern MATCHED for line: "${line}"`);
-    } else {
-      console.log(`[parseTextImport] ❌ Lorcanito pattern FAILED for line: "${line}"`);
-      console.log(`[parseTextImport] Pattern: ${lorcanitoPattern}`);
-      console.log(`[parseTextImport] Line length: ${line.length}`);
-      console.log(`[parseTextImport] Contains em dash (—): ${line.includes('—')}`);
-      console.log(`[parseTextImport] Contains regular dash (-): ${line.includes('-')}`);
-    }
     if (!match) {
       console.warn(`[parseTextImport] Unrecognized format on line ${index + 1}: "${line}"`);
       skippedLines++;
