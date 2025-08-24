@@ -4492,7 +4492,7 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
       open={open}
       onClose={onClose}
       title={`${card.name}${card.subname ? ` - ${card.subname}` : ''} • ${card.setName || card.set}`}
-      size="lg"
+      size="xl"
       footer={
         <div className="flex items-center justify-end gap-2">
           <button
@@ -4504,11 +4504,11 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         </div>
       }
     >
-      <div className="flex justify-center w-full" style={{ marginLeft: '-16px', marginRight: '-16px' }}>
+      <div className="flex justify-center w-full">
         <img 
           src={imgSrc} 
           alt={card.name} 
-          className="w-auto h-auto max-w-full max-h-[calc(80vh-200px)] object-contain rounded-xl border border-gray-800"
+          className="w-auto h-auto max-w-[95%] max-h-[calc(85vh-200px)] object-contain rounded-xl border border-gray-800"
         />
       </div>
     </Modal>
