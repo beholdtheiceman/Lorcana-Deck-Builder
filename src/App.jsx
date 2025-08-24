@@ -4534,6 +4534,7 @@ function DeckStats({ deck }) {
 
       <ChartCard title="Cost Curve">
         <div className="w-full h-56">
+          {console.log('[Chart Debug] Cost curve data:', costCurve)}
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={costCurve}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -4541,8 +4542,10 @@ function DeckStats({ deck }) {
               <YAxis allowDecimals={false} />
               <Tooltip 
                 content={({ active, payload, label }) => {
+                  console.log('[Tooltip Debug] Tooltip triggered:', { active, payload, label });
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
+                    console.log('[Tooltip Debug] Data payload:', data);
                     return (
                       <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
                         <p className="text-white font-semibold">Cost {label}: {data.count} cards</p>
@@ -4554,6 +4557,12 @@ function DeckStats({ deck }) {
                                 <p key={index} className="text-gray-400 text-xs">{card}</p>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {(!data.cards || data.cards.length === 0) && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">No card list available</p>
+                            <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
                           </div>
                         )}
                       </div>
@@ -4570,6 +4579,7 @@ function DeckStats({ deck }) {
 
       <ChartCard title="Card Types">
         <div className="w-full h-56">
+          {console.log('[Chart Debug] Type counts data:', typeCounts)}
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={typeCounts}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -4577,8 +4587,10 @@ function DeckStats({ deck }) {
               <YAxis allowDecimals={false} />
               <Tooltip 
                 content={({ active, payload, label }) => {
+                  console.log('[Tooltip Debug] Card Types tooltip triggered:', { active, payload, label });
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
+                    console.log('[Tooltip Debug] Card Types data payload:', data);
                     return (
                       <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
                         <p className="text-white font-semibold">{label}: {data.count} cards</p>
@@ -4590,6 +4602,12 @@ function DeckStats({ deck }) {
                                 <p key={index} className="text-gray-400 text-xs">{card}</p>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {(!data.cards || data.cards.length === 0) && (
+                          <div className="mt-2">
+                            <p className="text-gray-300 text-sm">No card list available</p>
+                            <p className="text-gray-400 text-xs">Data structure: {JSON.stringify(data)}</p>
                           </div>
                         )}
                       </div>
