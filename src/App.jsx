@@ -5315,11 +5315,11 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
         }
         
-        // Draw count indicator - Rounded bubble positioned on card corner
+        // Draw count indicator - Rounded bubble positioned exactly on card corner
         if (entry.count > 1) {
           const bubbleSize = 20;
-          const bubbleX = x + cardWidth - bubbleSize - 2;
-          const bubbleY = y + 2;
+          const bubbleX = x + cardWidth - bubbleSize;
+          const bubbleY = y;
           const bubbleRadius = bubbleSize / 2;
           
           // Draw rounded rectangle (bubble) with fallback for older browsers
