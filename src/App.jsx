@@ -1177,6 +1177,59 @@ function generateAlternativeImageUrls(card) {
   return uniqueUrls;
 }
 
+// Enhanced function to search Lorcast API for card resolution
+async function searchLorcastForCard(cardName, subtitle = null) {
+  try {
+    // Build search query - prefer exact match with quotes
+    let query = cardName;
+    if (subtitle) {
+      query = `"${cardName} - ${subtitle}"`;
+    } else {
+      query = `"${cardName}"`;
+    }
+    
+    console.log(`[LorcastSearch] Searching for: ${query}`);
+    
+    // Make API call to Lorcast search
+    const response = await fetch(`https://api.lorcast.com/v0/cards/search?q=${encodeURIComponent(query)}&unique=cards&per_page=5`);
+    
+    if (!response.ok) {
+      console.warn(`[LorcastSearch] API response not ok:`, response.status, response.statusText);
+      return null;
+    }
+    
+    const data = await response.json();
+    const results = data.results || [];
+    
+    if (results.length === 0) {
+      console.log(`[LorcastSearch] No results found for: ${query}`);
+      return null;
+    }
+    
+    // Find exact match if possible
+    const exactMatch = results.find(card => {
+      const cardNameLower = card.name?.toLowerCase() || '';
+      const searchNameLower = cardName.toLowerCase();
+      return cardNameLower === searchNameLower || 
+             cardNameLower.includes(searchNameLower) ||
+             searchNameLower.includes(cardNameLower);
+    });
+    
+    if (exactMatch) {
+      console.log(`[LorcastSearch] Found exact match:`, exactMatch.name);
+      return exactMatch;
+    }
+    
+    // Return first result as best guess
+    console.log(`[LorcastSearch] Using best match:`, results[0].name);
+    return results[0];
+    
+  } catch (error) {
+    console.warn(`[LorcastSearch] Error searching Lorcast for ${cardName}:`, error);
+    return null;
+  }
+}
+
 // New function: Reset failed image cache entries
 function resetFailedImageCache() {
   try {
@@ -1605,6 +1658,9 @@ async function fetchAllCards({ signal } = {}) {
     const mapped = normalized.map(card => ({
       id: card.id,
       name: card.name,
+      // CRITICAL: Preserve baseName and subname for subtitle matching
+      baseName: card.baseName,
+      subname: card.subname,
       // NORMALIZED set fields you can rely on everywhere:
       set: card.set,           // e.g. "TFC"
       setCode: card.setCode,   // e.g. "TFC"
@@ -1648,6 +1704,14 @@ async function fetchAllCards({ signal } = {}) {
       console.log("[DBG] No cards with set fields found");
     }
     
+    // Debug: Check if baseName and subname are being preserved
+    const subnameSample = mapped.find(x => x.name && x.subname);
+    if (subnameSample) {
+      console.log("[DBG] Subname sample", subnameSample.name, "baseName:", subnameSample.baseName, "subname:", subnameSample.subname);
+    } else {
+      console.log("[DBG] No cards with subname fields found");
+    }
+    
     return mapped;
   } catch (e) {
     console.error("[API] Unified fetch failed:", e);
@@ -1665,6 +1729,9 @@ async function fetchAllCardsFallback({ signal } = {}) {
     const mapped = normalized.map(card => ({
       id: card.id,
       name: card.name,
+      // CRITICAL: Preserve baseName and subname for subtitle matching
+      baseName: card.baseName,
+      subname: card.subname,
       // NORMALIZED set fields you can rely on everywhere:
       set: card.set,           // e.g. "TFC"
       setNum: card.setNum,     // numeric series index if present
@@ -2228,11 +2295,12 @@ function parseTextImport(text) {
   // Also handle regular hyphens for compatibility: "4 Card Name - Subtitle"
   const lorcanitoPattern = /^(\d+)\s+(.+?)\s*[—–-]\s*(.+?)\s*\((\d+)\s*#(\d+)\)$/;
   
-  lines.forEach((line, index) => {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
     // Skip empty lines and comments
     if (!line || line.startsWith('#') || line.startsWith('//')) {
       skippedLines++;
-      return;
+      continue;
     }
     
     // DEBUG: Log the actual line content to see what we're parsing
@@ -2364,15 +2432,14 @@ function parseTextImport(text) {
           deck.entries[key] = { card: placeholderCard, count: countNum };
           validCards++;
           notFoundCards.push({ name: `${cardName} — ${subtitle}`, count: countNum });
-        }
-        return; // Skip to next line
+                }
+        continue; // Skip to next line
       } else {
         console.warn(`[parseTextImport] Invalid count on line ${index + 1}: "${line}"`);
         skippedLines++;
       }
-    }
-    
-    // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
+      
+      // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
     const hyphenatedPattern = /^(\d+)\s+(.+?)\s*-\s*(.+)$/;
     const hyphenatedMatch = line.match(hyphenatedPattern);
     if (hyphenatedMatch) {
@@ -2456,43 +2523,93 @@ function parseTextImport(text) {
           // Handle ambiguous cases by creating a placeholder with candidate info
           console.log(`[parseTextImport] Ambiguous card found for ${cardName} - ${subtitle}, creating placeholder with ${foundCard.candidates.length} candidates`);
           
-          const placeholderCard = {
-            name: `${cardName} - ${subtitle}`,
-            set: 'Multiple',
-            number: 'Multiple',
-            cost: 0,
-            inks: [],
-            type: "Unknown",
-            rarity: "Unknown",
-            text: `Multiple variants found: ${foundCard.candidates.map(c => `${c.name} (${c.setId} #${c.setNum})`).join(', ')}`,
-            classifications: [],
-            keywords: [],
-            image_url: null,
-            _raw: {},
-            _candidates: foundCard.candidates,
-            _needsResolution: true,
-            setCode: 'Multiple',
-            setName: 'Multiple Sets',
-            setNum: 'Multiple',
-            inkable: false,
-            lore: 0,
-            willpower: 0,
-            strength: 0,
-            franchise: "",
-            gamemode: "Lorcana"
-          };
+          // Try to resolve via Lorcast search if we have candidates
+          let resolvedCard = null;
+          if (foundCard.candidates.length > 0) {
+            try {
+              // Use the first candidate as a starting point
+              const firstCandidate = foundCard.candidates[0];
+              resolvedCard = firstCandidate;
+              console.log(`[parseTextImport] Using first candidate for ${cardName} - ${subtitle}:`, firstCandidate.name);
+            } catch (error) {
+              console.warn(`[parseTextImport] Error resolving candidate for ${cardName} - ${subtitle}:`, error);
+            }
+          }
           
-          const key = deckKey(placeholderCard);
-          deck.entries[key] = { card: placeholderCard, count: countNum };
-          validCards++;
-          notFoundCards.push({ name: `${cardName} - ${subtitle}`, count: countNum, reason: 'ambiguous-needs-resolution' });
+          // Future enhancement: Could add Lorcast API search here for better resolution
+          
+          if (resolvedCard) {
+            // We have a resolved card, create a proper entry
+            const key = deckKey(resolvedCard);
+            try {
+              const transformedCard = toAppCard(resolvedCard);
+              const rawUrl = getCardImageUrl(transformedCard);
+              const proxied = lorcanaImageProxyUrl(rawUrl);
+              let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+              
+              if (image_url && typeof image_url !== 'string') {
+                image_url = null;
+              }
+              
+              deck.entries[key] = { 
+                card: {
+                  ...transformedCard,
+                  image_url,
+                  _generatedImageUrl: rawUrl,
+                  _proxiedImageUrl: proxied,
+                  _resolvedFromAmbiguous: true
+                }, 
+                count: countNum 
+              };
+              
+              validCards++;
+              foundCards.push({ name: `${cardName} - ${subtitle}`, found: resolvedCard.name, count: countNum, reason: 'resolved-from-candidates' });
+            } catch (error) {
+              console.warn(`[parseTextImport] Error processing resolved card for ${cardName} - ${subtitle}:`, error);
+              // Fall back to placeholder
+              resolvedCard = null;
+            }
+          }
+          
+          if (!resolvedCard) {
+            // Create placeholder if resolution failed
+            const placeholderCard = {
+              name: `${cardName} - ${subtitle}`,
+              set: 'Multiple',
+              number: 'Multiple',
+              cost: 0,
+              inks: [],
+              type: "Unknown",
+              rarity: "Unknown",
+              text: `Multiple variants found: ${foundCard.candidates.map(c => `${c.name} (${c.setId} #${c.setNum})`).join(', ')}`,
+              classifications: [],
+              keywords: [],
+              image_url: null,
+              _raw: {},
+              _candidates: foundCard.candidates,
+              _needsResolution: true,
+              setCode: 'Multiple',
+              setName: 'Multiple Sets',
+              setNum: 'Multiple',
+              inkable: false,
+              lore: 0,
+              willpower: 0,
+              strength: 0,
+              franchise: "",
+              gamemode: "Lorcana"
+            };
+            
+            const key = deckKey(placeholderCard);
+            deck.entries[key] = { card: placeholderCard, count: countNum };
+            validCards++;
+            notFoundCards.push({ name: `${cardName} - ${subtitle}`, count: countNum, reason: 'ambiguous-needs-resolution' });
+          }
         } else {
           console.log(`[parseTextImport] No card found for hyphenated format: ${cardName} - ${subtitle}`);
           notFoundCards.push({ name: cardName, count: countNum, reason: 'hyphenated-format-not-found' });
         }
-        return; // Skip to next line
+        continue; // Skip to next line
       }
-    }
     
     // Fallback: Handle old format "4 Rafiki - Mystical Fighter"
     const simpleMatch = line.match(/^(\d+)\s+(.+)$/);
@@ -2587,35 +2704,81 @@ function parseTextImport(text) {
           validCards++;
           foundCards.push({ name: cardName.trim(), found: foundCard.name, count: countNum });
         } else {
-          // If card not found, create a placeholder entry with better structure
-          const placeholderCard = { 
-            name: cardName.trim(), 
-            set: "Unknown", 
-            number: "?", 
-            cost: 0,
-            inks: [],
-            type: "Unknown",
-            rarity: "Unknown",
-            text: "",
-            classifications: [],
-            keywords: [],
-            image_url: "",
-            _raw: {},
-            // Add these fields to match expected card structure
-            setCode: "Unknown",
-            setName: "Unknown",
-            setNum: "?",
-            inkable: false,
-            lore: 0,
-            willpower: 0,
-            strength: 0,
-            franchise: "",
-            gamemode: "Lorcana"
-          };
-          const key = deckKey(placeholderCard);
-          deck.entries[key] = { card: placeholderCard, count: countNum };
-          validCards++;
-          notFoundCards.push({ name: cardName.trim(), count: countNum });
+          // If card not found, try to resolve via Lorcast search for simple names
+          console.log(`[parseTextImport] Attempting to resolve simple card name: ${cardName.trim()}`);
+          
+          // Try to find any card with a similar name (this could be enhanced with actual Lorcast API search)
+          const cards = window.getCurrentCards ? window.getCurrentCards() : [];
+          const similarCards = cards.filter(c => 
+            c.name.toLowerCase().includes(cardName.trim().toLowerCase()) ||
+            c.name.toLowerCase().startsWith(cardName.trim().toLowerCase())
+          );
+          
+          if (similarCards.length > 0) {
+            // Use the first similar card as a best guess
+            const bestMatch = similarCards[0];
+            console.log(`[parseTextImport] Found similar card for ${cardName.trim()}:`, bestMatch.name);
+            
+            try {
+              const transformedCard = toAppCard(bestMatch);
+              const rawUrl = getCardImageUrl(transformedCard);
+              const proxied = lorcanaImageProxyUrl(rawUrl);
+              let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+              
+              if (image_url && typeof image_url !== 'string') {
+                image_url = null;
+              }
+              
+              const key = deckKey(bestMatch);
+              deck.entries[key] = { 
+                card: {
+                  ...transformedCard,
+                  image_url,
+                  _generatedImageUrl: rawUrl,
+                  _proxiedImageUrl: proxied,
+                  _resolvedFromSimple: true,
+                  _originalInput: cardName.trim()
+                }, 
+                count: countNum 
+              };
+              
+              validCards++;
+              foundCards.push({ name: cardName.trim(), found: bestMatch.name, count: countNum, reason: 'resolved-from-similar' });
+            } catch (error) {
+              console.warn(`[parseTextImport] Error processing similar card for ${cardName.trim()}:`, error);
+              // Fall back to placeholder
+            }
+          } else {
+            // Create placeholder if no similar cards found
+            const placeholderCard = { 
+              name: cardName.trim(), 
+              set: "Unknown", 
+              number: "?", 
+              cost: 0,
+              inks: [],
+              type: "Unknown",
+              rarity: "Unknown",
+              text: "",
+              classifications: [],
+              keywords: [],
+              image_url: "",
+              _raw: {},
+              // Add these fields to match expected card structure
+              setCode: "Unknown",
+              setName: "Unknown",
+              setNum: "?",
+              inkable: false,
+              lore: 0,
+              willpower: 0,
+              strength: 0,
+              franchise: "",
+              gamemode: "Lorcana"
+            };
+            const key = deckKey(placeholderCard);
+            deck.entries[key] = { card: placeholderCard, count: countNum };
+            validCards++;
+            notFoundCards.push({ name: cardName.trim(), count: countNum });
+          }
         }
       } else {
         console.warn(`[parseTextImport] Invalid count or card name on line ${index + 1}: "${line}"`);
@@ -2637,7 +2800,7 @@ function parseTextImport(text) {
         skippedLines++;
       }
     }
-  });
+  }
   
   if (validCards === 0) {
     throw new Error('No valid cards found in text input');
@@ -6016,6 +6179,8 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
   }
 
 // Root App -------------------------------------------------------------------
+}
+}
 
 function AppInner() {
   console.log('[App] AppInner component starting up...');
