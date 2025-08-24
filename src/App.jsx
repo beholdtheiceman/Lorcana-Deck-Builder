@@ -32,6 +32,63 @@ import {
 // Authentication components
 import AuthButton from './components/AuthButton';
 
+// -----------------------------------------------------------------------------
+// Card image cache context
+// -----------------------------------------------------------------------------
+
+console.log('[Context] Creating ImageCacheContext...');
+const ImageCacheContext = createContext();
+console.log('[Context] ImageCacheContext created:', ImageCacheContext);
+
+function ImageCacheProvider({ children }) {
+  console.log('[ImageCacheProvider] Initializing...');
+  const [cache, setCache] = useState(() => loadLS(LS_KEYS.CACHE_IMG, {}));
+  const [cacheVersion, setCacheVersion] = useState(0);
+  
+  useEffect(() => {
+    console.log('[ImageCacheProvider] Cache updated, saving to localStorage');
+    saveLS(LS_KEYS.CACHE_IMG, cache);
+  }, [cache]);
+
+  const get = useCallback((key) => cache[key], [cache]);
+  const put = useCallback((key, value) => {
+    setCache((c) => ({ ...c, [key]: value }));
+    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
+  }, []);
+  const putFailed = useCallback((key) => {
+    setCache((c) => ({ ...c, [key]: 'FAILED' }));
+    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
+  }, []);
+
+  const value = useMemo(() => ({ get, put, putFailed, cache, cacheVersion }), [get, put, putFailed, cache, cacheVersion]);
+
+  console.log('[ImageCacheProvider] About to render with value:', value);
+
+  return (
+    <ImageCacheContext.Provider value={value}>
+      {children}
+    </ImageCacheContext.Provider>
+  );
+}
+
+// Debug component to trace context
+function ContextDebugger() {
+  const context = useContext(ImageCacheContext);
+  console.log('[ContextDebugger] Context value:', context);
+  return null; // This component doesn't render anything
+}
+
+function useImageCache() {
+  console.log('[useImageCache] Hook called');
+  const context = useContext(ImageCacheContext);
+  console.log('[useImageCache] Context value:', context);
+  if (!context) {
+    console.error('[useImageCache] Context is null/undefined - this will cause the error');
+    throw new Error('useImageCache must be used within ImageCacheProvider');
+  }
+  return context;
+}
+
 // Ink colors supported by the filters. Feel free to expand.
 const INK_COLORS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"];
 
@@ -3432,24 +3489,6 @@ function ImageCacheProvider({ children }) {
       {children}
     </ImageCacheContext.Provider>
   );
-}
-
-// Debug component to trace context
-function ContextDebugger() {
-  const context = useContext(ImageCacheContext);
-  console.log('[ContextDebugger] Context value:', context);
-  return null; // This component doesn't render anything
-}
-
-function useImageCache() {
-  console.log('[useImageCache] Hook called');
-  const context = useContext(ImageCacheContext);
-  console.log('[useImageCache] Context value:', context);
-  if (!context) {
-    console.error('[useImageCache] Context is null/undefined - this will cause the error');
-    throw new Error('useImageCache must be used within ImageCacheProvider');
-  }
-  return context;
 }
 
 // -----------------------------------------------------------------------------
