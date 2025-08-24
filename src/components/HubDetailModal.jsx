@@ -110,6 +110,13 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
                         console.log('🔍 First sample card keys:', Object.keys(deck.sampleCards[0]));
                       }
                       
+                      // Debug: Let's also look at the actual first card from the cards array
+                      if (deck.cards && deck.cards.length > 0) {
+                        console.log('🔍 First actual card from deck.cards:', deck.cards[0]);
+                        console.log('🔍 First actual card keys:', Object.keys(deck.cards[0]));
+                        console.log('🔍 First actual card values:', Object.values(deck.cards[0]));
+                      }
+                      
                       return (
                         <div
                           key={deck.id}
