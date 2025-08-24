@@ -1,67 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import DeckViewModal from './DeckViewModal';
 
 const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
-  const { user } = useAuth();
   const [hubDecks, setHubDecks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedDeck, setSelectedDeck] = useState(null);
 
   useEffect(() => {
-    if (hub) {
+    const fetchHubDecks = async () => {
+      try {
+        console.log('🔍 HubDetailModal: Starting to fetch decks for hub:', hub.id);
+        setLoading(true);
+        
+        const response = await fetch(`/api/hubs/${hub.id}/decks`);
+        console.log('🔍 HubDetailModal: API response status:', response.status);
+  
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+  
+        const decks = await response.json();
+        console.log('🔍 HubDetailModal: Received decks:', decks);
+        console.log('🔍 HubDetailModal: First deck data:', decks[0]);
+        
+        setHubDecks(decks);
+      } catch (error) {
+        console.error('Error fetching hub decks:', error);
+        setError('Failed to load decks.');
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    if (hub?.id) {
       fetchHubDecks();
     }
   }, [hub]);
 
-  const fetchHubDecks = async () => {
-    try {
-      console.log('🔍 HubDetailModal: Starting to fetch decks for hub:', hub.id);
-      setLoading(true);
-      
-      const response = await fetch(`/api/hubs/${hub.id}/decks`);
-      console.log('🔍 HubDetailModal: API response status:', response.status);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch hub decks');
-      }
-
-      const decks = await response.json();
-      console.log('🔍 HubDetailModal: Received decks:', decks);
-      console.log('🔍 HubDetailModal: First deck data:', decks[0]);
-      
-      setHubDecks(decks);
-    } catch (error) {
-      console.error('Error fetching hub decks:', error);
-      setError('Failed to load hub decks');
-    } finally {
-      setLoading(false);
-    }
+  const handleDeckClick = (deck) => {
+    setSelectedDeck(deck);
   };
 
-  if (!hub) return null;
+  const handleBackToHub = () => {
+    setSelectedDeck(null);
+  };
 
+  // If a deck is selected, show the deck view
+  if (selectedDeck) {
+    return (
+      <DeckViewModal 
+        deck={selectedDeck} 
+        hub={hub} 
+        onBack={handleBackToHub} 
+      />
+    );
+  }
+
+  // Otherwise show the hub view
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-gray-900 rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
-         {/* Header */}
-         <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
-           <div>
-             <h2 className="text-2xl font-bold text-white">{hub.name}</h2>
-             <p className="text-gray-400">
-               {hub.members.length + 1} member{(hub.members.length + 1) !== 1 ? 's' : ''} • 
-               Invite Code: <span className="font-mono bg-gray-800 px-2 py-1 rounded">{hub.inviteCode}</span>
-             </p>
-           </div>
-           <button
-             onClick={onClose}
-             className="text-gray-400 hover:text-white text-2xl font-bold"
-           >
-             ×
-           </button>
-         </div>
+      <div className="bg-gray-900 rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
+          <div>
+            <h2 className="text-2xl font-bold text-white">{hub.name}</h2>
+            <p className="text-gray-400">
+              {hub.members.length + 1} member{(hub.members.length + 1) !== 1 ? 's' : ''} • 
+              Invite Code: <span className="font-mono bg-gray-800 px-2 py-1 rounded">{hub.inviteCode}</span>
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl font-bold"
+          >
+            ×
+          </button>
+        </div>
 
-                 {/* Content */}
-         <div className="flex-1 overflow-y-auto p-4">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-white">Loading decks...</div>
@@ -101,53 +119,21 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {hubDecks.map((deck) => {
-                      // Debug: Log the deck structure
-                      console.log('🔍 Deck being rendered:', deck);
-                      console.log('🔍 Deck sample cards:', deck.sampleCards);
-                      if (deck.sampleCards && deck.sampleCards.length > 0) {
-                        console.log('🔍 First sample card:', deck.sampleCards[0]);
-                        console.log('🔍 First sample card keys:', Object.keys(deck.sampleCards[0]));
-                      }
-                      
-                      // Debug: Let's also look at the actual first card from the cards array
-                      if (deck.cards && deck.cards.length > 0) {
-                        console.log('🔍 First actual card from deck.cards:', deck.cards[0]);
-                        console.log('🔍 First actual card keys:', Object.keys(deck.cards[0]));
-                        console.log('🔍 First actual card values:', Object.values(deck.cards[0]));
-                      }
-                      
-                      return (
-                        <div
-                          key={deck.id}
-                          onClick={() => onDeckClick(deck)}
-                          className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors border border-gray-700 hover:border-purple-500"
-                        >
-                          <div className="aspect-[3/4] bg-gray-700 rounded mb-3 flex items-center justify-center">
-                            <div className="text-gray-400 text-center">
-                              <div className="text-2xl mb-2">🎴</div>
-                              <div className="text-sm">{deck.title}</div>
-                            </div>
-                          </div>
-                          <h4 className="text-white font-semibold mb-1">{deck.title}</h4>
-                          <p className="text-gray-400 text-sm">
-                            by {deck.user.email}
-                          </p>
-                          <p className="text-gray-500 text-xs mt-2">
-                            {deck.cardCount || 0} cards
-                          </p>
-                          {deck.sampleCards && deck.sampleCards.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {deck.sampleCards.map((card, index) => (
-                                <div key={index} className="text-xs text-gray-400">
-                                  {card.cost} {card.ink} • {card.name}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {hubDecks.map((deck) => (
+                      <div
+                        key={deck.id}
+                        onClick={() => handleDeckClick(deck)}
+                        className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors border border-gray-700 hover:border-purple-500"
+                      >
+                        <h4 className="text-white font-semibold mb-2 text-lg">{deck.title}</h4>
+                        <p className="text-gray-400 text-sm mb-2">
+                          by {deck.user.email}
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                          {deck.cardCount || 0} cards
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
