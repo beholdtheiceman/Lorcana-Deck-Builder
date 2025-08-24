@@ -743,6 +743,22 @@ function sortLog(...args) {
 // Current error: /vite.svg:1 Failed to load resource: the server responded with a status of 404 ()
 
 /**
+ * Auth-safe fetch wrapper that handles missing tokens gracefully
+ */
+async function authSafeFetch(input, init = {}) {
+  const token = localStorage.getItem("auth_token");
+  if (!token) {
+    if (init.method && init.method !== "GET") {
+      return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
+/**
  * Normalize display names and comparisons
  */
 const splitDisplayName = (name) => {
@@ -871,10 +887,11 @@ function getCardImageUrl(card) {
     return url;
   }
   
-  // FALLBACK: Use the Image field from the feed
-  if (card.imageUrl && typeof card.imageUrl === 'string') {
-    console.log(`[getCardImageUrl] Using feed imageUrl for ${card.name}:`, card.imageUrl);
-    return card.imageUrl;
+  // FALLBACK: Accept either imageUrl or image_url (handle both field names)
+  const direct = card.imageUrl || card.image_url;
+  if (typeof direct === 'string' && direct) {
+    console.log(`[getCardImageUrl] Using direct image for ${card.name}:`, direct);
+    return direct;
   }
   
   // LAST RESORT: Generate URL only if absolutely necessary
@@ -6052,7 +6069,7 @@ function AppInner() {
   // Debug: Check what's actually in allCards
   if (allCards && allCards.length > 0) {
     console.log('[App] allCards already has data! Sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
-    const cardsWithSubnames = allCards.filter(card => card.name && card.name.includes(' - '));
+    const cardsWithSubnames = allCards.filter(card => hasSubtitleLike(card));
     console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
     if (cardsWithSubnames.length > 0) {
       console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
@@ -6072,9 +6089,7 @@ function AppInner() {
             const parsed = JSON.parse(cachedCards);
             console.log('[App] Cached cards count:', parsed.length);
             if (parsed.length > 0) {
-              const cachedWithSubnames = parsed.filter(card => {
-                return !!card.subname || (card.name && card.name.includes(' - '));
-              });
+              const cachedWithSubnames = parsed.filter(card => hasSubtitleLike(card));
               console.log('[App] Cached cards with subnames/subtitles:', cachedWithSubnames.length);
               if (cachedWithSubnames.length > 0) {
                 console.log('[App] Sample cached subname/subtitle cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
@@ -6613,7 +6628,7 @@ function handleSaveDeck() {
 // Save deck to cloud database
 async function saveDeckToCloud(deckData) {
   try {
-    const response = await fetch('/api/decks', {
+    const response = await authSafeFetch('/api/decks', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -6638,7 +6653,7 @@ async function saveDeckToCloud(deckData) {
 async function loadDecksFromCloud() {
   try {
     console.log('[loadDecksFromCloud] Attempting to load decks from cloud...');
-    const response = await fetch('/api/decks', {
+    const response = await authSafeFetch('/api/decks', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
