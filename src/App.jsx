@@ -4504,7 +4504,7 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
         </div>
       }
     >
-      <div className="flex justify-center w-full -mx-4">
+      <div className="flex justify-center w-full" style={{ marginLeft: '-16px', marginRight: '-16px' }}>
         <img 
           src={imgSrc} 
           alt={card.name} 
