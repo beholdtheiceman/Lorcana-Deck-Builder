@@ -1665,19 +1665,20 @@ function normalizeLorcast(c) {
   // Extract abilities using the new helper
   const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
   
-      // Extract baseName and subname from the display name
-    const { baseName, subname } = splitDisplayName(c.name);
+      // Use the version field directly from the API for subtitle
+    const baseName = c.name;
+    const subname = c.version;
     
     // Debug: Log the extraction
     if (subname) {
-      console.log(`[normalizeLorcast] Extracted subtitle for "${c.name}": baseName="${baseName}", subname="${subname}"`);
+      console.log(`[normalizeLorcast] Using version for "${c.name}": baseName="${baseName}", subname="${subname}"`);
     }
     
     const result = {
       id: c.id || c.collector_number || c.name,
       name: c.name,
-      baseName,                    // <-- New: extracted base name
-      subname,                     // <-- New: extracted subtitle
+      baseName,                    // <-- Base name (without subtitle)
+      subname,                     // <-- Subtitle from version field
       // NORMALIZED set fields using Lorcast's actual model:
       set: setCode || setName || (setNum != null ? String(setNum) : ""),
       setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
@@ -2973,15 +2974,14 @@ const initialFilterState = () => {
     rarities: new Set(),
     types: new Set(),
     sets: new Set(),
-    classifications: new Set(),  // Changed from subtypes
+    classifications: new Set(),
     abilities: new Set(),
-    selectedCosts: new Set(), // No costs selected by default - show all cards
+    selectedCosts: new Set(),
     showInkablesOnly: false,
     showUninkablesOnly: false,
     sortBy: "ink-set-number",
     sortDir: "asc",
     showFilterPanel: false,
-    // New filters
     setNumber: "",
     franchise: "",
     gamemode: "",
@@ -2991,7 +2991,7 @@ const initialFilterState = () => {
     willpowerMax: "",
     strengthMin: "",
     strengthMax: "",
-    _resetTimestamp: Date.now(), // Force re-render
+    _resetTimestamp: Date.now(),
   };
   console.log('[initialFilterState] Created default state:', defaultState);
   return defaultState;
@@ -3007,9 +3007,8 @@ function serializeFilterState(state) {
     sets: Array.from(state.sets || []),
     classifications: Array.from(state.classifications || []),
     abilities: Array.from(state.abilities || []),
-    selectedCosts: Array.from(state.selectedCosts || []), // Add missing selectedCosts serialization
+    selectedCosts: Array.from(state.selectedCosts || []),
     showFilterPanel: state.showFilterPanel || false,
-    // New filters
     setNumber: state.setNumber || "",
     franchise: state.franchise || "",
     gamemode: state.gamemode || "",
@@ -3035,9 +3034,8 @@ function hydrateFilterState(raw) {
     sets: new Set(raw.sets || []),
     classifications: new Set(raw.classifications || []),
     abilities: new Set(raw.abilities || []),
-    selectedCosts: new Set(raw.selectedCosts || []), // Add missing selectedCosts hydration
+    selectedCosts: new Set(raw.selectedCosts || []),
     showFilterPanel: raw.showFilterPanel || false,
-    // New filters
     setNumber: raw.setNumber || "",
     franchise: raw.franchise || "",
     gamemode: raw.gamemode || "",
@@ -4474,7 +4472,7 @@ function Modal({ open, onClose, title, children, footer, size = "md" }) {
             Close
           </button>
         </div>
-        <div className="p-4 overflow-y-auto max-h-[calc(95vh-120px)]">{children}</div>
+        <div className="p-4 overflow-y-auto overflow-x-hidden max-h-[calc(95vh-120px)]">{children}</div>
         {footer && <div className="px-4 py-3 border-t border-gray-800">{footer}</div>}
       </div>
     </div>
@@ -4487,30 +4485,54 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   const imgSrc = getCardImg(card || {});
   if (!open || !card) return null;
   
+  // Debug log to see card structure
+  console.log('[InspectCardModal] Card object:', card);
+  console.log('[InspectCardModal] Card name:', card.name);
+  console.log('[InspectCardModal] Card subname:', card.subname);
+  console.log('[InspectCardModal] Card version:', card.version);
+  
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`${card.name} • ${card.set} #${card.number}`}
-      footer={
-        <div className="flex items-center justify-end gap-2">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="relative flex justify-center w-full">
+        {/* Card Image Container - this will be the positioning context for the X button */}
+        <div className="relative">
+          <img 
+            src={imgSrc} 
+            alt={card.name} 
+            className="w-auto h-auto max-w-[99.5%] max-h-[calc(90vh-100px)] object-contain rounded-xl border border-gray-800"
+          />
+          
+          {/* Close Button - positioned relative to the card image */}
           <button
-            className="px-3 py-1.5 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
-            onClick={() => onAdd(card)}
+            onClick={onClose}
+            className="absolute top-2 right-2 w-8 h-8 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center text-lg font-bold border border-white/30 hover:border-white/50 transition-colors"
           >
-            Add to Deck
+            ×
           </button>
         </div>
-      }
-    >
-      <div className="flex justify-center">
-        <img 
-          src={imgSrc} 
-          alt={card.name} 
-          className="max-w-full max-h-[70vh] object-contain rounded-xl border border-gray-800" 
-        />
+        
+        {/* Name Bubble - positioned above the card */}
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full border border-white/30 shadow-lg">
+          <span className="text-sm font-medium whitespace-nowrap">{card.subname ? `${card.name} - ${card.subname}` : card.name}</span>
+        </div>
+        
+        {/* +/- Buttons - centered over card bottom */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3">
+          <button
+            onClick={() => onAdd(card)}
+            className="w-10 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center text-xl font-bold border-2 border-emerald-400 hover:border-emerald-300 transition-colors shadow-lg"
+          >
+          +
+          </button>
+          <button
+            onClick={() => onAdd(card)}
+            className="w-10 h-10 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xl font-bold border-2 border-red-400 hover:border-red-300 transition-colors shadow-lg"
+          >
+          −
+          </button>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }
 
