@@ -4550,11 +4550,7 @@ function DeckStats({ deck }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="cost" />
                 <YAxis allowDecimals={false} />
-                <Bar dataKey="count" name="count" fill="#10b981">
-                  {costCurve.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill="#10b981" />
-                  ))}
-                </Bar>
+                <Bar dataKey="count" fill="#10b981" />
                 <Tooltip 
                   content={({ active, payload, label }) => {
                     console.log('[Tooltip Debug] Cost Curve Tooltip called:', { active, payload, label });
@@ -4594,11 +4590,7 @@ function DeckStats({ deck }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="type" />
                 <YAxis allowDecimals={false} />
-                <Bar dataKey="count" name="count" fill="#3b82f6">
-                  {typeCounts.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill="#3b82f6" />
-                  ))}
-                </Bar>
+                <Bar dataKey="count" fill="#3b82f6" />
                 <Tooltip 
                   content={({ active, payload, label }) => {
                     console.log('[Tooltip Debug] Card Types Tooltip called:', { active, payload, label });
