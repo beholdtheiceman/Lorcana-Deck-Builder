@@ -2331,13 +2331,13 @@ function findCardByLorcanitoFormat(cardName, subtitle, setId, setNumber) {
   }
 }
 
-// Parse text import - REVERSE ENGINEERED from export format for reliability
+// Parse text import - PERMISSIVE format that handles various deck list styles
 function parseTextImport(text) {
   if (!text || typeof text !== 'string') {
     throw new Error('Invalid text input');
   }
   
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+  const lines = text.split('\r?\n').map(line => line.trim()).filter(line => line);
   if (lines.length === 0) {
     throw new Error('No valid lines found in text input');
   }
@@ -2349,9 +2349,12 @@ function parseTextImport(text) {
   let foundCards = [];
   let notFoundCards = [];
   
-  // Parse Lorcanito export format: "4 Card Name — Subtitle (Set #Number)"
-  // Also handle regular hyphens for compatibility: "4 Card Name - Subtitle"
-  const lorcanitoPattern = /^(\d+)\s+(.+?)\s*[—–-]\s*(.+?)\s*\((\d+)\s*#(\d+)\)$/;
+  // Looser line format that handles:
+  // "4 Name - Subtitle (TFC #123)"
+  // "4 Name (1 #123)" 
+  // "4 Name - Subtitle"
+  // "4 Name"
+  const LINE_RE = /^\s*(\d+)\s+(.+?)(?:\s*[-–—]\s*(.+?))?(?:\s*\(\s*([A-Za-z0-9]+)\s*(?:#\s*([A-Za-z0-9]+))?\s*\))?\s*$/;
   
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
@@ -2364,8 +2367,8 @@ function parseTextImport(text) {
     // DEBUG: Log the actual line content to see what we're parsing
     console.log(`[parseTextImport] Processing line ${index + 1}: "${line}"`);
     
-    // Try Lorcanito format first (most reliable)
-    const lorcanitoMatch = line.match(lorcanitoPattern);
+    // Try to parse the line with the new permissive regex
+    const match = line.match(LINE_RE);
     if (lorcanitoMatch) {
       console.log(`[parseTextImport] ✅ Lorcanito pattern MATCHED for line: "${line}"`);
     } else {
@@ -2375,128 +2378,180 @@ function parseTextImport(text) {
       console.log(`[parseTextImport] Contains em dash (—): ${line.includes('—')}`);
       console.log(`[parseTextImport] Contains regular dash (-): ${line.includes('-')}`);
     }
-    if (lorcanitoMatch) {
-      const [, count, cardName, subtitle, setId, setNumber] = lorcanitoMatch;
-      const countNum = parseInt(count);
+    if (!match) {
+      console.warn(`[parseTextImport] Unrecognized format on line ${index + 1}: "${line}"`);
+      skippedLines++;
+      continue;
+    }
+    
+    const [, count, name, subtitle, setMaybe, noMaybe] = match;
+    const countNum = parseInt(count);
+    
+    if (countNum <= 0 || !name.trim()) {
+      console.warn(`[parseTextImport] Invalid count or card name on line ${index + 1}: "${line}"`);
+      skippedLines++;
+      continue;
+    }
+    
+    totalCards += countNum;
+    const cardName = name.trim();
+    const cardSubtitle = subtitle?.trim() || null;
+    const cardSet = setMaybe ? String(setMaybe).toUpperCase() : null;
+    const cardNumber = noMaybe || null;
+    
+    console.log(`[parseTextImport] Parsed: ${countNum}x "${cardName}"${cardSubtitle ? ` - ${cardSubtitle}` : ''}${cardSet && cardNumber ? ` (${cardSet} #${cardNumber})` : ''}`);
+    
+    // Try to find the card using the available information
+    const cards = window.getCurrentCards ? window.getCurrentCards() : [];
+    let foundCard = null;
+    
+    if (cardSubtitle) {
+      // Try to find by name + subtitle
+      foundCard = findCardByName(`${cardName} - ${cardSubtitle}`, cards);
+    } else {
+      // Try to find by name only
+      foundCard = findCardByName(cardName, cards);
+    }
+    
+    if (foundCard && !foundCard.reason) {
+      // Card found successfully
+      const key = deckKey(foundCard);
       
-      if (countNum > 0 && cardName.trim()) {
-        totalCards += countNum;
-        console.log(`[parseTextImport] Parsed Lorcanito format: ${countNum}x "${cardName} — ${subtitle}" (Set ${setId} #${setNumber})`);
+      try {
+        const transformedCard = toAppCard(foundCard);
+        const rawUrl = getCardImageUrl(transformedCard);
+        const proxied = lorcanaImageProxyUrl(rawUrl);
+        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
         
-        // Try to find the card using the exact format
-        const foundCard = findCardByLorcanitoFormat(cardName.trim(), subtitle.trim(), setId, setNumber);
-        if (foundCard) {
-          const key = deckKey(foundCard);
-          
-          try {
-            // TRANSFORM: Convert to app format for consistent data structure
-            const transformedCard = toAppCard(foundCard);
-            console.log(`[parseTextImport] Transformed card for ${foundCard.name}:`, {
-              original: foundCard.name,
-              transformed: transformedCard.name,
-              inkable: transformedCard.inkable,
-              imageUrl: transformedCard.imageUrl
-            });
-            
-            // NEW: Use getCardImageUrl to prefer feed Image, fallback to generator
-            const rawUrl = getCardImageUrl(transformedCard);         // string | null
-            console.log(`[parseTextImport] About to call lorcanaImageProxyUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof lorcanaImageProxyUrl });
-            const proxied = lorcanaImageProxyUrl(rawUrl);                   // string | null
-            
-            // Single source of truth: normalize to string | null
-            let image_url = asUrl(proxied) ?? asUrl(rawUrl);
-            
-            // Runtime guard - if anything weird slips through:
-            if (image_url && typeof image_url !== 'string') {
-              console.log('[parseTextImport] non-string image_url; clearing', image_url);
-              image_url = null;
-            }
-            
-            console.log(`[parseTextImport] Image URLs for ${transformedCard.name}:`, {
-              raw: rawUrl,
-              proxied: proxied,
-              final: image_url,
-              rawType: typeof rawUrl,
-              proxiedType: typeof proxied,
-              finalType: typeof image_url
-            });
-            
-            // Store the TRANSFORMED card with enhanced image data - NEVER store objects
-            deck.entries[key] = { 
-              card: {
-                ...transformedCard,  // Use transformed data structure
-                image_url,           // 🚨 This is now guaranteed to be string | null
-                _generatedImageUrl: rawUrl,    // Keep original for debugging
-                _proxiedImageUrl: proxied      // Keep proxied for debugging
-              }, 
-              count: countNum 
-            };
-            
-            // FINAL GUARD: Ensure image_url is never an object
-            if (deck.entries[key].card.image_url && typeof deck.entries[key].card.image_url !== 'string') {
-              console.warn('[parseTextImport] CRITICAL: image_url is still an object! Clearing it:', deck.entries[key].card.image_url);
-              deck.entries[key].card.image_url = null;
-            }
-            
-            console.log(`[parseTextImport] Stored transformed card with image_url:`, {
-              name: transformedCard.name,
-              image_url: deck.entries[key].card.image_url,
-              type: typeof deck.entries[key].card.image_url,
-              inkable: transformedCard.inkable
-            });
-            
-          } catch (error) {
-            console.warn(`[parseTextImport] Error generating image URL for ${foundCard.name}:`, error);
-            // Store the card without image on error
-            deck.entries[key] = { 
-              card: {
-                ...foundCard,
-                image_url: null,
-                _generatedImageUrl: null,
-                _proxiedImageUrl: null
-              }, 
-              count: countNum 
-            };
-          }
-          validCards++;
-          foundCards.push({ name: `${cardName} — ${subtitle}`, found: foundCard.name, count: countNum });
-        } else {
-          // If card not found, create a placeholder entry with better structure
-          const placeholderCard = { 
-            name: `${cardName} — ${subtitle}`, 
-            set: setId, 
-            number: setNumber, 
-            cost: 0,
-            inks: [],
-            type: "Unknown",
-            rarity: "Unknown",
-            text: "",
-            classifications: [],
-            keywords: [],
-            image_url: "",
-            _raw: {},
-            // Add these fields to match expected card structure
-            setCode: setId,
-            setName: `Set ${setId}`,
-            setNum: setNumber,
-            inkable: false,
-            lore: 0,
-            willpower: 0,
-            strength: 0,
-            franchise: "",
-            gamemode: "Lorcana"
-          };
-          const key = deckKey(placeholderCard);
-          deck.entries[key] = { card: placeholderCard, count: countNum };
-          validCards++;
-          notFoundCards.push({ name: `${cardName} — ${subtitle}`, count: countNum });
+        if (image_url && typeof image_url !== 'string') {
+          image_url = null;
         }
-        continue; // Skip to next line
-      } else {
-        console.warn(`[parseTextImport] Invalid count on line ${index + 1}: "${line}"`);
-        skippedLines++;
-        continue; // Skip to next line
+        
+        deck.entries[key] = { 
+          card: {
+            ...transformedCard,
+            image_url,
+            _generatedImageUrl: rawUrl,
+            _proxiedImageUrl: proxied
+          }, 
+          count: countNum 
+        };
+        
+        validCards++;
+        foundCards.push({ name: foundCard.name, found: foundCard.name, count: countNum });
+        console.log(`[parseTextImport] Successfully imported: ${foundCard.name}`);
+        
+      } catch (error) {
+        console.warn(`[parseTextImport] Error processing card ${foundCard.name}:`, error);
+        // Store the card without image on error
+        deck.entries[key] = { 
+          card: { ...foundCard, image_url: null }, 
+          count: countNum 
+        };
+        validCards++;
+        foundCards.push({ name: foundCard.name, found: foundCard.name, count: countNum });
       }
+      
+    } else if (foundCard && foundCard.reason === 'ambiguous-base' && foundCard.candidates) {
+      // Handle ambiguous cases
+      console.log(`[parseTextImport] Ambiguous card found for "${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}", ${foundCard.candidates.length} candidates`);
+      
+      // Use the first candidate as a best guess
+      const bestMatch = foundCard.candidates[0];
+      const key = deckKey(bestMatch);
+      
+      try {
+        const transformedCard = toAppCard(bestMatch);
+        const rawUrl = getCardImageUrl(transformedCard);
+        const proxied = lorcanaImageProxyUrl(rawUrl);
+        let image_url = asUrl(proxied) ?? asUrl(rawUrl);
+        
+        if (image_url && typeof image_url !== 'string') {
+          image_url = null;
+        }
+        
+        deck.entries[key] = { 
+          card: {
+            ...transformedCard,
+            image_url,
+            _generatedImageUrl: rawUrl,
+            _proxiedImageUrl: proxied,
+            _resolvedFromAmbiguous: true
+          }, 
+          count: countNum 
+        };
+        
+        validCards++;
+        foundCards.push({ name: bestMatch.name, found: bestMatch.name, count: countNum, reason: 'resolved-from-ambiguous' });
+        console.log(`[parseTextImport] Used best match: ${bestMatch.name}`);
+        
+      } catch (error) {
+        console.warn(`[parseTextImport] Error processing ambiguous card ${bestMatch.name}:`, error);
+        // Create placeholder
+        const placeholderCard = {
+          name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`,
+          set: cardSet || 'Multiple',
+          number: cardNumber || 'Multiple',
+          cost: 0,
+          inks: [],
+          type: "Unknown",
+          rarity: "Unknown",
+          text: `Multiple variants found: ${foundCard.candidates.map(c => c.name).join(', ')}`,
+          classifications: [],
+          keywords: [],
+          image_url: null,
+          _raw: {},
+          _candidates: foundCard.candidates,
+          _needsResolution: true,
+          setCode: cardSet || 'Multiple',
+          setName: cardSet ? `Set ${cardSet}` : 'Multiple Sets',
+          setNum: cardNumber || 'Multiple',
+          inkable: false,
+          lore: 0,
+          willpower: 0,
+          strength: 0,
+          franchise: "",
+          gamemode: "Lorcana"
+        };
+        
+        const placeholderKey = deckKey(placeholderCard);
+        deck.entries[placeholderKey] = { card: placeholderCard, count: countNum };
+        validCards++;
+        notFoundCards.push({ name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`, count: countNum, reason: 'ambiguous-needs-resolution' });
+      }
+      
+    } else {
+      // No card found, create placeholder
+      console.log(`[parseTextImport] No card found for: "${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}"`);
+      
+      const placeholderCard = {
+        name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`,
+        set: cardSet || "Unknown",
+        number: cardNumber || "?",
+        cost: 0,
+        inks: [],
+        type: "Unknown",
+        rarity: "Unknown",
+        text: "",
+        classifications: [],
+        keywords: [],
+        image_url: null,
+        _raw: {},
+        setCode: cardSet || "Unknown",
+        setName: cardSet ? `Set ${cardSet}` : "Unknown",
+        setNum: cardNumber || "?",
+        inkable: false,
+        lore: 0,
+        willpower: 0,
+        strength: 0,
+        franchise: "",
+        gamemode: "Lorcana"
+      };
+      
+      const key = deckKey(placeholderCard);
+      deck.entries[key] = { card: placeholderCard, count: countNum };
+      validCards++;
+      notFoundCards.push({ name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`, count: countNum, reason: 'not-found' });
     }
     
     // NEW: Try hyphenated format without set numbers: "4 Card Name - Subtitle"
