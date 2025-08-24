@@ -2595,6 +2595,15 @@ function parseTextImport(text) {
       const card = entry.card;
       if (!card) return null;
       
+      // DEBUG: Log what we're working with
+      console.log(`[parseTextImport] Prefetch processing card:`, {
+        name: card.name,
+        type: typeof card,
+        keys: Object.keys(card),
+        hasImageUrl: !!card.image_url,
+        imageUrlType: typeof card.image_url
+      });
+      
       // Use getCardImageUrl to get the best possible URL
       const rawUrl = getCardImageUrl(card);
       console.log(`[parseTextImport] Prefetch call to proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
