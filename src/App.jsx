@@ -2657,8 +2657,8 @@ function parseTextImport(text) {
         return asUrl(rawUrl);
       }
       
-      console.log(`[parseTextImport] Prefetch call to proxyImageUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof proxyImageUrl });
-      const proxied = proxyImageUrl(rawUrl);
+      console.log(`[parseTextImport] Prefetch call to lorcanaImageProxyUrl with:`, { rawUrl, type: typeof rawUrl, function: typeof lorcanaImageProxyUrl });
+      const proxied = lorcanaImageProxyUrl(rawUrl);
       return asUrl(proxied) ?? asUrl(rawUrl);
     })
     .filter(url => typeof url === 'string' && url.length > 0);
