@@ -14,6 +14,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   decks        Deck[]
+  comments     Comment[]
+
+  // Team relationships
+  ownedHubs    Hub[]    @relation("HubOwner")
+  hubMemberships HubMember[]
 }
 
 model Deck {
@@ -24,6 +29,50 @@ model Deck {
   data      Json     @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  comments  Comment[]
 
+  @@index([userId])
+}
+
+model Hub {
+  id          String   @id @default(uuid())
+  name        String
+  inviteCode  String   @unique
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User     @relation("HubOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     HubMember[]
+
+  @@index([inviteCode])
+  @@index([ownerId])
+}
+
+model HubMember {
+  id       String   @id @default(uuid())
+  hubId    String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  hub       Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([hubId, userId])
+  @@index([hubId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  deckId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deckId])
   @@index([userId])
 }

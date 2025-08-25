@@ -1,26 +1,47 @@
-import { prisma } from "./_lib/db.js";
+import { prisma } from './_lib/db.js';
 
-export default async function handler(req, res) {
+export async function GET() {
   try {
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
+    // Test basic database connection
+    const result = await prisma.$queryRaw`SELECT 1 as test`;
     
-    // Test if we can access the User table
-    const userCount = await prisma.user.count();
+    // Check if Hub table exists
+    let hubTableExists = false;
+    try {
+      await prisma.hub.findFirst();
+      hubTableExists = true;
+    } catch (error) {
+      hubTableExists = false;
+    }
     
-    return res.json({ 
-      success: true, 
-      message: "Database connection successful",
-      userCount,
-      timestamp: new Date().toISOString()
+    // Check if HubMember table exists
+    let hubMemberTableExists = false;
+    try {
+      await prisma.hubMember.findFirst();
+      hubMemberTableExists = true;
+    } catch (error) {
+      hubMemberTableExists = false;
+    }
+    
+    return new Response(JSON.stringify({
+      status: 'success',
+      databaseConnected: true,
+      hubTableExists,
+      hubMemberTableExists,
+      testResult: result
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('Database test failed:', error);
-    return res.status(500).json({ 
-      success: false, 
+    console.error('Database test error:', error);
+    return new Response(JSON.stringify({
+      status: 'error',
       error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
+      stack: error.stack
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }
