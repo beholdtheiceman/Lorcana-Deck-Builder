@@ -3469,7 +3469,6 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         {/* 3. Types */}
         <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
           <legend className="text-sm text-gray-300">Types</legend>
-          <div className="text-xs text-gray-400 mb-2">Song = Action - Song cards</div>
           <div className="flex flex-wrap gap-2 mt-2">
             {CARD_TYPES.map((t) => (
               <TogglePill
@@ -3480,6 +3479,62 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               />
             ))}
           </div>
+        </fieldset>
+
+        {/* 4. Legality */}
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+          <legend className="text-sm text-gray-300">Legality</legend>
+          <select
+            className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+            value={state.gamemode}
+            onChange={(e) => dispatch({ type: "SET_GAMEMODE", value: e.target.value })}
+          >
+            <option value="">Any</option>
+            {GAMEMODES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+        </fieldset>
+
+        {/* 5. Classifications */}
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+          <legend className="text-sm text-gray-300">Classifications</legend>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {CLASSIFICATIONS.map((classification) => (
+              <TogglePill
+                key={classification}
+                label={classification}
+                active={state.classifications.has(classification)}
+                onClick={() => dispatch({ type: "TOGGLE_CLASSIFICATION", classification })}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        {/* 6. Abilities */}
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+          <legend className="text-sm text-gray-300">Abilities</legend>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {ABILITIES.map((ability) => (
+              <TogglePill
+                key={ability}
+                label={ability}
+                active={state.abilities.has(ability)}
+                onClick={() => dispatch({ type: "TOGGLE_ABILITY", ability: ability })}
+              />
+            ))}
+          </div>
+          <button
+            className="mt-2 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+            onClick={() => {
+              console.log('[Debug] Current abilities state:', state.abilities);
+              dispatch({ type: "RESET" });
+            }}
+          >
+            Reset Filters (Debug)
+          </button>
         </fieldset>
 
         {/* 4. Lore Range */}
@@ -3554,21 +3609,6 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
           </div>
         </fieldset>
 
-        {/* 7. Rarity */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
-          <legend className="text-sm text-gray-300">Rarity</legend>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {RARITIES.map((rar) => (
-              <TogglePill
-                key={rar}
-                label={rar}
-                active={state.rarities.has(rar)}
-                onClick={() => dispatch({ type: "TOGGLE_RARITY", rarity: rar })}
-              />
-            ))}
-          </div>
-        </fieldset>
-
         <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
           <legend className="text-sm text-gray-300">Sets</legend>
           <div className="space-y-3">
@@ -3640,63 +3680,24 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
           </div>
         </fieldset>
 
+
+
+
+
+        {/* 7. Rarity */}
         <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
-          <legend className="text-sm text-gray-300">Classifications</legend>
+          <legend className="text-sm text-gray-300">Rarity</legend>
           <div className="flex flex-wrap gap-2 mt-2">
-            {CLASSIFICATIONS.map((classification) => (
+            {RARITIES.map((rar) => (
               <TogglePill
-                key={classification}
-                label={classification}
-                active={state.classifications.has(classification)}
-                onClick={() => dispatch({ type: "TOGGLE_CLASSIFICATION", classification })}
+                key={rar}
+                label={rar}
+                active={state.rarities.has(rar)}
+                onClick={() => dispatch({ type: "TOGGLE_RARITY", rarity: rar })}
               />
             ))}
           </div>
         </fieldset>
-
-                <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
-          <legend className="text-sm text-gray-300">Abilities</legend>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {ABILITIES.map((ability) => (
-              <TogglePill
-                key={ability}
-                label={ability}
-                active={state.abilities.has(ability)}
-                onClick={() => dispatch({ type: "TOGGLE_ABILITY", ability: ability })}
-              />
-            ))}
-          </div>
-          <button
-            className="mt-2 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
-            onClick={() => {
-              console.log('[Debug] Current abilities state:', state.abilities);
-              dispatch({ type: "RESET" });
-            }}
-          >
-            Reset Filters (Debug)
-          </button>
-        </fieldset>
-
-
-
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
-          <legend className="text-sm text-gray-300">Legality</legend>
-          <select
-            className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
-            value={state.gamemode}
-            onChange={(e) => dispatch({ type: "SET_GAMEMODE", value: e.target.value })}
-          >
-            <option value="">Any</option>
-            {GAMEMODES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-        </fieldset>
-
-
-
 
       </div>
 
