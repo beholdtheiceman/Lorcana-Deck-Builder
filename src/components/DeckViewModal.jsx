@@ -87,7 +87,7 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Deck Display */}
           <div className="lg:col-span-2">
