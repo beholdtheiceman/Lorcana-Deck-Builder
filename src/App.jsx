@@ -243,7 +243,7 @@ function normalizeSetMeta(raw) {
 
 // New filter constants
 // const FRANCHISES = ["Bolt", "Disney", "Pixar", "Marvel", "Star Wars", "Indiana Jones"]; // Commented out - no longer used
-const GAMEMODES = ["Lorcana", "Limited", "Constructed"];
+const GAMEMODES = ["Infinity", "Core Constructed"];
 const INKABLE_OPTIONS = ["Any", "Inkable", "Non-Inkable"];
 
 // Legacy code mapping for UI compatibility (TFC ↔ "1", ROC ↔ "2", etc.)
@@ -264,10 +264,11 @@ const SETS = [
   { code: "AZS", name: "Azurite Sea", shortName: "AZS", setNum: 6 },
   { code: "ARI", name: "Archazia's Island", shortName: "ARI", setNum: 7 },
   { code: "ROJ", name: "Reign of Jafar", shortName: "ROJ", setNum: 8 },
+  { code: "FAB", name: "Fabled", shortName: "FAB", setNum: 9 },
 ];
 
 // Set order for consistent sorting (ink → set → set number → card number)
-const SET_ORDER = ["TFC", "ROC", "IAT", "URS", "SSK", "AZS", "ARI", "ROJ"];
+const SET_ORDER = ["TFC", "ROC", "IAT", "URS", "SSK", "AZS", "ARI", "ROJ", "FAB"];
 
 // Helper function to get set info by set number
 function getSetByNumber(setNum) {
@@ -281,7 +282,7 @@ function getSetByCode(code) {
 
 // Robust card comparison function that doesn't rely on set_num
 const INK_ORDER = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
-const SET_CODE_ORDER = ["1","2","3","4","5","6","7","8","D100"]; // extend as new sets arrive
+const SET_CODE_ORDER = ["1","2","3","4","5","6","7","8","9","D100"]; // extend as new sets arrive
 
 function primaryInk(card){
   return (Array.isArray(card.inks) && card.inks[0]) || card.ink || card._raw?.ink || "";
@@ -3679,7 +3680,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
 
 
         <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
-          <legend className="text-sm text-gray-300">Gamemode</legend>
+          <legend className="text-sm text-gray-300">Legality</legend>
           <select
             className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
             value={state.gamemode}
@@ -7966,7 +7967,7 @@ useEffect(() => {
       )}
       {filters?.gamemode && (
         <span className="px-2 py-1 rounded-full bg-cyan-600/20 border border-cyan-500/40 text-cyan-200 text-xs">
-          Gamemode: {filters.gamemode}
+          Legality: {filters.gamemode}
         </span>
       )}
       {filters?.inkable && filters.inkable !== "Any" && (
@@ -8590,7 +8591,7 @@ function applyFilters(cards, filters) {
 
   if (filters.gamemode && filters.gamemode.trim()) {
     list = list.filter((c) => {
-      // Check multiple sources for gamemode based on Lorcast structure
+      // Check multiple sources for legality/gamemode based on Lorcast structure
       let cardGamemode = "";
       
       // First try the normalized gamemode field
@@ -8605,10 +8606,29 @@ function applyFilters(cards, filters) {
         cardGamemode = c._raw.Gamemode;
       }
       
-      console.log(`[Gamemode Filter] Card "${c.name}" gamemode: "${cardGamemode}" vs filter: "${filters.gamemode}"`);
+      console.log(`[Legality Filter] Card "${c.name}" gamemode: "${cardGamemode}" vs filter: "${filters.gamemode}"`);
       
       return String(cardGamemode).toLowerCase() === filters.gamemode.trim().toLowerCase();
     });
+  }
+
+  // Apply Core Constructed legality filter - exclude sets 1-4 when Core Constructed is selected
+  if (filters.gamemode === "Core Constructed") {
+    list = list.filter((c) => {
+      const setNum = c.setNum ?? 
+                     (typeof c._raw?.set?.num === "number" ? c._raw.set.num : null) ??
+                     (Number.isFinite(Number(c._raw?.set_num)) ? Number(c._raw.set_num) : null);
+      
+      // Filter out sets 1-4 (The First Chapter, Rise of the Floodborn, Into the Inklands, Ursula's Return)
+      if (setNum >= 1 && setNum <= 4) {
+        console.log(`[Core Constructed Filter] Excluding card "${c.name}" from set ${setNum}`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log(`[Core Constructed Filter] After Core Constructed filtering, cards remaining: ${list.length}`);
   }
 
 
