@@ -49,11 +49,15 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
   // If a deck is selected, show the deck view
   if (selectedDeck) {
     return (
-      <DeckViewModal 
-        deck={selectedDeck} 
-        hub={hub} 
-        onBack={handleBackToHub} 
-      />
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-gray-900 rounded-lg w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden">
+          <DeckViewModal 
+            deck={selectedDeck} 
+            hub={hub} 
+            onBack={handleBackToHub} 
+          />
+        </div>
+      </div>
     );
   }
 
