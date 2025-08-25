@@ -8,7 +8,6 @@ const TeamHub = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedHub, setSelectedHub] = useState(null);
-  const [hubDecks, setHubDecks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showHubDetail, setShowHubDetail] = useState(false);
@@ -105,57 +104,6 @@ const TeamHub = () => {
     }
   };
 
-  const fetchHubDecks = async (hubId) => {
-    try {
-      const response = await fetch(`/api/hubs/${hubId}/decks`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setHubDecks(data);
-      }
-    } catch (error) {
-      console.error('Error fetching hub decks:', error);
-    }
-  };
-
-  const removeMember = async (hubId, userId) => {
-    try {
-      const response = await fetch(`/api/hubs/${hubId}/members`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ userId })
-      });
-
-      if (response.ok) {
-        // Refresh hubs to get updated member list
-        fetchHubs();
-      }
-    } catch (error) {
-      setError('Error removing member');
-    }
-  };
-
-  const transferOwnership = async (hubId, newOwnerId) => {
-    try {
-      const response = await fetch(`/api/hubs/${hubId}/members`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ newOwnerId })
-      });
-
-      if (response.ok) {
-        // Refresh hubs to get updated ownership
-        fetchHubs();
-      }
-    } catch (error) {
-      setError('Error transferring ownership');
-    }
-  };
-
   const regenerateInviteCode = async (hubId) => {
     // For now, we'll need to implement this in the backend
     // This would require a new API endpoint
@@ -234,11 +182,11 @@ const TeamHub = () => {
                       <button
                         onClick={() => {
                           setSelectedHub(hub);
-                          fetchHubDecks(hub.id);
+                          setShowHubDetail(true);
                         }}
                         className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                       >
-                        Manage
+                        View Decks
                       </button>
                     </>
                   )}
@@ -340,73 +288,6 @@ const TeamHub = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Hub Management Modal */}
-      {selectedHub && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-900 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">{selectedHub.name} - Management</h2>
-              <button
-                onClick={() => setSelectedHub(null)}
-                className="text-gray-400 hover:text-white text-2xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Members Management */}
-            {selectedHub.owner.id === user.id && (
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-white mb-3">Manage Members</h3>
-                <div className="space-y-2">
-                  {selectedHub.members.map(member => (
-                    <div key={member.id} className="flex justify-between items-center p-3 bg-gray-800 rounded">
-                      <span className="text-white">{member.user.email}</span>
-                      <div className="space-x-2">
-                        <button
-                          onClick={() => transferOwnership(selectedHub.id, member.user.id)}
-                          className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                        >
-                          Make Owner
-                        </button>
-                        <button
-                          onClick={() => removeMember(selectedHub.id, member.user.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Hub Decks */}
-            <div>
-              <h3 className="text-lg font-medium text-white mb-3">Team Decks</h3>
-              {hubDecks.length === 0 ? (
-                <p className="text-gray-400">No decks found in this hub.</p>
-              ) : (
-                <div className="space-y-2">
-                  {hubDecks.map(deck => (
-                    <div key={deck.id} className="flex justify-between items-center p-3 bg-gray-800 rounded">
-                      <div>
-                        <span className="text-white font-medium">{deck.title}</span>
-                        <span className="text-gray-400 text-sm ml-3">by {deck.user.email}</span>
-                      </div>
-                      <span className="text-gray-400 text-sm">
-                        {new Date(deck.updatedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
