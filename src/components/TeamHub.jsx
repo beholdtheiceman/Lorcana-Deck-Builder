@@ -172,30 +172,19 @@ const TeamHub = () => {
                 </div>
                 <div className="space-x-2">
                   {hub.owner.id === user.id && (
-                    <>
-                      <button
-                        onClick={() => regenerateInviteCode(hub.id)}
-                        className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                      >
-                        Regenerate Code
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedHub(hub);
-                          setShowHubDetail(true);
-                        }}
-                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                      >
-                        View Decks
-                      </button>
-                    </>
+                    <button
+                      onClick={() => regenerateInviteCode(hub.id)}
+                      className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                    >
+                      Regenerate Code
+                    </button>
                   )}
                   <button
                     onClick={() => {
                       setSelectedHub(hub);
                       setShowHubDetail(true);
                     }}
-                    className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                   >
                     View Decks
                   </button>
