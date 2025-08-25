@@ -35,6 +35,7 @@ import {
 
 // Authentication components
 import AuthButton from './components/AuthButton';
+import TeamHub from './components/TeamHub';
 
 // -----------------------------------------------------------------------------
 // Local storage & caching
@@ -3304,7 +3305,7 @@ function filterReducer(state, action) {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager }) {
+function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
   return (
     <div className="flex items-center justify-between gap-4 p-3 bg-gray-900/70 border-b border-gray-800 sticky top-0 z-40 backdrop-blur">
       <div className="flex items-center gap-2">
@@ -3357,6 +3358,14 @@ function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, 
           title="Import deck JSON"
         >
           Import
+        </button>
+        
+        <button
+          className="px-3 py-1.5 rounded-xl bg-purple-600 border border-purple-700 hover:bg-purple-700"
+          onClick={onTeamHub}
+          title="Team Hub"
+        >
+          Team Hub
         </button>
         
         {/* Authentication Button */}
@@ -6939,6 +6948,7 @@ function AppInner() {
   const [decks, setDecks] = useState({});
   const [currentDeckId, setCurrentDeckId] = useState(null);
   const [showDeckManager, setShowDeckManager] = useState(false);
+  const [showTeamHub, setShowTeamHub] = useState(false);
 
   // Add batch image loader
   const { loadImagesInBatch } = useBatchImageLoader();
@@ -7758,6 +7768,7 @@ useEffect(() => {
             onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
             onNewDeck={handleNewDeck}
             onDeckManager={() => setShowDeckManager(true)}
+            onTeamHub={() => setShowTeamHub(true)}
 
           />
 
@@ -8192,6 +8203,26 @@ useEffect(() => {
   }}
   onImportDeck={handleImportDeck}
 />
+
+{/* Team Hub */}
+{showTeamHub && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] overflow-hidden">
+      <div className="flex justify-between items-center p-4 border-b border-gray-700">
+        <h2 className="text-xl font-semibold text-white">Team Hub</h2>
+        <button
+          onClick={() => setShowTeamHub(false)}
+          className="text-gray-400 hover:text-white text-2xl font-bold"
+        >
+          ×
+        </button>
+      </div>
+      <div className="h-full overflow-y-auto">
+        <TeamHub />
+      </div>
+    </div>
+  </div>
+)}
         </>
       </div>
     </ImageCacheProvider>
