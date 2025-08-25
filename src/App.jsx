@@ -8589,46 +8589,40 @@ function applyFilters(cards, filters) {
     });
   }
 
+  // Apply legality filter using set-based logic (same approach as sets filter)
   if (filters.gamemode && filters.gamemode.trim()) {
-    list = list.filter((c) => {
-      // Check multiple sources for legality/gamemode based on Lorcast structure
-      let cardGamemode = "";
-      
-      // First try the normalized gamemode field
-      if (c.gamemode) {
-        cardGamemode = c.gamemode;
-      }
-      // Then try the raw data from Lorcast API
-      else if (c._raw?.gamemode) {
-        cardGamemode = c._raw.gamemode;
-      }
-      else if (c._raw?.Gamemode) {
-        cardGamemode = c._raw.Gamemode;
-      }
-      
-      console.log(`[Legality Filter] Card "${c.name}" gamemode: "${cardGamemode}" vs filter: "${filters.gamemode}"`);
-      
-      return String(cardGamemode).toLowerCase() === filters.gamemode.trim().toLowerCase();
-    });
-  }
-
-  // Apply Core Constructed legality filter - exclude sets 1-4 when Core Constructed is selected
-  if (filters.gamemode === "Core Constructed") {
-    list = list.filter((c) => {
-      const setNum = c.setNum ?? 
-                     (typeof c._raw?.set?.num === "number" ? c._raw.set.num : null) ??
-                     (Number.isFinite(Number(c._raw?.set_num)) ? Number(c._raw.set_num) : null);
-      
-      // Filter out sets 1-4 (The First Chapter, Rise of the Floodborn, Into the Inklands, Ursula's Return)
-      if (setNum >= 1 && setNum <= 4) {
-        console.log(`[Core Constructed Filter] Excluding card "${c.name}" from set ${setNum}`);
-        return false;
-      }
-      
-      return true;
-    });
+    console.log(`[Legality Filter] Applying ${filters.gamemode} filter`);
     
-    console.log(`[Core Constructed Filter] After Core Constructed filtering, cards remaining: ${list.length}`);
+    if (filters.gamemode === "Core Constructed") {
+      // Core Constructed: only allow sets 5+ (exclude sets 1-4)
+      const allowedSetNums = new Set([5, 6, 7, 8, 9]); // SSK, AZS, ARI, ROJ, FAB
+      
+      list = list.filter((c) => {
+        // Try multiple sources for set number information (same as sets filter)
+        const setNum = c.setNum ?? 
+                       (typeof c._raw?.set?.num === "number" ? c._raw.set.num : null) ??
+                       (Number.isFinite(Number(c._raw?.set_num)) ? Number(c._raw.set_num) : null);
+        
+        if (setNum === null) {
+          // If we can't determine the set number, allow the card through (permissive)
+          console.log(`[Legality Filter] Card "${c.name}" has unknown set number, allowing through`);
+          return true;
+        }
+        
+        if (allowedSetNums.has(setNum)) {
+          return true; // Allow sets 5+
+        } else {
+          console.log(`[Legality Filter] Excluding card "${c.name}" from set ${setNum} (not allowed in Core Constructed)`);
+          return false;
+        }
+      });
+      
+      console.log(`[Legality Filter] After Core Constructed filtering, cards remaining: ${list.length}`);
+    }
+    // Infinity mode: no filtering needed, show all cards
+    else if (filters.gamemode === "Infinity") {
+      console.log('[Legality Filter] Infinity mode selected - showing all cards');
+    }
   }
 
 
