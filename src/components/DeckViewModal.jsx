@@ -110,7 +110,7 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
               </div>
 
               {/* Deck Cards - Actual deck display */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3">
                 {(() => {
                   const entries = Object.values(deck.data?.entries || {}).filter((e) => e.count > 0);
                   console.log('🔍 DeckViewModal: Deck data:', deck.data);
@@ -196,7 +196,7 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
               <h3 className="text-xl font-semibold text-white mb-4">Comments</h3>
               {error && <p className="text-red-400 mb-4">{error}</p>}
               
-              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+              <div className="space-y-4 mb-6">
                 {loadingComments ? (
                   <p className="text-gray-400">Loading comments...</p>
                 ) : comments.length === 0 ? (
