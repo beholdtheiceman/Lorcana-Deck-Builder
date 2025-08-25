@@ -248,7 +248,7 @@ const INKABLE_OPTIONS = ["Any", "Inkable", "Non-Inkable"];
 
 // Legacy code mapping for UI compatibility (TFC ↔ "1", ROC ↔ "2", etc.)
 const LEGACY_TO_LORCAST = {
-  TFC: "1", ROC: "2", IAT: "3", URS: "4", SSK: "5", AZS: "6", ARI: "7", ROJ: "8", D100: "D100"
+  TFC: "1", ROC: "2", IAT: "3", URS: "4", SSK: "5", AZS: "6", ARI: "7", ROJ: "8", FAB: "9", D100: "D100"
 };
 const LORCAST_TO_LEGACY = Object.fromEntries(
   Object.entries(LEGACY_TO_LORCAST).map(([k, v]) => [v, k])
