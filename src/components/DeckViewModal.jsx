@@ -106,13 +106,77 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
                 </div>
               </div>
 
-              {/* Deck Cards - Placeholder for now */}
-              <div className="bg-gray-700 rounded-lg p-8 text-center">
-                <div className="text-gray-400 text-lg">
-                  <div className="text-6xl mb-4">🎴</div>
-                  <div>Deck cards will be displayed here</div>
-                  <div className="text-sm mt-2">(Using existing deck builder components)</div>
-                </div>
+              {/* Deck Cards - Actual deck display */}
+              <div className="space-y-3">
+                {(() => {
+                  const entries = Object.values(deck.data?.entries || {}).filter((e) => e.count > 0);
+                  const groupedByCost = {};
+                  
+                  // Group cards by cost
+                  entries.forEach((e) => {
+                    const cost = e.card?.cost || 0;
+                    if (!groupedByCost[cost]) groupedByCost[cost] = [];
+                    groupedByCost[cost].push(e);
+                  });
+                  
+                  return Object.keys(groupedByCost)
+                    .sort((a, b) => parseInt(a) - parseInt(b))
+                    .map((cost) => (
+                      <div key={cost} className="bg-gray-700 rounded-lg border border-gray-600">
+                        <div className="px-3 py-2 font-semibold border-b border-gray-600 text-white">
+                          Cost {cost}
+                        </div>
+                        <div className="divide-y divide-gray-600">
+                          {groupedByCost[cost].map((e) => (
+                            <div key={`${e.card?.name}-${e.card?.set}-${e.card?.number}`} className="flex items-center gap-3 p-3">
+                              {/* Card Image */}
+                              <div className="relative">
+                                <img 
+                                  src={e.card?.image_url || e.card?._imageFromAPI || '/card-back.jpg'} 
+                                  alt={e.card?.name} 
+                                  className="w-16 h-22 object-cover rounded-lg border border-gray-600" 
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'flex';
+                                  }}
+                                />
+                                {/* Fallback display when no image */}
+                                <div 
+                                  className="w-16 h-22 bg-gray-800 rounded-lg border border-gray-600 flex items-center justify-center hidden"
+                                >
+                                  <div className="text-center text-gray-400">
+                                    <div className="text-xs mb-1">No image</div>
+                                    <div className="text-xs font-medium">{e.card?.name}</div>
+                                  </div>
+                                </div>
+                                
+                                {/* Count Bubble */}
+                                <div className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
+                                  {e.count}
+                                </div>
+                              </div>
+                              
+                              {/* Card Info */}
+                              <div className="flex-1">
+                                <div className="text-sm font-semibold text-white">{e.card?.name}</div>
+                                <div className="text-xs text-gray-400">
+                                  {e.card?.set} • #{e.card?.number} • Cost {e.card?.cost} • {e.card?.type} • {e.card?.rarity}
+                                </div>
+                                {(e.card?.franchise || e.card?.lore > 0 || e.card?.willpower > 0 || e.card?.strength > 0) && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {e.card?.franchise && <span className="mr-2">{e.card.franchise}</span>}
+                                    {e.card?.lore > 0 && <span className="mr-2">Lore: {e.card.lore}</span>}
+                                    {e.card?.willpower > 0 && <span className="mr-2">Will: {e.card.willpower}</span>}
+                                    {e.card?.strength > 0 && <span className="mr-2">Str: {e.card.strength}</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                })()}
               </div>
             </div>
           </div>
