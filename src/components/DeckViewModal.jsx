@@ -97,7 +97,10 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
               {/* Deck Info */}
               <div className="mb-6 p-4 bg-gray-700 rounded-lg">
                 <div className="text-gray-300 text-sm space-y-2">
-                  <p><span className="font-semibold">Cards:</span> {deck.cardCount || 0}</p>
+                  <p><span className="font-semibold">Cards:</span> {(() => {
+                    const entries = Object.values(deck.data?.entries || {}).filter((e) => e.count > 0);
+                    return entries.reduce((total, e) => total + (e.count || 0), 0);
+                  })()}</p>
                   <p><span className="font-semibold">Created:</span> {new Date(deck.createdAt).toLocaleDateString()}</p>
                   <p><span className="font-semibold">Last Updated:</span> {new Date(deck.updatedAt).toLocaleDateString()}</p>
                   {isOwner && (
@@ -107,9 +110,13 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
               </div>
 
               {/* Deck Cards - Actual deck display */}
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {(() => {
                   const entries = Object.values(deck.data?.entries || {}).filter((e) => e.count > 0);
+                  console.log('🔍 DeckViewModal: Deck data:', deck.data);
+                  console.log('🔍 DeckViewModal: Entries:', entries);
+                  console.log('🔍 DeckViewModal: Total cards:', entries.reduce((total, e) => total + (e.count || 0), 0));
+                  
                   const groupedByCost = {};
                   
                   // Group cards by cost
@@ -119,12 +126,14 @@ const DeckViewModal = ({ deck, hub, onBack }) => {
                     groupedByCost[cost].push(e);
                   });
                   
+                  console.log('🔍 DeckViewModal: Grouped by cost:', groupedByCost);
+                  
                   return Object.keys(groupedByCost)
                     .sort((a, b) => parseInt(a) - parseInt(b))
                     .map((cost) => (
                       <div key={cost} className="bg-gray-700 rounded-lg border border-gray-600">
                         <div className="px-3 py-2 font-semibold border-b border-gray-600 text-white">
-                          Cost {cost}
+                          Cost {cost} ({groupedByCost[cost].reduce((sum, e) => sum + (e.count || 0), 0)} cards)
                         </div>
                         <div className="divide-y divide-gray-600">
                           {groupedByCost[cost].map((e) => (
