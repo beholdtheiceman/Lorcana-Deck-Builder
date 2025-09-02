@@ -4017,15 +4017,20 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                   onClick={async () => {
                     console.log('[DeckManager] Manual refresh triggered');
                     try {
-                      const syncedDecks = await syncDecksWithCloud();
-                      if (syncedDecks) {
-                        setDecks(syncedDecks);
+                      // Try to load decks from local storage first
+                      const { decks: localDecks } = loadAllDecks();
+                      console.log('[DeckManager] Local decks found:', Object.keys(localDecks).length);
+                      if (Object.keys(localDecks).length > 0) {
+                        setDecks(localDecks);
                         console.log('[DeckManager] Manual refresh completed, decks updated');
+                        addToast(`Loaded ${Object.keys(localDecks).length} decks from local storage`, 'success');
                       } else {
-                        console.log('[DeckManager] Manual refresh: no cloud decks found');
+                        console.log('[DeckManager] Manual refresh: no local decks found');
+                        addToast('No decks found in local storage', 'info');
                       }
                     } catch (error) {
                       console.error('[DeckManager] Manual refresh failed:', error);
+                      addToast('Failed to refresh decks', 'error');
                     }
                   }}
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
@@ -7726,6 +7731,11 @@ useEffect(() => {
 }, []);
 
 console.log('[App] 🚨 TEST useEffect defined - if you see this, useEffect was defined successfully');
+
+// SIMPLE TEST - This should run immediately
+useEffect(() => {
+  console.log('[App] 🚨 SIMPLE TEST useEffect is running! This proves useEffect works!');
+}, []);
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
