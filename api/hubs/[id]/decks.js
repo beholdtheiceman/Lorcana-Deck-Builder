@@ -88,10 +88,19 @@ export default async function handler(req, res) {
         // Get card count from deck data
         let cardCount = 0;
         if (deckData.entries && typeof deckData.entries === 'object') {
-          cardCount = Object.keys(deckData.entries).length;
+          // Sum up the count of each card entry to get total cards
+          cardCount = Object.values(deckData.entries).reduce((total, entry) => {
+            return total + (entry.count || 0);
+          }, 0);
         } else if (deckData.total) {
           cardCount = deckData.total;
         }
+        
+        console.log(`Deck "${deck.title}" card count calculation:`, {
+          entriesCount: Object.keys(deckData.entries || {}).length,
+          totalCards: cardCount,
+          deckDataTotal: deckData.total
+        });
         
         return {
           ...deck,
