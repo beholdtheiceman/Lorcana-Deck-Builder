@@ -11,6 +11,9 @@ import React, {
   useContext,
 } from "react";
 
+// Auth context
+import { useAuth } from './contexts/AuthContext';
+
 console.log('[React Import] React object:', React);
 console.log('[React Import] createContext function:', createContext);
 console.log('[React Import] useContext function:', useContext);
@@ -6852,6 +6855,7 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
 function AppInner() {
   console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
+  const { user, loading: authLoading } = useAuth();
   
   // Debug: Track component lifecycle
   console.log('[App] ===== COMPONENT LIFECYCLE DEBUG =====');
@@ -7753,31 +7757,70 @@ try {
 
 // WORKAROUND: Use setTimeout to trigger deck loading since useEffect isn't working
 console.log('[App] 🚨 WORKAROUND: Setting up setTimeout to load decks...');
+console.log('[App] 🚨 WORKAROUND: Auth state - user:', user, 'authLoading:', authLoading);
+
 setTimeout(async () => {
   console.log('[App] 🚨 WORKAROUND: Timeout triggered, attempting to load decks...');
+  console.log('[App] 🚨 WORKAROUND: Current auth state - user:', user, 'authLoading:', authLoading);
+  
   try {
-    // Load decks from local storage
+    // First check if we already have decks loaded (to avoid infinite loops)
+    if (Object.keys(decks).length > 0) {
+      console.log('[App] 🚨 WORKAROUND: Decks already loaded, skipping');
+      return;
+    }
+
+    // Wait for auth to finish loading if it's still loading
+    if (authLoading) {
+      console.log('[App] 🚨 WORKAROUND: Auth still loading, waiting...');
+      // Try again after auth loads
+      setTimeout(arguments.callee, 500);
+      return;
+    }
+
+    // Load decks from local storage first
     const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
     console.log('[App] 🚨 WORKAROUND: Local decks loaded:', Object.keys(localDecks).length);
     
     if (Object.keys(localDecks).length > 0) {
-      console.log('[App] 🚨 WORKAROUND: Local decks found, would set state here');
-      // In a real scenario, we'd call setDecks(localDecks) here
-      // But we need to find a way to access the setter from outside render
-    } else {
-      console.log('[App] 🚨 WORKAROUND: No local decks, attempting cloud sync...');
-      // Try cloud sync
+      console.log('[App] 🚨 WORKAROUND: Local decks found, setting state...');
+      setDecks(localDecks);
+      if (localCurrentDeckId && localDecks[localCurrentDeckId]) {
+        setCurrentDeckId(localCurrentDeckId);
+      } else {
+        // Use first deck as current
+        const firstDeckId = Object.keys(localDecks)[0];
+        setCurrentDeckId(firstDeckId);
+      }
+      console.log('[App] 🚨 WORKAROUND: Decks state updated successfully');
+    } else if (user) {
+      // User is authenticated, try cloud sync
+      console.log('[App] 🚨 WORKAROUND: No local decks but user authenticated, attempting cloud sync...');
       const syncedDecks = await syncDecksWithCloud();
       if (syncedDecks && Object.keys(syncedDecks).length > 0) {
         console.log('[App] 🚨 WORKAROUND: Cloud decks found:', Object.keys(syncedDecks).length);
+        setDecks(syncedDecks);
+        
+        // Set current deck
+        const savedCurrentDeckId = loadLS(LS_KEYS.CURRENT_DECK_ID) || Object.keys(syncedDecks)[0];
+        if (savedCurrentDeckId && syncedDecks[savedCurrentDeckId]) {
+          setCurrentDeckId(savedCurrentDeckId);
+        } else {
+          setCurrentDeckId(Object.keys(syncedDecks)[0]);
+        }
+        console.log('[App] 🚨 WORKAROUND: Cloud decks state updated successfully');
       } else {
-        console.log('[App] 🚨 WORKAROUND: No cloud decks found either');
+        console.log('[App] 🚨 WORKAROUND: No cloud decks found for authenticated user');
       }
+    } else {
+      // User not authenticated
+      console.log('[App] 🚨 WORKAROUND: User not authenticated, no cloud decks to load');
+      console.log('[App] 🚨 WORKAROUND: User should login to access their saved decks');
     }
   } catch (error) {
     console.error('[App] 🚨 WORKAROUND: Failed to load decks via timeout:', error);
   }
-}, 100); // 100ms delay to ensure component is mounted
+}, 1000); // 1 second delay to ensure component and auth are ready
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
