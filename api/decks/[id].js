@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
   
   try {
-    console.log('[DELETE /api/decks/[id]] Attempting to delete deck:', id, 'for user:', sess.uid);
+    console.log('[DELETE /api/decks/[id]] DEBUG: Attempting to delete deck:', id, 'for user:', sess.uid);
     
     // First check if the deck exists and belongs to the user
     const existingDeck = await prisma.deck.findFirst({
