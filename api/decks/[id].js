@@ -2,25 +2,44 @@ import { prisma } from "../../_lib/db.js";
 import { getSession } from "../../_lib/auth.js";
 
 export default async function handler(req, res) {
-  // Add a test endpoint to check if the function is working
-  if (req.method === "GET") {
-    return res.json({ 
-      message: "DELETE endpoint is working", 
-      timestamp: new Date().toISOString(),
-      hasId: !!req.query.id,
-      environment: process.env.NODE_ENV 
-    });
-  }
+  try {
+    // Add a test endpoint to check if the function is working
+    if (req.method === "GET") {
+      return res.json({ 
+        message: "DELETE endpoint is working", 
+        timestamp: new Date().toISOString(),
+        hasId: !!req.query.id,
+        environment: process.env.NODE_ENV,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasDatabaseUrl: !!process.env.DATABASE_URL
+      });
+    }
 
-  console.log('[DELETE /api/decks/[id]] Function started for method:', req.method);
-  console.log('[DELETE /api/decks/[id]] Query params:', req.query);
-  
-  const sess = getSession(req);
-  console.log('[DELETE /api/decks/[id]] Session retrieved:', !!sess);
-  
-  if (!sess) return res.status(401).json({ error: "Unauthorized" });
-  
-  if (req.method !== "DELETE") return res.status(405).end();
+    console.log('[DELETE /api/decks/[id]] Function started for method:', req.method);
+    console.log('[DELETE /api/decks/[id]] Query params:', req.query);
+    console.log('[DELETE /api/decks/[id]] Environment check:', {
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      nodeEnv: process.env.NODE_ENV
+    });
+    
+    if (!process.env.JWT_SECRET) {
+      console.error('[DELETE /api/decks/[id]] CRITICAL: JWT_SECRET environment variable is missing');
+      return res.status(500).json({ error: "Server configuration error - JWT_SECRET missing" });
+    }
+    
+    if (!process.env.DATABASE_URL) {
+      console.error('[DELETE /api/decks/[id]] CRITICAL: DATABASE_URL environment variable is missing');
+      return res.status(500).json({ error: "Server configuration error - DATABASE_URL missing" });
+    }
+    
+    console.log('[DELETE /api/decks/[id]] Attempting to get session...');
+    const sess = getSession(req);
+    console.log('[DELETE /api/decks/[id]] Session retrieved:', !!sess);
+    
+    if (!sess) return res.status(401).json({ error: "Unauthorized" });
+    
+    if (req.method !== "DELETE") return res.status(405).end();
 
   const { id } = req.query;
   
@@ -77,5 +96,16 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Deck not found" });
     }
     res.status(500).json({ error: "Failed to delete deck", details: error.message });
+  }
+  } catch (outerError) {
+    console.error('[DELETE /api/decks/[id]] CRITICAL: Function failed to start:', outerError);
+    console.error('[DELETE /api/decks/[id]] CRITICAL: Error details:', {
+      message: outerError.message,
+      stack: outerError.stack?.substring(0, 500)
+    });
+    return res.status(500).json({ 
+      error: "Function initialization failed", 
+      details: outerError.message 
+    });
   }
 }
