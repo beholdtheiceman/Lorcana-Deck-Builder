@@ -3,8 +3,45 @@ import { getSession } from "../_lib/auth.js";
 import { readJson } from "../_lib/http.js";
 
 export default async function handler(req, res) {
-  const sess = getSession(req);
-  if (!sess) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    // Add debugging for environment variables
+    console.log('[DECKS] Handler called - Method:', req.method);
+    console.log('[DECKS] Environment check - JWT_SECRET exists:', !!process.env.JWT_SECRET);
+    console.log('[DECKS] Environment check - DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('[DECKS] Request headers - Cookie:', req.headers.cookie ? 'Present' : 'Missing');
+    
+    let sess;
+    try {
+      sess = getSession(req);
+      console.log('[DECKS] Session result:', sess ? { uid: sess.uid, email: sess.email } : 'null');
+    } catch (sessionError) {
+      console.error('[DECKS] Session retrieval error:', sessionError.message);
+      console.error('[DECKS] Session error stack:', sessionError.stack);
+      return res.status(401).json({ 
+        error: "Authentication failed", 
+        details: sessionError.message,
+        hasJwtSecret: !!process.env.JWT_SECRET
+      });
+    }
+    
+    if (!sess) {
+      console.log('[DECKS] No valid session found - returning 401');
+      return res.status(401).json({ 
+        error: "Unauthorized",
+        hasCookie: !!req.headers.cookie,
+        hasJwtSecret: !!process.env.JWT_SECRET
+      });
+    }
+    
+    console.log('[DECKS] Session validated successfully - proceeding with request');
+  } catch (error) {
+    console.error('[DECKS] Handler initialization error:', error.message);
+    console.error('[DECKS] Handler error stack:', error.stack);
+    return res.status(500).json({ 
+      error: "Server initialization failed", 
+      details: error.message 
+    });
+  }
 
   if (req.method === "GET") {
     const decks = await prisma.deck.findMany({
