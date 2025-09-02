@@ -51,6 +51,9 @@ export default async function handler(req, res) {
     if (req.method !== "DELETE") return res.status(405).end();
 
   const { id } = req.query;
+  console.log('[DELETE /api/decks/[id]] DEBUG: Received delete request for ID:', id);
+  console.log('[DELETE /api/decks/[id]] DEBUG: ID type:', typeof id);
+  console.log('[DELETE /api/decks/[id]] DEBUG: ID length:', id?.length);
   
   try {
     console.log('[DELETE /api/decks/[id]] DEBUG: Attempting to delete deck:', id, 'for user:', sess.uid);
@@ -64,9 +67,21 @@ export default async function handler(req, res) {
     
     // First check if the deck exists and belongs to the user
     console.log('[DELETE /api/decks/[id]] DEBUG: Looking for deck with query:', { id, userId: sess.uid });
+    console.log('[DELETE /api/decks/[id]] DEBUG: About to query database with exact values:', 
+      'ID:', JSON.stringify(id), 'UserID:', JSON.stringify(sess.uid));
+    
     const existingDeck = await prisma.deck.findFirst({
       where: { id, userId: sess.uid }
     });
+    
+    console.log('[DELETE /api/decks/[id]] DEBUG: Database query result:', existingDeck ? 'FOUND' : 'NOT FOUND');
+    if (existingDeck) {
+      console.log('[DELETE /api/decks/[id]] DEBUG: Found deck details:', {
+        id: existingDeck.id,
+        title: existingDeck.title,
+        userId: existingDeck.userId
+      });
+    }
     
     if (!existingDeck) {
       console.log('[DELETE /api/decks/[id]] Deck not found or user unauthorized:', { id, userId: sess.uid });
