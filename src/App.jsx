@@ -7475,19 +7475,38 @@ function handleSaveDeck() {
 // Save deck to cloud database
 async function saveDeckToCloud(deckData) {
   try {
+    // Use the database ID if available for updates
+    const isUpdate = deckData._dbId || deckData._cloudId;
+    const payload = {
+      title: deckData.name,
+      data: deckData,
+    };
+    
+    // If this is an update, include the database ID
+    if (isUpdate) {
+      payload.id = deckData._dbId || deckData._cloudId;
+    }
+    
+    console.log('[saveDeckToCloud] Saving deck:', deckData.id, 'isUpdate:', !!isUpdate, 'cloudId:', payload.id);
+    
     const response = await authSafeFetch('/api/decks', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        title: deckData.name,
-        data: deckData,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (response.ok) {
-      console.log('[saveDeckToCloud] Deck saved to cloud successfully');
+      const responseData = await response.json();
+      console.log('[saveDeckToCloud] Deck saved to cloud successfully:', responseData);
+      
+      // If this was a new deck creation, we might want to update the local deck with the new database ID
+      if (!isUpdate && responseData.deck && responseData.deck.id) {
+        console.log('[saveDeckToCloud] New deck created with database ID:', responseData.deck.id);
+        // Note: We could update the local deck here with the database ID, but that would require
+        // more complex state management. For now, the sync will handle this.
+      }
     } else {
       console.warn('[saveDeckToCloud] Failed to save to cloud, but local save succeeded');
     }
@@ -7532,7 +7551,13 @@ async function loadDecksFromCloud() {
           console.log('[loadDecksFromCloud] Processing deck:', cloudDeck);
           if (cloudDeck.data && cloudDeck.data.id) {
             console.log('[loadDecksFromCloud] Converting deck:', cloudDeck.data.id, cloudDeck.title);
-            convertedDecks[cloudDeck.data.id] = cloudDeck.data;
+            // Use the frontend ID as the key, but store the database ID for deletion
+            const deckData = { 
+              ...cloudDeck.data, 
+              _dbId: cloudDeck.id, // Store the database UUID for deletion
+              _cloudId: cloudDeck.id // Also store as _cloudId for clarity
+            };
+            convertedDecks[cloudDeck.data.id] = deckData;
           } else {
             console.log('[loadDecksFromCloud] Skipping deck - missing data or id:', cloudDeck);
           }
@@ -7640,8 +7665,11 @@ async function handleDeleteDeck(deckId) {
     // Delete from cloud first if authenticated
     if (user) {
       try {
-        console.log('[handleDeleteDeck] Attempting to delete from cloud:', deckId);
-        const response = await authSafeFetch(`/api/decks/${deckId}`, {
+        // Use the database ID for deletion if available, otherwise use the deck ID
+        const cloudId = deckToDelete?._dbId || deckToDelete?._cloudId || deckId;
+        console.log('[handleDeleteDeck] Attempting to delete from cloud:', deckId, 'using cloudId:', cloudId);
+        
+        const response = await authSafeFetch(`/api/decks/${cloudId}`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
