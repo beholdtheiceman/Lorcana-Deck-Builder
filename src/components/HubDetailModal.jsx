@@ -24,6 +24,21 @@ const HubDetailModal = ({ hub, onClose, onDeckClick }) => {
         console.log('🔍 HubDetailModal: Received decks:', decks);
         console.log('🔍 HubDetailModal: First deck data:', decks[0]);
         
+        // Log ownership breakdown for debugging
+        const decksByUser = {};
+        decks.forEach(deck => {
+          const userEmail = deck.user?.email || 'Unknown';
+          if (!decksByUser[userEmail]) {
+            decksByUser[userEmail] = [];
+          }
+          decksByUser[userEmail].push(deck.title);
+        });
+        
+        console.log('🔍 HubDetailModal: Decks by user:');
+        Object.keys(decksByUser).forEach(userEmail => {
+          console.log(`  ${userEmail}: ${decksByUser[userEmail].length} decks - ${decksByUser[userEmail].join(', ')}`);
+        });
+        
         setHubDecks(decks);
       } catch (error) {
         console.error('Error fetching hub decks:', error);
