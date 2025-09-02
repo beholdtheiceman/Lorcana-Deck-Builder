@@ -11,18 +11,38 @@ export default async function handler(req, res) {
   
   try {
     console.log('[DELETE /api/decks/[id]] DEBUG: Attempting to delete deck:', id, 'for user:', sess.uid);
+    console.log('[DELETE /api/decks/[id]] DEBUG: Prisma client available:', !!prisma);
+    console.log('[DELETE /api/decks/[id]] DEBUG: Environment check - DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    
+    // Test database connection first
+    console.log('[DELETE /api/decks/[id]] DEBUG: Testing database connection...');
+    await prisma.$connect();
+    console.log('[DELETE /api/decks/[id]] DEBUG: Database connected successfully');
     
     // First check if the deck exists and belongs to the user
+    console.log('[DELETE /api/decks/[id]] DEBUG: Looking for deck with query:', { id, userId: sess.uid });
     const existingDeck = await prisma.deck.findFirst({
       where: { id, userId: sess.uid }
     });
     
     if (!existingDeck) {
       console.log('[DELETE /api/decks/[id]] Deck not found or user unauthorized:', { id, userId: sess.uid });
+      
+      // Additional debugging - check if deck exists with different user
+      const deckWithDifferentUser = await prisma.deck.findFirst({
+        where: { id }
+      });
+      if (deckWithDifferentUser) {
+        console.log('[DELETE /api/decks/[id]] DEBUG: Deck exists but belongs to different user:', deckWithDifferentUser.userId);
+      } else {
+        console.log('[DELETE /api/decks/[id]] DEBUG: Deck does not exist in database at all');
+      }
+      
       return res.status(404).json({ error: "Deck not found or unauthorized" });
     }
     
     console.log('[DELETE /api/decks/[id]] Found deck to delete:', existingDeck.title);
+    console.log('[DELETE /api/decks/[id]] DEBUG: Performing delete operation...');
     
     await prisma.deck.delete({ 
       where: { id, userId: sess.uid } 
@@ -32,6 +52,11 @@ export default async function handler(req, res) {
     res.json({ ok: true });
   } catch (error) {
     console.error('[DELETE /api/decks/[id]] Error deleting deck:', error);
+    console.error('[DELETE /api/decks/[id]] Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack?.substring(0, 500)
+    });
     
     if (error.code === 'P2025') {
       return res.status(404).json({ error: "Deck not found" });
