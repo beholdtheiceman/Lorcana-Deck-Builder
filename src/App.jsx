@@ -7679,14 +7679,18 @@ async function handleDeleteDeck(deckId) {
         if (response.ok) {
           console.log('[handleDeleteDeck] Successfully deleted from cloud');
         } else {
-          console.warn('[handleDeleteDeck] Cloud deletion failed but continuing with local deletion');
+          console.error('[handleDeleteDeck] Cloud deletion failed with status:', response.status);
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('[handleDeleteDeck] Error response:', errorText);
+          addToast("Warning: Failed to delete deck from cloud. Deck deleted locally only.", "warning");
         }
       } catch (cloudError) {
         if (cloudError.message.includes('Authentication required')) {
           console.warn('[handleDeleteDeck] Authentication failed for cloud deletion - user may need to log in again');
           addToast("Warning: Could not delete from cloud - please log in again", "warning");
         } else {
-          console.warn('[handleDeleteDeck] Cloud deletion failed but continuing with local deletion:', cloudError);
+          console.error('[handleDeleteDeck] Cloud deletion failed but continuing with local deletion:', cloudError);
+          addToast("Warning: Failed to delete deck from cloud. Deck deleted locally only.", "warning");
         }
       }
     }
