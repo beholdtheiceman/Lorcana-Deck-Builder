@@ -930,9 +930,9 @@ function sortLog(...args) {
 async function authSafeFetch(input, init = {}) {
   // With cookie-based auth, we don't need to manually add tokens
   // The cookies are automatically included with the request
-      console.log('[authSafeFetch] Making authenticated request to:', input);
-    console.log('[authSafeFetch] Request method:', init.method || 'GET');
-    console.log('[authSafeFetch] Request headers:', init.headers);
+  console.log('[authSafeFetch] Making authenticated request to:', input);
+  console.log('[authSafeFetch] Request method:', init.method || 'GET');
+  console.log('[authSafeFetch] Request headers:', init.headers);
   
   try {
     const response = await fetch(input, {
@@ -946,8 +946,17 @@ async function authSafeFetch(input, init = {}) {
     
     // Check if response indicates authentication failure
     if (response.status === 401) {
-      console.log('[authSafeFetch] Authentication failed - user not logged in');
+      console.log('[authSafeFetch] Authentication failed - user not logged in or session expired');
       console.log('[authSafeFetch] Failed request details - URL:', input, 'Method:', init.method || 'GET');
+      
+      // For deck operations that require authentication, don't mask the error
+      // Let the calling code handle the 401 properly
+      if (input.includes('/api/decks')) {
+        console.log('[authSafeFetch] Deck operation failed due to authentication - returning actual error');
+        throw new Error('Authentication required. Please log in to access your decks.');
+      }
+      
+      // For other operations, return graceful fallback
       if (init.method && init.method !== "GET") {
         return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
       }
@@ -957,7 +966,13 @@ async function authSafeFetch(input, init = {}) {
     return response;
   } catch (error) {
     console.error('[authSafeFetch] Request failed:', error);
-    // Return appropriate fallback response
+    
+    // If it's an authentication error for deck operations, re-throw it
+    if (error.message.includes('Authentication required')) {
+      throw error;
+    }
+    
+    // Return appropriate fallback response for other errors
     if (init.method && init.method !== "GET") {
       return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
     }
@@ -3910,7 +3925,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
 // Deck Manager Component
 // -----------------------------------------------------------------------------
 
-function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onExportDeck, onImportDeck }) {
+function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onExportDeck, onImportDeck, onRefreshDecks }) {
   const [selectedDeckId, setSelectedDeckId] = useState(currentDeckId);
   const [showNewDeckForm, setShowNewDeckForm] = useState(false);
   const [newDeckName, setNewDeckName] = useState("");
@@ -4045,15 +4060,11 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                   onClick={async () => {
                     console.log('[DeckManager] Manual refresh triggered');
                     try {
-                      // Try to load decks from local storage first
-                      const { decks: localDecks } = loadAllDecks();
-                      console.log('[DeckManager] Local decks found:', Object.keys(localDecks).length);
-                      if (Object.keys(localDecks).length > 0) {
-                        setDecks(localDecks);
-                        console.log('[DeckManager] Manual refresh completed, decks updated');
-                        console.log(`[DeckManager] Loaded ${Object.keys(localDecks).length} decks from local storage`);
+                      if (onRefreshDecks) {
+                        await onRefreshDecks();
+                        console.log('[DeckManager] Manual refresh completed');
                       } else {
-                        console.log('[DeckManager] Manual refresh: no local decks found');
+                        console.warn('[DeckManager] No onRefreshDecks function provided');
                       }
                     } catch (error) {
                       console.error('[DeckManager] Manual refresh failed:', error);
@@ -7536,7 +7547,11 @@ async function loadDecksFromCloud() {
       return null;
     }
   } catch (error) {
-    console.warn('[loadDecksFromCloud] Failed to load from cloud:', error);
+    if (error.message.includes('Authentication required')) {
+      console.log('[loadDecksFromCloud] No auth token, skipping cloud load');
+    } else {
+      console.warn('[loadDecksFromCloud] Failed to load from cloud:', error);
+    }
     return null;
   }
 }
@@ -7618,29 +7633,62 @@ function handleSwitchDeck(deckToSwitch) {
   addToast(`Switched to deck: "${deckToSwitch.name}"`, "success");
 }
 
-function handleDeleteDeck(deckId) {
+async function handleDeleteDeck(deckId) {
   const deckToDelete = decks[deckId];
-  const updatedDecks = deleteDeck(decks, deckId);
-  setDecks(updatedDecks);
   
-  // If we're deleting the current deck, switch to another deck or create a new one
-  if (deckId === currentDeckId) {
-    if (Object.keys(updatedDecks).length > 0) {
-      // Switch to the first available deck
-      const firstDeckId = Object.keys(updatedDecks)[0];
-      setCurrentDeckId(firstDeckId);
-      deckDispatch({ type: "SWITCH_DECK", deck: updatedDecks[firstDeckId] });
-      saveCurrentDeckId(firstDeckId);
-    } else {
-      // Create a new empty deck
-      const newDeck = createNewDeck("Untitled Deck");
-      setCurrentDeckId(newDeck.id);
-      deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
-      saveCurrentDeckId(newDeck.id);
+  try {
+    // Delete from cloud first if authenticated
+    if (user) {
+      try {
+        console.log('[handleDeleteDeck] Attempting to delete from cloud:', deckId);
+        const response = await authSafeFetch(`/api/decks/${deckId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          console.log('[handleDeleteDeck] Successfully deleted from cloud');
+        } else {
+          console.warn('[handleDeleteDeck] Cloud deletion failed but continuing with local deletion');
+        }
+      } catch (cloudError) {
+        if (cloudError.message.includes('Authentication required')) {
+          console.warn('[handleDeleteDeck] Authentication failed for cloud deletion - user may need to log in again');
+          addToast("Warning: Could not delete from cloud - please log in again", "warning");
+        } else {
+          console.warn('[handleDeleteDeck] Cloud deletion failed but continuing with local deletion:', cloudError);
+        }
+      }
     }
+    
+    // Delete from local storage
+    const updatedDecks = deleteDeck(decks, deckId);
+    setDecks(updatedDecks);
+    
+    // If we're deleting the current deck, switch to another deck or create a new one
+    if (deckId === currentDeckId) {
+      if (Object.keys(updatedDecks).length > 0) {
+        // Switch to the first available deck
+        const firstDeckId = Object.keys(updatedDecks)[0];
+        setCurrentDeckId(firstDeckId);
+        deckDispatch({ type: "SWITCH_DECK", deck: updatedDecks[firstDeckId] });
+        saveCurrentDeckId(firstDeckId);
+      } else {
+        // Create a new empty deck
+        const newDeck = createNewDeck("Untitled Deck");
+        setCurrentDeckId(newDeck.id);
+        deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+        saveCurrentDeckId(newDeck.id);
+      }
+    }
+    
+    addToast(`Deleted deck: "${deckToDelete.name}"`, "success");
+  } catch (error) {
+    console.error('[handleDeleteDeck] Error deleting deck:', error);
+    addToast(`Failed to delete deck: "${deckToDelete.name}"`, "error");
   }
-  
-  addToast(`Deleted deck: "${deckToDelete.name}"`, "success");
 }
 
 function handleDuplicateDeck(deckId) {
@@ -7665,6 +7713,54 @@ function handleImportDeck(importedDeck) {
   deckDispatch({ type: "SWITCH_DECK", deck: importedDeck });
   saveCurrentDeckId(importedDeck.id);
   addToast(`Imported deck: "${importedDeck.name}"`, "success");
+}
+
+async function handleRefreshDecks() {
+  try {
+    console.log('[handleRefreshDecks] Starting deck refresh...');
+    
+    // Try cloud sync first if authenticated
+    if (user) {
+      try {
+        const syncedDecks = await syncDecksWithCloud();
+        if (syncedDecks && Object.keys(syncedDecks).length > 0) {
+          console.log('[handleRefreshDecks] Cloud sync successful, got', Object.keys(syncedDecks).length, 'decks');
+          setDecks(syncedDecks);
+          addToast(`Refreshed ${Object.keys(syncedDecks).length} decks from cloud`, "success");
+          return;
+        }
+      } catch (cloudError) {
+        if (cloudError.message.includes('Authentication required')) {
+          console.warn('[handleRefreshDecks] Authentication failed - user may need to log in again');
+          addToast("Authentication expired. Please log in again to access cloud decks.", "warning");
+        } else {
+          console.error('[handleRefreshDecks] Cloud sync failed:', cloudError);
+          addToast("Failed to sync with cloud, using local decks", "warning");
+        }
+      }
+    }
+    
+    // Fall back to local storage
+    const { decks: localDecks } = loadAllDecks();
+    console.log('[handleRefreshDecks] Local decks found:', Object.keys(localDecks).length);
+    if (Object.keys(localDecks).length > 0) {
+      setDecks(localDecks);
+      if (user) {
+        addToast(`Refreshed ${Object.keys(localDecks).length} decks from local storage (cloud sync failed)`, "warning");
+      } else {
+        addToast(`Refreshed ${Object.keys(localDecks).length} decks from local storage`, "success");
+      }
+    } else {
+      if (user) {
+        addToast("No decks found locally or in cloud. Please check your connection and try logging in again.", "info");
+      } else {
+        addToast("No decks found. Please log in to access your saved decks.", "info");
+      }
+    }
+  } catch (error) {
+    console.error('[handleRefreshDecks] Error refreshing decks:', error);
+    addToast("Failed to refresh decks", "error");
+  }
 }
 
 // Initialize deck management system with cloud sync
@@ -7821,24 +7917,10 @@ setTimeout(async () => {
       }
       console.log('[App] 🚨 WORKAROUND: Decks state updated successfully');
     } else if (user) {
-      // User is authenticated, try cloud sync
-      console.log('[App] 🚨 WORKAROUND: No local decks but user authenticated, attempting cloud sync...');
-      const syncedDecks = await syncDecksWithCloud();
-      if (syncedDecks && Object.keys(syncedDecks).length > 0) {
-        console.log('[App] 🚨 WORKAROUND: Cloud decks found:', Object.keys(syncedDecks).length);
-        setDecks(syncedDecks);
-        
-        // Set current deck
-        const savedCurrentDeckId = loadLS(LS_KEYS.CURRENT_DECK_ID) || Object.keys(syncedDecks)[0];
-        if (savedCurrentDeckId && syncedDecks[savedCurrentDeckId]) {
-          setCurrentDeckId(savedCurrentDeckId);
-        } else {
-          setCurrentDeckId(Object.keys(syncedDecks)[0]);
-        }
-        console.log('[App] 🚨 WORKAROUND: Cloud decks state updated successfully');
-      } else {
-        console.log('[App] 🚨 WORKAROUND: No cloud decks found for authenticated user');
-      }
+      // User is authenticated, but don't automatically sync if no local decks exist
+      // This prevents deleted decks from being restored automatically
+      console.log('[App] 🚨 WORKAROUND: No local decks but user authenticated - not auto-syncing to avoid restoring deleted decks');
+      console.log('[App] 🚨 WORKAROUND: User can manually refresh if needed');
     } else {
       // User not authenticated
       console.log('[App] 🚨 WORKAROUND: User not authenticated, no cloud decks to load');
@@ -8371,6 +8453,7 @@ useEffect(() => {
     if (deckToExport) exportDeck(deckToExport, "json");
   }}
   onImportDeck={handleImportDeck}
+  onRefreshDecks={handleRefreshDecks}
 />
 
 {/* Team Hub */}
