@@ -1,5 +1,5 @@
-import { prisma } from "../../_lib/db.js";
-import { getSession } from "../../_lib/auth.js";
+import { prisma } from "../_lib/db.js";
+import { getSession } from "../_lib/auth.js";
 
 export default async function handler(req, res) {
   try {
