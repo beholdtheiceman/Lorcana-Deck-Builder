@@ -12,20 +12,15 @@ export default async function handler(req, res) {
     });
   }
 
-  try {
-    console.log('[DELETE /api/decks/[id]] Function started for method:', req.method);
-    console.log('[DELETE /api/decks/[id]] Query params:', req.query);
-    
-    const sess = getSession(req);
-    console.log('[DELETE /api/decks/[id]] Session retrieved:', !!sess);
-    
-    if (!sess) return res.status(401).json({ error: "Unauthorized" });
-    
-    if (req.method !== "DELETE") return res.status(405).end();
-  } catch (error) {
-    console.error('[DELETE /api/decks/[id]] Error in initial setup:', error);
-    return res.status(500).json({ error: "Setup error", details: error.message });
-  }
+  console.log('[DELETE /api/decks/[id]] Function started for method:', req.method);
+  console.log('[DELETE /api/decks/[id]] Query params:', req.query);
+  
+  const sess = getSession(req);
+  console.log('[DELETE /api/decks/[id]] Session retrieved:', !!sess);
+  
+  if (!sess) return res.status(401).json({ error: "Unauthorized" });
+  
+  if (req.method !== "DELETE") return res.status(405).end();
 
   const { id } = req.query;
   
