@@ -928,16 +928,37 @@ function sortLog(...args) {
  * Auth-safe fetch wrapper that handles missing tokens gracefully
  */
 async function authSafeFetch(input, init = {}) {
-  const token = localStorage.getItem("auth_token");
-  if (!token) {
+  // With cookie-based auth, we don't need to manually add tokens
+  // The cookies are automatically included with the request
+  console.log('[authSafeFetch] Making authenticated request to:', input);
+  
+  try {
+    const response = await fetch(input, {
+      ...init,
+      // Ensure credentials (cookies) are included
+      credentials: 'include'
+    });
+    
+    console.log('[authSafeFetch] Response status:', response.status);
+    
+    // Check if response indicates authentication failure
+    if (response.status === 401) {
+      console.log('[authSafeFetch] Authentication failed - user not logged in');
+      if (init.method && init.method !== "GET") {
+        return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('[authSafeFetch] Request failed:', error);
+    // Return appropriate fallback response
     if (init.method && init.method !== "GET") {
       return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
     }
     return new Response(JSON.stringify([]), { status: 200 });
   }
-  const headers = new Headers(init.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
-  return fetch(input, { ...init, headers });
 }
 
 /**
@@ -7465,12 +7486,8 @@ async function loadDecksFromCloud() {
   try {
     console.log('[loadDecksFromCloud] Attempting to load decks from cloud...');
     
-    // Check if user is authenticated
-    const token = localStorage.getItem("auth_token");
-    if (!token) {
-      console.log('[loadDecksFromCloud] No auth token, skipping cloud load');
-      return null;
-    }
+    // With cookie-based auth, we don't need to check for tokens
+    // The authSafeFetch will handle authentication via cookies
     
     const response = await authSafeFetch('/api/decks', {
       method: 'GET',
@@ -7491,18 +7508,24 @@ async function loadDecksFromCloud() {
       
       // Extract decks array from response
       const cloudDecksArray = responseData.decks || [];
+      console.log('[loadDecksFromCloud] Raw cloud decks array:', cloudDecksArray);
       
       // Convert cloud format to app format
       const convertedDecks = {};
       if (Array.isArray(cloudDecksArray)) {
         cloudDecksArray.forEach(cloudDeck => {
+          console.log('[loadDecksFromCloud] Processing deck:', cloudDeck);
           if (cloudDeck.data && cloudDeck.data.id) {
+            console.log('[loadDecksFromCloud] Converting deck:', cloudDeck.data.id, cloudDeck.title);
             convertedDecks[cloudDeck.data.id] = cloudDeck.data;
+          } else {
+            console.log('[loadDecksFromCloud] Skipping deck - missing data or id:', cloudDeck);
           }
         });
       }
       
       console.log('[loadDecksFromCloud] Converted cloud decks:', convertedDecks);
+      console.log('[loadDecksFromCloud] Found', Object.keys(convertedDecks).length, 'decks');
       return convertedDecks;
     } else {
       console.warn('[loadDecksFromCloud] Cloud response not ok:', response.status);
