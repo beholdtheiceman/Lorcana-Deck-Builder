@@ -4014,6 +4014,26 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
               <h3 className="font-semibold">Your Decks</h3>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={async () => {
+                    console.log('[DeckManager] Manual refresh triggered');
+                    try {
+                      const syncedDecks = await syncDecksWithCloud();
+                      if (syncedDecks) {
+                        setDecks(syncedDecks);
+                        console.log('[DeckManager] Manual refresh completed, decks updated');
+                      } else {
+                        console.log('[DeckManager] Manual refresh: no cloud decks found');
+                      }
+                    } catch (error) {
+                      console.error('[DeckManager] Manual refresh failed:', error);
+                    }
+                  }}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+                  title="Refresh decks from cloud"
+                >
+                  ↻ Refresh
+                </button>
+                <button
                   onClick={() => setShowNewDeckForm(true)}
                   className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
                 >
@@ -4198,14 +4218,22 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                     </div>
                   </div>
 
-                  {selectedDeck.id !== currentDeckId && (
-                    <button
-                      onClick={() => onDeleteDeck(selectedDeck.id)}
-                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
-                    >
-                      Delete Deck
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      if (selectedDeck.id === currentDeckId) {
+                        if (confirm(`Are you sure you want to delete the current deck "${selectedDeck.name}"? This will switch you to a new empty deck.`)) {
+                          onDeleteDeck(selectedDeck.id);
+                        }
+                      } else {
+                        if (confirm(`Are you sure you want to delete "${selectedDeck.name}"? This action cannot be undone.`)) {
+                          onDeleteDeck(selectedDeck.id);
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
+                  >
+                    Delete Deck
+                  </button>
                 </div>
               </div>
             ) : Object.keys(decks).length > 0 ? (
@@ -7152,40 +7180,7 @@ function AppInner() {
     setHasActiveFilters(hasFilters);
   }, [allCards, filters]);
 
-  // Enhanced deck management initialization
-  useEffect(() => {
-    console.log('[App] Initializing enhanced deck management...');
-    
-    // Load all decks from storage
-    const allDecks = loadAllDecks();
-    console.log('[App] Loaded decks:', Object.keys(allDecks).length);
-    setDecks(allDecks);
-    
-    // Load current deck ID
-    const currentId = localStorage.getItem(LS_KEYS.CURRENT_DECK_ID);
-    if (currentId && allDecks[currentId]) {
-      console.log('[App] Loading current deck:', currentId);
-      setCurrentDeckId(currentId);
-      deckDispatch({ type: "SWITCH_DECK", deck: allDecks[currentId] });
-    } else if (Object.keys(allDecks).length > 0) {
-      // If no current deck but we have decks, use the first one
-      const firstDeckId = Object.keys(allDecks)[0];
-      console.log('[App] No current deck, using first available:', firstDeckId);
-      setCurrentDeckId(firstDeckId);
-      deckDispatch({ type: "SWITCH_DECK", deck: allDecks[firstDeckId] });
-      saveCurrentDeckId(firstDeckId);
-    } else {
-      // Create a default deck if none exist
-      console.log('[App] No decks found, creating default deck');
-      const defaultDeck = createNewDeck("My First Deck");
-      const newDecks = { [defaultDeck.id]: defaultDeck };
-      setDecks(newDecks);
-      setCurrentDeckId(defaultDeck.id);
-      deckDispatch({ type: "SWITCH_DECK", deck: defaultDeck });
-      saveCurrentDeckId(defaultDeck.id);
-      saveAllDecks(newDecks);
-    }
-  }, []);
+
 
   // Ensure current deck stays in sync with decks state
   useEffect(() => {
@@ -7462,6 +7457,14 @@ async function saveDeckToCloud(deckData) {
 async function loadDecksFromCloud() {
   try {
     console.log('[loadDecksFromCloud] Attempting to load decks from cloud...');
+    
+    // Check if user is authenticated
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      console.log('[loadDecksFromCloud] No auth token, skipping cloud load');
+      return null;
+    }
+    
     const response = await authSafeFetch('/api/decks', {
       method: 'GET',
       headers: {
@@ -7470,13 +7473,22 @@ async function loadDecksFromCloud() {
     });
 
     if (response.ok) {
-      const cloudDecks = await response.json();
-      console.log('[loadDecksFromCloud] Successfully loaded from cloud:', cloudDecks);
+      const responseData = await response.json();
+      console.log('[loadDecksFromCloud] Successfully loaded from cloud:', responseData);
+      
+      // Check if this is a skipped auth response
+      if (responseData.skippedAuth) {
+        console.log('[loadDecksFromCloud] Auth was skipped, returning null');
+        return null;
+      }
+      
+      // Extract decks array from response
+      const cloudDecksArray = responseData.decks || [];
       
       // Convert cloud format to app format
       const convertedDecks = {};
-      if (Array.isArray(cloudDecks)) {
-        cloudDecks.forEach(cloudDeck => {
+      if (Array.isArray(cloudDecksArray)) {
+        cloudDecksArray.forEach(cloudDeck => {
           if (cloudDeck.data && cloudDeck.data.id) {
             convertedDecks[cloudDeck.data.id] = cloudDeck.data;
           }
@@ -7502,10 +7514,12 @@ async function syncDecksWithCloud() {
     
     // Load from cloud first
     const cloudDecks = await loadDecksFromCloud();
+    console.log('[syncDecksWithCloud] Cloud decks received:', cloudDecks);
     
-    if (cloudDecks) {
+    if (cloudDecks && Object.keys(cloudDecks).length > 0) {
       // Load local decks
       const localDecks = loadLS(LS_KEYS.DECKS, {});
+      console.log('[syncDecksWithCloud] Local decks:', localDecks);
       
       // Merge: cloud takes priority, but keep local changes
       const mergedDecks = { ...localDecks };
@@ -7527,8 +7541,10 @@ async function syncDecksWithCloud() {
       // Save merged result to localStorage
       saveAllDecks(mergedDecks);
       
-      console.log('[syncDecksWithCloud] Cloud sync completed');
+      console.log('[syncDecksWithCloud] Cloud sync completed, merged decks:', mergedDecks);
       return mergedDecks;
+    } else {
+      console.log('[syncDecksWithCloud] No cloud decks found or cloud sync failed');
     }
     
     return null;
@@ -7569,23 +7585,25 @@ function handleSwitchDeck(deckToSwitch) {
 }
 
 function handleDeleteDeck(deckId) {
-  if (deckId === currentDeckId) {
-    addToast("Cannot delete the current deck", "error");
-    return;
-  }
-  
   const deckToDelete = decks[deckId];
   const updatedDecks = deleteDeck(decks, deckId);
   setDecks(updatedDecks);
   
-  if (Object.keys(updatedDecks).length === 0) {
-    // If no decks left, create a default one
-    const defaultDeck = createNewDeck("My First Deck");
-    const newDecks = { [defaultDeck.id]: defaultDeck };
-    setDecks(newDecks);
-    setCurrentDeckId(defaultDeck.id);
-    deckDispatch({ type: "SWITCH_DECK", deck: defaultDeck });
-    saveCurrentDeckId(defaultDeck.id);
+  // If we're deleting the current deck, switch to another deck or create a new one
+  if (deckId === currentDeckId) {
+    if (Object.keys(updatedDecks).length > 0) {
+      // Switch to the first available deck
+      const firstDeckId = Object.keys(updatedDecks)[0];
+      setCurrentDeckId(firstDeckId);
+      deckDispatch({ type: "SWITCH_DECK", deck: updatedDecks[firstDeckId] });
+      saveCurrentDeckId(firstDeckId);
+    } else {
+      // Create a new empty deck
+      const newDeck = createNewDeck("Untitled Deck");
+      setCurrentDeckId(newDeck.id);
+      deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
+      saveCurrentDeckId(newDeck.id);
+    }
   }
   
   addToast(`Deleted deck: "${deckToDelete.name}"`, "success");
@@ -7623,9 +7641,12 @@ useEffect(() => {
       
       // First try to sync with cloud
       const syncedDecks = await syncDecksWithCloud();
+      console.log('[App] Cloud sync result:', syncedDecks);
       
       // Fall back to local storage if cloud sync fails
       const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
+      console.log('[App] Local decks:', localDecks);
+      console.log('[App] Local currentDeckId:', localCurrentDeckId);
       
       // Use synced decks if available, otherwise use local
       const finalDecks = syncedDecks || localDecks;
@@ -7637,24 +7658,29 @@ useEffect(() => {
       // Only load decks that have been explicitly saved (have a valid updatedAt timestamp)
       const savedDecks = {};
       Object.entries(finalDecks).forEach(([id, deck]) => {
-        console.log('[App] Processing deck:', { id, deckId: deck.id, deckName: deck.name, hasId: !!deck.id });
+        console.log('[App] Processing deck:', { id, deckId: deck.id, deckName: deck.name, hasId: !!deck.id, updatedAt: deck.updatedAt });
         if (deck.updatedAt && deck.updatedAt > 0) {
           // Ensure the deck has the correct ID
           const deckWithId = { ...deck, id: id };
           savedDecks[id] = deckWithId;
           console.log('[App] Added deck to savedDecks:', { id, deckId: deckWithId.id, deckName: deckWithId.name });
+        } else {
+          console.log('[App] Skipping deck (no updatedAt):', { id, deckName: deck.name });
         }
       });
       
       console.log('[App] Final savedDecks:', savedDecks);
+      console.log('[App] Number of saved decks:', Object.keys(savedDecks).length);
       setDecks(savedDecks);
       
       // Only set current deck if it was explicitly saved
       if (finalCurrentDeckId && savedDecks[finalCurrentDeckId]) {
+        console.log('[App] Setting current deck from saved decks:', finalCurrentDeckId);
         setCurrentDeckId(finalCurrentDeckId);
         deckDispatch({ type: "SWITCH_DECK", deck: savedDecks[finalCurrentDeckId] });
       } else {
         // Create a new empty deck if no saved deck exists - but don't add it to decks collection
+        console.log('[App] Creating new empty deck');
         const newDeck = createNewDeck("Untitled Deck");
         setCurrentDeckId(newDeck.id);
         deckDispatch({ type: "SWITCH_DECK", deck: newDeck });
