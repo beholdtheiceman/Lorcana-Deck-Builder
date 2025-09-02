@@ -930,7 +930,9 @@ function sortLog(...args) {
 async function authSafeFetch(input, init = {}) {
   // With cookie-based auth, we don't need to manually add tokens
   // The cookies are automatically included with the request
-  console.log('[authSafeFetch] Making authenticated request to:', input);
+      console.log('[authSafeFetch] Making authenticated request to:', input);
+    console.log('[authSafeFetch] Request method:', init.method || 'GET');
+    console.log('[authSafeFetch] Request headers:', init.headers);
   
   try {
     const response = await fetch(input, {
@@ -940,10 +942,12 @@ async function authSafeFetch(input, init = {}) {
     });
     
     console.log('[authSafeFetch] Response status:', response.status);
+    console.log('[authSafeFetch] Response URL:', response.url);
     
     // Check if response indicates authentication failure
     if (response.status === 401) {
       console.log('[authSafeFetch] Authentication failed - user not logged in');
+      console.log('[authSafeFetch] Failed request details - URL:', input, 'Method:', init.method || 'GET');
       if (init.method && init.method !== "GET") {
         return new Response(JSON.stringify({ ok: true, skippedAuth: true }), { status: 200 });
       }

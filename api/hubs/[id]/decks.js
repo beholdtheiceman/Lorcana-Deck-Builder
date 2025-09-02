@@ -62,6 +62,25 @@ export default async function handler(req, res) {
         orderBy: { updatedAt: 'desc' }
       });
 
+      console.log('Raw decks from database:', decks.length);
+      console.log('Member IDs we\'re searching for:', memberIds);
+      console.log('Current user ID:', user.id);
+      
+      // Log deck ownership breakdown
+      const decksByUser = {};
+      decks.forEach(deck => {
+        if (!decksByUser[deck.userId]) {
+          decksByUser[deck.userId] = [];
+        }
+        decksByUser[deck.userId].push(deck.title);
+      });
+      
+      console.log('Decks by user breakdown:');
+      Object.keys(decksByUser).forEach(userId => {
+        const userEmail = decks.find(d => d.userId === userId)?.user?.email || 'Unknown';
+        console.log(`  ${userEmail} (${userId}): ${decksByUser[userId].length} decks - ${decksByUser[userId].join(', ')}`);
+      });
+
       // Process decks to include basic info
       const processedDecks = decks.map((deck) => {
         const deckData = deck.data || {};
