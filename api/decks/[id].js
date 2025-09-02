@@ -34,8 +34,17 @@ export default async function handler(req, res) {
     }
     
     console.log('[DELETE /api/decks/[id]] Attempting to get session...');
-    const sess = getSession(req);
-    console.log('[DELETE /api/decks/[id]] Session retrieved:', !!sess);
+    let sess;
+    try {
+      sess = getSession(req);
+      console.log('[DELETE /api/decks/[id]] Session retrieved:', !!sess);
+    } catch (sessionError) {
+      console.error('[DELETE /api/decks/[id]] Session retrieval error:', sessionError.message);
+      return res.status(401).json({ 
+        error: "Authentication failed", 
+        details: sessionError.message 
+      });
+    }
     
     if (!sess) return res.status(401).json({ error: "Unauthorized" });
     
