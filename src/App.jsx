@@ -7636,6 +7636,7 @@ function handleImportDeck(importedDeck) {
 // Initialize deck management system with cloud sync
 useEffect(() => {
   console.log('[App] 🚀 DECK INITIALIZATION useEffect triggered!');
+  console.log('[App] 🚀 useEffect is actually running!');
   const initializeDecks = async () => {
     try {
       console.log('[App] Starting deck initialization with cloud sync...');
@@ -7710,6 +7711,12 @@ useEffect(() => {
 }, []);
 
 console.log('[App] 🎯 DECK INITIALIZATION useEffect defined and ready to run');
+console.log('[App] 🔍 Checking if useEffect will run...');
+console.log('[App] 🔍 Current component state at definition time:', { 
+  decks: Object.keys(decks || {}).length, 
+  currentDeckId,
+  hasDeckDispatch: typeof deckDispatch === 'function'
+});
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
