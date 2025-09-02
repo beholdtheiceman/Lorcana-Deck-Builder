@@ -7718,10 +7718,14 @@ console.log('[App] 🔍 Current component state at definition time:', {
   hasDeckDispatch: typeof deckDispatch === 'function'
 });
 
+console.log('[App] 🚨 ABOUT TO DEFINE TEST useEffect - if you see this, the component is still running');
+
 // Test if ANY useEffect runs
 useEffect(() => {
   console.log('[App] 🧪 TEST useEffect is running!');
 }, []);
+
+console.log('[App] 🚨 TEST useEffect defined - if you see this, useEffect was defined successfully');
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
