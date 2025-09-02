@@ -7738,6 +7738,47 @@ useEffect(() => {
 // Test if component is completing its lifecycle
 console.log('[App] 🚨 COMPONENT RENDER COMPLETE - If you see this, the component finished rendering');
 
+// EMERGENCY DECK LOADING - Since useEffect isn't working, try immediate loading
+console.log('[App] 🚨 EMERGENCY: Attempting immediate deck loading since useEffect is not working...');
+try {
+  const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
+  console.log('[App] 🚨 EMERGENCY: Local decks loaded:', Object.keys(localDecks).length);
+  if (Object.keys(localDecks).length > 0) {
+    console.log('[App] 🚨 EMERGENCY: Setting decks immediately');
+    // We can't call setDecks here since we're in render, but we can see if decks exist
+  }
+} catch (error) {
+  console.error('[App] 🚨 EMERGENCY: Failed to load decks:', error);
+}
+
+// WORKAROUND: Use setTimeout to trigger deck loading since useEffect isn't working
+console.log('[App] 🚨 WORKAROUND: Setting up setTimeout to load decks...');
+setTimeout(async () => {
+  console.log('[App] 🚨 WORKAROUND: Timeout triggered, attempting to load decks...');
+  try {
+    // Load decks from local storage
+    const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
+    console.log('[App] 🚨 WORKAROUND: Local decks loaded:', Object.keys(localDecks).length);
+    
+    if (Object.keys(localDecks).length > 0) {
+      console.log('[App] 🚨 WORKAROUND: Local decks found, would set state here');
+      // In a real scenario, we'd call setDecks(localDecks) here
+      // But we need to find a way to access the setter from outside render
+    } else {
+      console.log('[App] 🚨 WORKAROUND: No local decks, attempting cloud sync...');
+      // Try cloud sync
+      const syncedDecks = await syncDecksWithCloud();
+      if (syncedDecks && Object.keys(syncedDecks).length > 0) {
+        console.log('[App] 🚨 WORKAROUND: Cloud decks found:', Object.keys(syncedDecks).length);
+      } else {
+        console.log('[App] 🚨 WORKAROUND: No cloud decks found either');
+      }
+    }
+  } catch (error) {
+    console.error('[App] 🚨 WORKAROUND: Failed to load decks via timeout:', error);
+  }
+}, 100); // 100ms delay to ensure component is mounted
+
 // Keyboard shortcuts (basic)
 useEffect(() => {
   const onKey = (e) => {
