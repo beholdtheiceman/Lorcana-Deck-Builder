@@ -4218,7 +4218,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                     </div>
                   </div>
 
-                  <button
+                    <button
                     onClick={() => {
                       if (selectedDeck.id === currentDeckId) {
                         if (confirm(`Are you sure you want to delete the current deck "${selectedDeck.name}"? This will switch you to a new empty deck.`)) {
@@ -4230,10 +4230,10 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                         }
                       }
                     }}
-                    className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
-                  >
-                    Delete Deck
-                  </button>
+                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
+                    >
+                      Delete Deck
+                    </button>
                 </div>
               </div>
             ) : Object.keys(decks).length > 0 ? (
@@ -7635,6 +7635,7 @@ function handleImportDeck(importedDeck) {
 
 // Initialize deck management system with cloud sync
 useEffect(() => {
+  console.log('[App] 🚀 DECK INITIALIZATION useEffect triggered!');
   const initializeDecks = async () => {
     try {
       console.log('[App] Starting deck initialization with cloud sync...');
@@ -7707,6 +7708,8 @@ useEffect(() => {
   
   initializeDecks();
 }, []);
+
+console.log('[App] 🎯 DECK INITIALIZATION useEffect defined and ready to run');
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
