@@ -4672,11 +4672,14 @@ function DeckStats({ deck }) {
   // Role breakdown
   const roleData = useMemo(() => {
     const counts = {};
+    const roleCards = {};
     cards.forEach(c => {
       const r = roleForCard(c);
       counts[r] = (counts[r] || 0) + 1;
+      if (!roleCards[r]) roleCards[r] = [];
+      roleCards[r].push(c.name);
     });
-    return Object.entries(counts).map(([role, value]) => ({ role, value }));
+    return Object.entries(counts).map(([role, value]) => ({ role, value, cards: roleCards[role] || [] }));
   }, [cards]);
 
   // Synergies detection
@@ -7110,12 +7113,33 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                       <XAxis dataKey="role" interval={0} angle={-10} textAnchor="end" height={60} stroke="#9CA3AF" />
                       <YAxis allowDecimals={false} stroke="#9CA3AF" />
                       <Tooltip 
-                        formatter={(value, name) => [value, 'Cards']}
-                        contentStyle={{
-                          backgroundColor: '#1F2937',
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                          color: '#F9FAFB'
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            const cards = data.cards || [];
+                            
+                            // Group and count cards
+                            const counts = {};
+                            cards.forEach(cardName => {
+                              counts[cardName] = (counts[cardName] || 0) + 1;
+                            });
+                            const groupedCards = Object.entries(counts)
+                              .sort((a, b) => a[0].localeCompare(b[0]))
+                              .map(([name, count]) => (count > 1 ? `${count} - ${name}` : name));
+
+                            return (
+                              <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3 max-w-sm">
+                                <p className="text-white font-semibold mb-1">{label}: {payload[0].value} cards</p>
+                                <div className="text-gray-300 text-sm">Cards:</div>
+                                <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                                  {groupedCards.map((card, index) => (
+                                    <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
                       />
                       <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
