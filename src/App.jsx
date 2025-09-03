@@ -359,85 +359,55 @@ const RX_FINISH = rx("(gain.*lore.*each|when this quests.*lore|ready .*again)");
 
 const textOf = c => (c?.text || c?.rulesText || c?.Body_Text || "").toString();
 
-function roleForCard(c) {
-  const t = textOf(c);
-  const type = (c?.type || "").toLowerCase();
-  const lore = Number(c?.lore || c?._raw?.Lore || c?._raw?.lore || c?._raw?.loreValue || 0);
-  const cost = Number(c?.cost || 0);
-  const name = c.name || "";
+const ROLE_ORDER = [
+  "Questers",
+  "Ramp / Cost",
+  "Draw / Dig",
+  "Interaction",
+  "Buff / Support",
+  "Defenders / Walls",
+  "Tempo / Aggro Tools",
+  "Combo Pieces",
+  "Utility"
+];
 
-  // Debug role assignment
-  const debug = {
-    name: c.name,
-    type: type,
-    lore: lore,
-    cost: cost,
-    text: t.substring(0, 100) + '...',
-    tests: {
-      removal: RX_REMOVAL.test(t),
-      isAction: type === "action",
-      draw: RX_DRAW.test(t),
-      search: RX_SEARCH.test(t),
-      ramp: RX_RAMP.test(t),
-      song: RX_SONG.test(t),
-      finisher: (lore >= 2 && cost >= 6) || RX_FINISH.test(t),
-      quester: lore >= 1 && type.includes("character")
-    }
+function roleForCard(card) {
+  const t = textOf(card);
+  const type = (card?.type || "").toLowerCase();
+  const lore = Number(card?.lore || card?._raw?.Lore || card?._raw?.lore || card?._raw?.loreValue || 0);
+  const cost = Number(card?.cost || 0);
+  const name = card.name || "";
+  const willpower = Number(card?.willpower || card?._raw?.Willpower || card?._raw?.willpower || 0);
+  const strength = Number(card?.strength || card?._raw?.Strength || card?._raw?.strength || 0);
+
+  const isDraw = RX_DRAW.test(t) || RX_SEARCH.test(t);
+  const isRamp = RX_RAMP.test(t);
+  const isRemoval = RX_REMOVAL.test(t);
+  const isSupport = /gets \+\d+|gain strength|gain willpower|support/i.test(t);
+  const isWall = willpower >= 5;
+  const isAggro = cost <= 3 && strength >= 3;
+  const isCombo = /each time|loop|whenever|copy/i.test(t);
+  const isUtility = /look at opponent|reveal.*deck|shuffle/i.test(t);
+  const isQuest = lore >= 1 && type.includes("character");
+
+  const OVERRIDES = {
+    "Scar - Mastermind": "Draw / Dig",
+    "Strength of a Raging Fire": "Interaction",
+    "Let the Storm Rage On": "Ramp / Cost",
   };
+  if (OVERRIDES[name]) return OVERRIDES[name];
 
-  // Special case handling for specific problematic cards
-  // Scar: Primary function is draw, banish is just a cost/consequence
-  if (name.toLowerCase().includes("scar") && RX_DRAW.test(t)) {
-    console.log('[Role Debug]', c.name, '→ Draw / Dig (special case - draw prioritized over incidental banish):', debug);
-    return "Draw / Dig";
-  }
-  
-  // Strength of a Raging Fire: Primary function is damage, song is just the casting method
-  if (name.toLowerCase().includes("strength of a raging fire")) {
-    console.log('[Role Debug]', c.name, '→ Interaction (special case - damage song):', debug);
-    return "Interaction";
-  }
+  if (isRamp) return "Ramp / Cost";
+  if (isDraw) return "Draw / Dig";
+  if (isRemoval) return "Interaction";
+  if (isSupport) return "Buff / Support";
+  if (isWall) return "Defenders / Walls";
+  if (isAggro) return "Tempo / Aggro Tools";
+  if (isCombo) return "Combo Pieces";
+  if (isQuest) return "Questers";
+  if (isUtility) return "Utility";
 
-  // For cards that have both draw and removal effects, prioritize the primary effect
-  // If a card has draw effects AND the removal is conditional/costly, prioritize draw
-  if (RX_DRAW.test(t) && RX_REMOVAL.test(t)) {
-    // Check if the removal effect is conditional or part of a cost
-    if (t.toLowerCase().includes("if you do") && t.toLowerCase().includes("banish")) {
-      console.log('[Role Debug]', c.name, '→ Draw / Dig (conditional removal, draw prioritized):', debug);
-      return "Draw / Dig";
-    }
-  }
-
-  // For songs that deal damage, prioritize the damage effect over the song mechanic
-  if (RX_SONG.test(t) && RX_REMOVAL.test(t)) {
-    console.log('[Role Debug]', c.name, '→ Interaction (damage song):', debug);
-    return "Interaction";
-  }
-
-  // Standard priority order
-  if (RX_REMOVAL.test(t) || type === "action") {
-    console.log('[Role Debug]', c.name, '→ Interaction:', debug);
-    return "Interaction";
-  }
-  if (RX_DRAW.test(t) || RX_SEARCH.test(t)) {
-    console.log('[Role Debug]', c.name, '→ Draw / Dig:', debug);
-    return "Draw / Dig";
-  }
-  if (RX_RAMP.test(t) || RX_SONG.test(t)) {
-    console.log('[Role Debug]', c.name, '→ Ramp / Cost:', debug);
-    return "Ramp / Cost";
-  }
-  if ((lore >= 2 && cost >= 6) || RX_FINISH.test(t)) {
-    console.log('[Role Debug]', c.name, '→ Finisher:', debug);
-    return "Finisher";
-  }
-  if (lore >= 1 && type.includes("character")) {
-    console.log('[Role Debug]', c.name, '→ Questers:', debug);
-    return "Questers";
-  }
-  
-  console.log('[Role Debug]', c.name, '→ Utility / Support (default):', debug);
-  return "Utility / Support";
+  return "Utility";
 }
 
 function detectSynergies(cards) {
@@ -4702,24 +4672,16 @@ function DeckStats({ deck }) {
 
   // Role breakdown
   const roleData = useMemo(() => {
-    console.log('[Role Data - MAIN] Starting calculation with cards:', cards.length);
     const counts = {};
-    const roleCards = {};
-    cards.forEach((c, idx) => {
-      const r = roleForCard(c);
-      if (idx < 3) console.log(`[Role Data - MAIN] Card ${idx}: ${c.name} -> ${r}`);
-      counts[r] = (counts[r] || 0) + 1;
-      if (!roleCards[r]) roleCards[r] = [];
-      roleCards[r].push(c.name);
+    cards.forEach(card => {
+      const role = roleForCard(card);
+      counts[role] = (counts[role] || 0) + 1;
     });
-    console.log('[Role Data - MAIN] roleCards object:', roleCards);
-    const result = Object.entries(counts).map(([role, value]) => {
-      const cardList = roleCards[role] || [];
-      console.log(`[Role Data - MAIN] Building entry for ${role}: value=${value}, cards.length=${cardList.length}`);
-      return { role, value, cards: cardList };
-    });
-    console.log('[Role Data - MAIN FINAL]', result);
-    return result;
+
+    return ROLE_ORDER.map(role => ({
+      role,
+      value: counts[role] || 0,
+    }));
   }, [cards]);
 
   // Synergies detection
@@ -7053,33 +7015,11 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 roleAssignments[r].push(c.name);
               });
               
-              console.log('[Comp Dashboard] Role data:', counts);
-              console.log('[Comp Dashboard] Role assignments:', roleAssignments);
-              
-              // Special focus on Utility/Support cards
-              if (roleAssignments['Utility / Support']) {
-                console.log('[Comp Dashboard] Utility/Support cards:', roleAssignments['Utility / Support']);
-                console.log('[Comp Dashboard] Why these are Utility/Support:');
-                roleAssignments['Utility / Support'].forEach(cardName => {
-                  const card = cards.find(c => c.name === cardName);
-                  if (card) {
-                    const cardText = (card.text || card.rulesText || card._raw?.text || card._raw?.rulesText || card._raw?.Body_Text || "").toString().toLowerCase();
-                    const cardType = (card?.type || "").toLowerCase();
-                    const cardLore = Number(card.lore || card._raw?.Lore || card._raw?.lore || card._raw?.loreValue || 0);
-                    const cardCost = Number(card.cost || 0);
-                    
-                    console.log(`  ${cardName}:`, {
-                      type: cardType,
-                      lore: cardLore,
-                      cost: cardCost,
-                      text: cardText.substring(0, 100) + '...',
-                      why: 'No specific role detected - falls through to default'
-                    });
-                  }
-                });
-              }
-              
-              return Object.entries(counts).map(([role,value])=>({role, value, cards: roleAssignments[role] || []}));
+              return ROLE_ORDER.map(role => ({
+                role,
+                value: counts[role] || 0,
+                cards: roleAssignments[role] || []
+              }));
             })();
             
             // Make compDashboardRoleData available as 'roleData' for chart (now includes cards)
