@@ -7050,6 +7050,9 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               
               return Object.entries(counts).map(([role,value])=>({role, value}));
             })();
+            
+            // Make role data available as 'roleData' for any legacy references
+            const roleData = compDashboardRoleData;
 
             // --- Synergies list ---
             const synergies = (() => detectSynergies(cards))();
