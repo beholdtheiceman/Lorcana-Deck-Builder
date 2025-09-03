@@ -7551,13 +7551,16 @@ async function loadDecksFromCloud() {
           console.log('[loadDecksFromCloud] Processing deck:', cloudDeck);
           if (cloudDeck.data && cloudDeck.data.id) {
             console.log('[loadDecksFromCloud] Converting deck:', cloudDeck.data.id, cloudDeck.title);
-            // Use the frontend ID as the key, but store the database ID for deletion
+            // Use the unique database ID as the key to prevent duplicates from overwriting each other
             const deckData = { 
               ...cloudDeck.data, 
               _dbId: cloudDeck.id, // Store the database UUID for deletion
-              _cloudId: cloudDeck.id // Also store as _cloudId for clarity
+              _cloudId: cloudDeck.id, // Also store as _cloudId for clarity
+              // Update the deck's ID to be the unique database ID to prevent conflicts
+              id: cloudDeck.id
             };
-            convertedDecks[cloudDeck.data.id] = deckData;
+            // Use the unique database ID as the key instead of the potentially duplicate frontend ID
+            convertedDecks[cloudDeck.id] = deckData;
           } else {
             console.log('[loadDecksFromCloud] Skipping deck - missing data or id:', cloudDeck);
           }
