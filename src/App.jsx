@@ -7124,11 +7124,24 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
                             const cards = data.cards || [];
-                            console.log('[Card Roles Tooltip]', { label, cards, data });
+                            
+                            // Debug: Check if we can find the cards in roleData by matching the role
+                            const roleMatch = roleData.find(item => item.role === data.role);
+                            const fallbackCards = roleMatch?.cards || [];
+                            const finalCards = cards.length > 0 ? cards : fallbackCards;
+                            
+                            console.log('[Card Roles Tooltip]', { 
+                              label, 
+                              cards, 
+                              data, 
+                              roleMatch, 
+                              fallbackCards, 
+                              finalCards 
+                            });
                             
                             // Group and count cards
                             const counts = {};
-                            cards.forEach(cardName => {
+                            finalCards.forEach(cardName => {
                               counts[cardName] = (counts[cardName] || 0) + 1;
                             });
                             const groupedCards = Object.entries(counts)
@@ -7138,7 +7151,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                             return (
                               <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3 max-w-sm">
                                 <p className="text-white font-semibold mb-1">{label}: {payload[0].value} cards</p>
-                                {cards.length > 0 ? (
+                                {finalCards.length > 0 ? (
                                   <>
                                     <div className="text-gray-300 text-sm">Cards:</div>
                                     <div className="space-y-0.5 max-h-48 overflow-y-auto">
