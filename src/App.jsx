@@ -4671,21 +4671,23 @@ function DeckStats({ deck }) {
 
   // Role breakdown
   const roleData = useMemo(() => {
+    console.log('[Role Data - MAIN] Starting calculation with cards:', cards.length);
     const counts = {};
     const roleCards = {};
-    cards.forEach(c => {
+    cards.forEach((c, idx) => {
       const r = roleForCard(c);
+      if (idx < 3) console.log(`[Role Data - MAIN] Card ${idx}: ${c.name} -> ${r}`);
       counts[r] = (counts[r] || 0) + 1;
       if (!roleCards[r]) roleCards[r] = [];
       roleCards[r].push(c.name);
     });
-    const result = Object.entries(counts).map(([role, value]) => ({ role, value, cards: roleCards[role] || [] }));
-    console.log('[Role Data - LATEST]', result);
-    console.log('[Role Data - LATEST] Sample entry:', result[0]);
-    console.log('[Role Data - LATEST] Sample cards:', result[0]?.cards);
-    result.forEach((item, idx) => {
-      console.log(`[Role Data - LATEST] Item ${idx}: ${item.role} = ${item.value} cards, cards array:`, item.cards);
+    console.log('[Role Data - MAIN] roleCards object:', roleCards);
+    const result = Object.entries(counts).map(([role, value]) => {
+      const cardList = roleCards[role] || [];
+      console.log(`[Role Data - MAIN] Building entry for ${role}: value=${value}, cards.length=${cardList.length}`);
+      return { role, value, cards: cardList };
     });
+    console.log('[Role Data - MAIN FINAL]', result);
     return result;
   }, [cards]);
 
