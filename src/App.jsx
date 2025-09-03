@@ -7368,6 +7368,162 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           </div>
         </div>
 
+        {/* NEW COMPETITIVE ANALYSIS IN DECK MODAL */}
+        <div className="bg-gray-800 rounded-lg p-6 mt-6">
+          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">🎯 Competitive Analysis</h3>
+          
+          {(() => {
+            // Calculate data for competitive analysis in modal
+            const cards = entries.flatMap(e => Array(e.count).fill(e.card));
+            
+            // Meta curve templates for comparison
+            const metaCurves = {
+              "Aggro": { "1": 8, "2": 12, "3": 8, "4": 6, "5": 4, "6": 2, "7+": 0 },
+              "Midrange": { "1": 4, "2": 8, "3": 10, "4": 8, "5": 6, "6": 4, "7+": 0 },
+              "Control": { "1": 2, "2": 6, "3": 8, "4": 8, "5": 6, "6": 6, "7+": 4 },
+              "Ramp": { "1": 2, "2": 4, "3": 6, "4": 6, "5": 8, "6": 8, "7+": 6 }
+            };
+
+            // Curve with inkable/uninkable breakdown + meta comparison
+            const curveData = (() => {
+              const buckets = {};
+              const deckSize = cards.length;
+              
+              // Initialize buckets
+              const order = ["0","1","2","3","4","5","6","7+"];
+              order.forEach(key => {
+                buckets[key] = { cost: key, inkable: 0, uninkable: 0, total: 0 };
+              });
+              
+              // Fill with deck data
+              cards.forEach(c => {
+                const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
+                const key = cost >= 7 ? "7+" : String(cost);
+                buckets[key].total++;
+                const isInkable = Boolean(c.inkable ?? c._raw?.inkwell ?? c._raw?.inkable ?? false);
+                (isInkable ? buckets[key].inkable++ : buckets[key].uninkable++);
+              });
+              
+              // Add meta comparison (scaled to deck size)
+              return order.map(k => {
+                const bucket = buckets[k];
+                const result = { ...bucket };
+                
+                // Add meta curves (scaled to percentage of 60-card deck)
+                Object.entries(metaCurves).forEach(([archetype, curve]) => {
+                  const metaCount = curve[k] || 0;
+                  result[`meta_${archetype.toLowerCase()}`] = deckSize > 0 ? (metaCount / 60) * deckSize : 0;
+                });
+                
+                return result;
+              }).filter(k => k.total > 0 || Object.keys(metaCurves).some(arch => k[`meta_${arch.toLowerCase()}`] > 0));
+            })();
+
+            // Draw consistency analysis
+            const drawConsistency = (() => {
+              let drawCount = 0, searchCount = 0, rawDrawPieces = 0;
+              const detectedCards = { draw: [], search: [], combined: [] };
+              
+              const textOf = c => (c?.text || c?.rulesText || c?.Body_Text || "").toString();
+              const RX_DRAW = /draw|draws|draw a card|draw two|card advantage|gain\s+a\s+card|gain\s+cards|add.*to.*hand|put.*(?:a\s+card|cards?).*into\s+your\s+hand/i;
+              const RX_SEARCH = /search|look at|reveal|scry|find|choose.*card.*hand|choose.*put.*hand|select.*card.*hand|put.*on top|put.*on bottom|shuffle|arrange/i;
+              
+              cards.forEach(c => {
+                const t = textOf(c);
+                if (RX_DRAW.test(t)) { 
+                  drawCount++; 
+                  rawDrawPieces++; 
+                  detectedCards.draw.push(c.name);
+                  detectedCards.combined.push(c.name);
+                }
+                if (RX_SEARCH.test(t)) { 
+                  searchCount++; 
+                  rawDrawPieces++; 
+                  detectedCards.search.push(c.name);
+                  if (!detectedCards.combined.includes(c.name)) {
+                    detectedCards.combined.push(c.name);
+                  }
+                }
+              });
+              const density = (rawDrawPieces / Math.max(cards.length, 1)) * 100;
+              return { 
+                drawCount, 
+                searchCount, 
+                density: Number(density.toFixed(1)),
+                detectedCards 
+              };
+            })();
+
+            // Synergies detection
+            const synergies = [];
+            // Add basic synergy detection here...
+
+            return (
+              <div>
+                {/* Enhanced Cost Curve with Meta Comparison */}
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🏗️ Enhanced Cost Curve</h4>
+                  <EnhancedCurveChart data={curveData} />
+                </div>
+
+                {/* Draw Probability Calculator */}
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Draw Probability Calculator</h4>
+                  <DrawProbabilityTool deck={entries} />
+                </div>
+
+                {/* Turn-by-Turn Draw Simulator */}
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎲 Turn-by-Turn Draw Simulator</h4>
+                  <DrawSimulator deck={entries} />
+                </div>
+
+                {/* Consistency & Role Analysis */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Draw Consistency */}
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold mb-3 text-emerald-300">Consistency</h4>
+                    <div className="space-y-3 text-sm">
+                      <HoverableStatLine 
+                        label="Draw pieces" 
+                        value={drawConsistency.drawCount} 
+                        cards={drawConsistency.detectedCards.draw}
+                      />
+                      <HoverableStatLine 
+                        label="Search/Dig pieces" 
+                        value={drawConsistency.searchCount} 
+                        cards={drawConsistency.detectedCards.search}
+                      />
+                      <HoverableStatLine 
+                        label="Card advantage density" 
+                        value={`${drawConsistency.density}% of deck`} 
+                        cards={drawConsistency.detectedCards.combined}
+                      />
+                      <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
+                    </div>
+                  </div>
+
+                  {/* Synergies */}
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold mb-3 text-emerald-300">Synergies</h4>
+                    {synergies.length > 0 ? (
+                      <div className="space-y-2">
+                        <ul className="space-y-1 text-sm">
+                          {synergies.map((s, i) => (
+                            <li key={i} className="text-emerald-200 text-xs">• {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400">No obvious synergies detected.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
         {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
         {false && <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">OLD Competitive Analysis</h3>
