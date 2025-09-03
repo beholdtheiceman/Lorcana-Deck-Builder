@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { calculateMonteCarloDrawOdds } from "../utils/monteCarloDrawOdds";
 
-const DeckStats = ({ entries, focusCardName }) => {
+const DeckStats = ({ entries, focusCardName = "" }) => {
   // Convert entries to individual cards for analysis (same pattern as in App.jsx)
   const cards = useMemo(() => 
     entries.flatMap(e => Array(e.count).fill(e.card))
