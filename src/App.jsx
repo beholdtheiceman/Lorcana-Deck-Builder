@@ -8064,7 +8064,7 @@ useEffect(() => {
           />
 
           {/* Essential Quick Filters */}
-          <div className="p-4 bg-gray-900/30 border-b border-gray-800">
+          <div className="p-4 bg-gray-900/70 border-b border-gray-800 sticky top-16 z-30 backdrop-blur">
   <div className="flex flex-wrap items-center gap-4">
     <div className="text-gray-300 font-medium">Quick Filters:</div>
 
@@ -8153,6 +8153,20 @@ useEffect(() => {
           </button>
         ))}
       </div>
+    </div>
+
+    {/* Legality Filter */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-gray-300">Legality:</span>
+      <select
+        value={filters?.gamemode || ""}
+        onChange={(e) => filterDispatch({ type: "SET_GAMEMODE", value: e.target.value })}
+        className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-gray-300 focus:ring-emerald-500 focus:ring-2"
+      >
+        <option value="">Any</option>
+        <option value="Core Constructed">Core Constructed</option>
+        <option value="Infinity">Infinity</option>
+      </select>
     </div>
 
     {/* Clear Filters */}
