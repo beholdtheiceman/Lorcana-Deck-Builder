@@ -3927,6 +3927,8 @@ function DrawProbabilityTool({ deck }) {
   const [targetTurn, setTargetTurn] = useState(4);
   const [withMulligan, setWithMulligan] = useState(true);
   const [mulliganCount, setMulliganCount] = useState(3);
+  const [useMonteCarloSim, setUseMonteCarloSim] = useState(false);
+  const [simulations, setSimulations] = useState(10000);
 
   // Calculate hypergeometric probability
   const calculateDrawProbability = (cardCopies, deckSize, handSize, targetTurn) => {
@@ -3947,6 +3949,56 @@ function DrawProbabilityTool({ deck }) {
     return (1 - probabilityOfNotDrawing) * 100; // Convert to percentage
   };
 
+  // Monte Carlo simulation for complex scenarios
+  const simulateDrawProbability = ({
+    deckSize = 60,
+    copiesInDeck = 4,
+    handSize = 7,
+    cardsDrawnPerTurn = 1,
+    turnCount = 3,
+    mulliganCount = 0,
+    simulations = 10000,
+  }) => {
+    let hits = 0;
+
+    for (let i = 0; i < simulations; i++) {
+      // Create deck array
+      let deck = Array(deckSize).fill('other');
+      for (let j = 0; j < copiesInDeck; j++) {
+        deck[j] = 'target';
+      }
+
+      // Fisher-Yates shuffle
+      for (let k = deck.length - 1; k > 0; k--) {
+        const rand = Math.floor(Math.random() * (k + 1));
+        [deck[k], deck[rand]] = [deck[rand], deck[k]];
+      }
+
+      // Initial hand draw
+      let hand = deck.slice(0, handSize);
+      let deckIndex = handSize;
+
+      // Mulligan logic (replace specified number of cards)
+      if (mulliganCount > 0 && deckIndex + mulliganCount <= deckSize) {
+        const newCards = deck.slice(deckIndex, deckIndex + mulliganCount);
+        hand = hand.slice(mulliganCount).concat(newCards);
+        deckIndex += mulliganCount;
+      }
+
+      // Draw cards for additional turns
+      const additionalDraws = Math.min((turnCount - 1) * cardsDrawnPerTurn, deckSize - deckIndex);
+      const turnDraws = deck.slice(deckIndex, deckIndex + additionalDraws);
+      const allCardsSeen = hand.concat(turnDraws);
+
+      // Check if target card is present
+      if (allCardsSeen.includes('target')) {
+        hits++;
+      }
+    }
+
+    return (hits / simulations) * 100;
+  };
+
   // Get deck data
   const deckSize = deck.reduce((sum, entry) => sum + entry.count, 0);
   const uniqueCards = deck.map(entry => ({
@@ -3958,42 +4010,78 @@ function DrawProbabilityTool({ deck }) {
   const selectedCardData = deck.find(entry => entry.card.name === selectedCard);
   const cardCopies = selectedCardData ? selectedCardData.count : 0;
 
-  // Calculate probabilities
-  const openingHandProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
-  const targetTurnProb = calculateDrawProbability(cardCopies, deckSize, 7, targetTurn);
+  // Calculate probabilities using selected method
+  let openingHandProb, targetTurnProb;
+  
+  if (useMonteCarloSim) {
+    // Monte Carlo simulation
+    openingHandProb = simulateDrawProbability({
+      deckSize,
+      copiesInDeck: cardCopies,
+      handSize: 7,
+      turnCount: 1,
+      mulliganCount: 0,
+      simulations
+    });
+    
+    targetTurnProb = simulateDrawProbability({
+      deckSize,
+      copiesInDeck: cardCopies,
+      handSize: 7,
+      turnCount: targetTurn,
+      mulliganCount: 0,
+      simulations
+    });
+  } else {
+    // Hypergeometric calculation
+    openingHandProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
+    targetTurnProb = calculateDrawProbability(cardCopies, deckSize, 7, targetTurn);
+  }
   
   // Advanced mulligan calculation with partial mulligan support
   let finalProb = targetTurnProb;
   
   if (withMulligan && mulliganCount > 0) {
-    // Probability calculations for partial mulligan
-    const cardsKept = 7 - mulliganCount;
-    const cardsDrawn = mulliganCount;
-    
-    // Scenario 1: Card is in the cards you keep (don't mulligan)
-    const probInKept = calculateDrawProbability(cardCopies, deckSize, cardsKept, 1);
-    
-    // Scenario 2: Card is NOT in kept cards, but you draw it in mulligan
-    const probNotInKept = 100 - probInKept;
-    const remainingCopies = cardCopies; // Still all copies available for mulligan draw
-    const remainingDeckSize = deckSize - cardsKept; // Cards available for mulligan
-    const probInMulligan = calculateDrawProbability(remainingCopies, remainingDeckSize, cardsDrawn, 1);
-    
-    // Combined probability after opening + mulligan
-    const probAfterMulligan = probInKept + (probNotInKept/100 * probInMulligan);
-    
-    // Continue to target turn if needed
-    const remainingTurns = targetTurn - 1;
-    if (remainingTurns > 0) {
-      // Calculate probability of drawing in remaining turns
-      const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
-      const cardsSeenSoFar = 7; // Always see 7 cards total after opening+mulligan
-      const remainingDeckForDraw = deckSize - cardsSeenSoFar;
-      const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
-      
-      finalProb = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
+    if (useMonteCarloSim) {
+      // Use Monte Carlo simulation for mulligan
+      finalProb = simulateDrawProbability({
+        deckSize,
+        copiesInDeck: cardCopies,
+        handSize: 7,
+        turnCount: targetTurn,
+        mulliganCount,
+        simulations
+      });
     } else {
-      finalProb = probAfterMulligan;
+      // Hypergeometric calculation for partial mulligan
+      const cardsKept = 7 - mulliganCount;
+      const cardsDrawn = mulliganCount;
+      
+      // Scenario 1: Card is in the cards you keep (don't mulligan)
+      const probInKept = calculateDrawProbability(cardCopies, deckSize, cardsKept, 1);
+      
+      // Scenario 2: Card is NOT in kept cards, but you draw it in mulligan
+      const probNotInKept = 100 - probInKept;
+      const remainingCopies = cardCopies; // Still all copies available for mulligan draw
+      const remainingDeckSize = deckSize - cardsKept; // Cards available for mulligan
+      const probInMulligan = calculateDrawProbability(remainingCopies, remainingDeckSize, cardsDrawn, 1);
+      
+      // Combined probability after opening + mulligan
+      const probAfterMulligan = probInKept + (probNotInKept/100 * probInMulligan);
+      
+      // Continue to target turn if needed
+      const remainingTurns = targetTurn - 1;
+      if (remainingTurns > 0) {
+        // Calculate probability of drawing in remaining turns
+        const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
+        const cardsSeenSoFar = 7; // Always see 7 cards total after opening+mulligan
+        const remainingDeckForDraw = deckSize - cardsSeenSoFar;
+        const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
+        
+        finalProb = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
+      } else {
+        finalProb = probAfterMulligan;
+      }
     }
   }
 
@@ -4076,12 +4164,55 @@ function DrawProbabilityTool({ deck }) {
         )}
       </div>
 
+      {/* Monte Carlo Simulation Options */}
+      <div className="bg-gray-700 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <input 
+            type="checkbox" 
+            id="monte-carlo" 
+            checked={useMonteCarloSim}
+            onChange={(e) => setUseMonteCarloSim(e.target.checked)}
+            className="rounded bg-gray-800 border-gray-700"
+          />
+          <label htmlFor="monte-carlo" className="text-sm text-gray-300">
+            🎲 Use Monte Carlo simulation
+          </label>
+        </div>
+        
+        {useMonteCarloSim && (
+          <div>
+            <label className="block text-xs uppercase text-gray-400 mb-1">
+              Number of Simulations
+            </label>
+            <select 
+              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+              value={simulations}
+              onChange={(e) => setSimulations(parseInt(e.target.value))}
+            >
+              <option value={1000}>1,000 (Fast)</option>
+              <option value={10000}>10,000 (Balanced)</option>
+              <option value={50000}>50,000 (Accurate)</option>
+              <option value={100000}>100,000 (High Precision)</option>
+            </select>
+            <div className="text-xs text-gray-400 mt-1">
+              Higher simulation count = more accurate results but slower calculation
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Results */}
       {selectedCard && (
         <div className="bg-gray-700 rounded-lg p-4 mt-4">
           <h4 className="font-semibold mb-3 text-emerald-300">
-            Probability Results for "{selectedCard}"
+            Probability Results for "{selectedCard}" {useMonteCarloSim ? '🎲' : '🧮'}
           </h4>
+          <div className="text-xs text-gray-400 mb-3">
+            {useMonteCarloSim ? 
+              `Monte Carlo simulation with ${simulations.toLocaleString()} runs` : 
+              'Hypergeometric probability calculation'
+            }
+          </div>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-white">
@@ -4125,27 +4256,55 @@ function DrawProbabilityTool({ deck }) {
                   // Generate curve data for turns 1-10
                   const curveData = [];
                   for (let turn = 1; turn <= 10; turn++) {
-                    const baseProb = calculateDrawProbability(cardCopies, deckSize, 7, turn);
-                    let probWithMulligan = baseProb;
+                    let baseProb, probWithMulligan;
+                    
+                    if (useMonteCarloSim) {
+                      // Monte Carlo simulation for curve
+                      baseProb = simulateDrawProbability({
+                        deckSize,
+                        copiesInDeck: cardCopies,
+                        handSize: 7,
+                        turnCount: turn,
+                        mulliganCount: 0,
+                        simulations: Math.min(simulations, 5000) // Limit for performance
+                      });
+                      probWithMulligan = baseProb;
+                    } else {
+                      // Hypergeometric calculation
+                      baseProb = calculateDrawProbability(cardCopies, deckSize, 7, turn);
+                      probWithMulligan = baseProb;
+                    }
                     
                     if (withMulligan && mulliganCount > 0 && turn >= 1) {
-                      // Apply mulligan calculation for this turn
-                      const cardsKept = 7 - mulliganCount;
-                      const cardsDrawn = mulliganCount;
-                      const probInKept = calculateDrawProbability(cardCopies, deckSize, cardsKept, 1);
-                      const probNotInKept = 100 - probInKept;
-                      const remainingDeckSize = deckSize - cardsKept;
-                      const probInMulligan = calculateDrawProbability(cardCopies, remainingDeckSize, cardsDrawn, 1);
-                      const probAfterMulligan = probInKept + (probNotInKept/100 * probInMulligan);
-                      
-                      const remainingTurns = turn - 1;
-                      if (remainingTurns > 0) {
-                        const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
-                        const remainingDeckForDraw = deckSize - 7;
-                        const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
-                        probWithMulligan = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
+                      if (useMonteCarloSim) {
+                        // Monte Carlo simulation for mulligan in curve
+                        probWithMulligan = simulateDrawProbability({
+                          deckSize,
+                          copiesInDeck: cardCopies,
+                          handSize: 7,
+                          turnCount: turn,
+                          mulliganCount,
+                          simulations: Math.min(simulations, 5000) // Limit for performance
+                        });
                       } else {
-                        probWithMulligan = probAfterMulligan;
+                        // Hypergeometric calculation for mulligan
+                        const cardsKept = 7 - mulliganCount;
+                        const cardsDrawn = mulliganCount;
+                        const probInKept = calculateDrawProbability(cardCopies, deckSize, cardsKept, 1);
+                        const probNotInKept = 100 - probInKept;
+                        const remainingDeckSize = deckSize - cardsKept;
+                        const probInMulligan = calculateDrawProbability(cardCopies, remainingDeckSize, cardsDrawn, 1);
+                        const probAfterMulligan = probInKept + (probNotInKept/100 * probInMulligan);
+                        
+                        const remainingTurns = turn - 1;
+                        if (remainingTurns > 0) {
+                          const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
+                          const remainingDeckForDraw = deckSize - 7;
+                          const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
+                          probWithMulligan = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
+                        } else {
+                          probWithMulligan = probAfterMulligan;
+                        }
                       }
                     }
                     
