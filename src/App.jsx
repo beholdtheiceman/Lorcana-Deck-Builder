@@ -4680,9 +4680,12 @@ function DeckStats({ deck }) {
       roleCards[r].push(c.name);
     });
     const result = Object.entries(counts).map(([role, value]) => ({ role, value, cards: roleCards[role] || [] }));
-    console.log('[Role Data]', result);
-    console.log('[Role Data] Sample entry:', result[0]);
-    console.log('[Role Data] Sample cards:', result[0]?.cards);
+    console.log('[Role Data - LATEST]', result);
+    console.log('[Role Data - LATEST] Sample entry:', result[0]);
+    console.log('[Role Data - LATEST] Sample cards:', result[0]?.cards);
+    result.forEach((item, idx) => {
+      console.log(`[Role Data - LATEST] Item ${idx}: ${item.role} = ${item.value} cards, cards array:`, item.cards);
+    });
     return result;
   }, [cards]);
 
