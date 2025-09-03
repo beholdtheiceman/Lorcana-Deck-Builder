@@ -7600,6 +7600,44 @@ async function loadDecksFromCloud() {
   }
 }
 
+// Helper function to generate a signature for deck content (for duplicate detection)
+function getDeckContentSignature(deck) {
+  if (!deck || !deck.entries) return null;
+  
+  // Create a sorted signature of the deck's card content
+  const cardSignatures = Object.entries(deck.entries)
+    .map(([cardId, entry]) => `${cardId}:${entry.count}`)
+    .sort()
+    .join('|');
+  
+  return cardSignatures;
+}
+
+// Helper function to detect content-based duplicates
+function findContentDuplicates(decks) {
+  const signatureMap = new Map();
+  const duplicates = [];
+  
+  Object.entries(decks).forEach(([deckId, deck]) => {
+    const signature = getDeckContentSignature(deck);
+    if (signature) {
+      if (signatureMap.has(signature)) {
+        const originalDeckId = signatureMap.get(signature);
+        duplicates.push({
+          originalId: originalDeckId,
+          originalDeck: decks[originalDeckId],
+          duplicateId: deckId,
+          duplicateDeck: deck
+        });
+      } else {
+        signatureMap.set(signature, deckId);
+      }
+    }
+  });
+  
+  return duplicates;
+}
+
 // Sync decks between cloud and local storage
 async function syncDecksWithCloud() {
   try {
@@ -7628,6 +7666,25 @@ async function syncDecksWithCloud() {
           // Local deck is newer, push to cloud
           console.log(`[syncDecksWithCloud] Local deck is newer, will push: ${localDeck.name}`);
           saveDeckToCloud(localDeck);
+        }
+      });
+      
+      // Check for content-based duplicates and resolve them
+      const duplicates = findContentDuplicates(mergedDecks);
+      console.log('[syncDecksWithCloud] Found content duplicates:', duplicates.length);
+      
+      duplicates.forEach(({ originalId, originalDeck, duplicateId, duplicateDeck }) => {
+        console.log(`[syncDecksWithCloud] Resolving duplicate: "${originalDeck.name}" (${originalId}) vs "${duplicateDeck.name}" (${duplicateId})`);
+        
+        // Keep the deck with the cloud database ID (has _dbId) or the most recently updated one
+        const keepOriginal = originalDeck._dbId || (originalDeck.updatedAt >= duplicateDeck.updatedAt);
+        
+        if (keepOriginal) {
+          console.log(`[syncDecksWithCloud] Keeping original deck: ${originalDeck.name}`);
+          delete mergedDecks[duplicateId];
+        } else {
+          console.log(`[syncDecksWithCloud] Keeping duplicate deck: ${duplicateDeck.name}`);
+          delete mergedDecks[originalId];
         }
       });
       
