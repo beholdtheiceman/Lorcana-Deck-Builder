@@ -379,26 +379,46 @@ function rolesForCard(card) {
   const name = card.name || "";
   const willpower = Number(card?.willpower || card?._raw?.Willpower || card?._raw?.willpower || 0);
   const strength = Number(card?.strength || card?._raw?.Strength || card?._raw?.strength || 0);
+  
+  // Get keywords/abilities from multiple possible sources
+  const keywords = [];
+  if (card.keywords && Array.isArray(card.keywords)) {
+    keywords.push(...card.keywords);
+  }
+  if (card.abilities && Array.isArray(card.abilities)) {
+    keywords.push(...card.abilities);
+  }
+  // Also check text for keyword patterns
+  const keywordText = t.toLowerCase();
+  if (/\bambush\b/i.test(keywordText)) keywords.push("Ambush");
+  if (/\brush\b/i.test(keywordText)) keywords.push("Rush");
+  if (/\bevasive\b/i.test(keywordText)) keywords.push("Evasive");
+  if (/\bbodyguard\b/i.test(keywordText)) keywords.push("Bodyguard");
+  if (/\bward\b/i.test(keywordText)) keywords.push("Ward");
+  if (/\bsupport\b/i.test(keywordText)) keywords.push("Support");
 
   const roles = [];
 
-  const isDraw = RX_DRAW.test(t) || RX_SEARCH.test(t);
-  const isRamp = RX_RAMP.test(t);
-  const isRemoval = RX_REMOVAL.test(t);
-  const isSupport = /gets \+\d+|gain strength|gain willpower|support/i.test(t);
-  const isWall = willpower >= 5;
-  const isAggro = cost <= 3 && strength >= 3;
-  const isCombo = /each time|loop|whenever|copy|combo|repeat/i.test(t);
-  const isUtility = /reveal|shuffle|look at opponent|toolbox/i.test(t);
-  const isQuest = lore >= 2 && type.includes("character");
-
-  // Handle special overrides first
+  // Handle special overrides first - EXPANDED
   const OVERRIDES = {
     "Scar - Mastermind": ["Draw / Dig"],
     "Strength of a Raging Fire": ["Interaction"],
     "Let the Storm Rage On": ["Ramp / Cost"],
+    "Hades - Infernal Schemer": ["Interaction"], // Fix for Hades misclassification
   };
   if (OVERRIDES[name]) return OVERRIDES[name];
+
+  const isDraw = RX_DRAW.test(t) || RX_SEARCH.test(t);
+  const isRamp = RX_RAMP.test(t) && !name.includes("Hades"); // Exclude Hades from ramp detection
+  const isRemoval = RX_REMOVAL.test(t);
+  const isSupport = /gets \+\d+|gain strength|gain willpower/i.test(t) || keywords.includes("Support");
+  const isWall = willpower >= 5 || keywords.includes("Bodyguard");
+  const isAggro = (cost <= 3 && strength >= 3) || keywords.includes("Rush");
+  const isTempo = keywords.includes("Ambush") || keywords.includes("Evasive");
+  const isCombo = /each time|loop|whenever|copy|combo|repeat/i.test(t);
+  const isUtility = /reveal|shuffle|look at opponent|toolbox/i.test(t);
+  const isQuest = lore >= 2 && type.includes("character");
+  const isDefensive = keywords.includes("Ward") || keywords.includes("Bodyguard");
 
   // Add roles based on card properties
   if (isQuest) roles.push("Questers");
@@ -406,8 +426,14 @@ function rolesForCard(card) {
   if (isDraw) roles.push("Draw / Dig");
   if (isRemoval) roles.push("Interaction");
   if (isSupport) roles.push("Buff / Support");
-  if (isWall) roles.push("Defenders / Walls");
-  if (isAggro) roles.push("Tempo / Aggro Tools");
+  if (isWall || isDefensive) roles.push("Defenders / Walls");
+  if (isAggro && isTempo) {
+    roles.push("Tempo / Aggro Tools"); // Both tempo and aggro
+  } else if (isAggro) {
+    roles.push("Tempo / Aggro Tools"); // Pure aggro
+  } else if (isTempo) {
+    roles.push("Tempo / Aggro Tools"); // Pure tempo
+  }
   if (isCombo) roles.push("Combo Pieces");
   if (roles.length === 0 || isUtility) roles.push("Utility");
 
