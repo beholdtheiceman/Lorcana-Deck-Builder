@@ -7048,10 +7048,11 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 });
               }
               
-              return Object.entries(counts).map(([role,value])=>({role, value}));
+              return Object.entries(counts).map(([role,value])=>({role, value, cards: roleAssignments[role] || []}));
             })();
             
-            // Note: Using main roleData (with cards) for chart tooltips
+            // Make compDashboardRoleData available as 'roleData' for chart (now includes cards)
+            const roleData = compDashboardRoleData;
 
             // --- Synergies list ---
             const synergies = (() => detectSynergies(cards))();
