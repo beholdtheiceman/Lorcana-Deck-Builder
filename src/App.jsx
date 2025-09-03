@@ -351,8 +351,8 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const rx = (p) => new RegExp(p, "i");
 const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage|gain\\s+a\\s+card|gain\\s+cards|add.*to.*hand|put.*(?:a\\s+card|cards?).*into\\s+your\\s+hand)");
 const RX_SEARCH = rx("(search|look at|reveal|scry|find|choose.*card.*hand|choose.*put.*hand|select.*card.*hand|put.*on top|put.*on bottom|shuffle|arrange)");
-const RX_REMOVAL = rx("(banish|deal \\d+ damage|return .* to (their|its) hand|exert target)");
-const RX_RAMP = rx("(reduce(s)? cost|play .* for free|inkwell|gain ink)");
+const RX_REMOVAL = rx("(banish|deal \\d+ damage|return .* to (their|its) hand|exert target|put.*into.*inkwell|put.*opposing.*into)");
+const RX_RAMP = rx("(reduce(s)? cost|play .* for free|gain ink|inkwell.*able)");
 const RX_SONG = rx("\\bSong\\b|Action\\s*[-—]\\s*Song");
 const RX_SINGER = rx("\\bSinger\\b");
 const RX_FINISH = rx("(gain.*lore.*each|when this quests.*lore|ready .*again)");
@@ -404,12 +404,12 @@ function rolesForCard(card) {
     "Scar - Mastermind": ["Draw / Dig"],
     "Strength of a Raging Fire": ["Interaction"],
     "Let the Storm Rage On": ["Ramp / Cost"],
-    "Hades - Infernal Schemer": ["Interaction"], // Fix for Hades misclassification
+    // Removed Hades override - should be detected by improved RX_REMOVAL regex
   };
   if (OVERRIDES[name]) return OVERRIDES[name];
 
   const isDraw = RX_DRAW.test(t) || RX_SEARCH.test(t);
-  const isRamp = RX_RAMP.test(t) && !name.includes("Hades"); // Exclude Hades from ramp detection
+  const isRamp = RX_RAMP.test(t);
   const isRemoval = RX_REMOVAL.test(t);
   const isSupport = /gets \+\d+|gain strength|gain willpower/i.test(t) || keywords.includes("Support");
   const isWall = willpower >= 5 || keywords.includes("Bodyguard");
