@@ -4679,7 +4679,9 @@ function DeckStats({ deck }) {
       if (!roleCards[r]) roleCards[r] = [];
       roleCards[r].push(c.name);
     });
-    return Object.entries(counts).map(([role, value]) => ({ role, value, cards: roleCards[role] || [] }));
+    const result = Object.entries(counts).map(([role, value]) => ({ role, value, cards: roleCards[role] || [] }));
+    console.log('[Role Data]', result);
+    return result;
   }, [cards]);
 
   // Synergies detection
@@ -7117,6 +7119,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
                             const cards = data.cards || [];
+                            console.log('[Card Roles Tooltip]', { label, cards, data });
                             
                             // Group and count cards
                             const counts = {};
@@ -7130,12 +7133,18 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                             return (
                               <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3 max-w-sm">
                                 <p className="text-white font-semibold mb-1">{label}: {payload[0].value} cards</p>
-                                <div className="text-gray-300 text-sm">Cards:</div>
-                                <div className="space-y-0.5 max-h-48 overflow-y-auto">
-                                  {groupedCards.map((card, index) => (
-                                    <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                  ))}
-                                </div>
+                                {cards.length > 0 ? (
+                                  <>
+                                    <div className="text-gray-300 text-sm">Cards:</div>
+                                    <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                                      {groupedCards.map((card, index) => (
+                                        <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                      ))}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-red-400 text-sm">No cards found in this role</div>
+                                )}
                               </div>
                             );
                           }
