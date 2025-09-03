@@ -3989,21 +3989,18 @@ function DrawProbabilityTool({ deck }) {
 
         {/* Turn Selection */}
         <div>
-          <label className="block text-xs uppercase text-gray-400 mb-1">
-            Target Turn ({targetTurn})
-          </label>
-          <input 
-            type="range" 
-            min="1" 
-            max="10" 
+          <label className="block text-xs uppercase text-gray-400 mb-1">Target Turn</label>
+          <select 
+            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
             value={targetTurn}
             onChange={(e) => setTargetTurn(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-          />
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
-            <span>Turn 1</span>
-            <span>Turn 10</span>
-          </div>
+          >
+            {Array.from({ length: 10 }, (_, i) => i + 1).map(turn => (
+              <option key={turn} value={turn}>
+                Turn {turn}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
