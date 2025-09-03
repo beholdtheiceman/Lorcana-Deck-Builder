@@ -3826,6 +3826,464 @@ function TogglePill({ label, active, onClick }) {
   );
 }
 
+// Enhanced Curve Chart with Meta Comparison
+function EnhancedCurveChart({ data }) {
+  const [showMeta, setShowMeta] = useState(false);
+  const [selectedArchetype, setSelectedArchetype] = useState('midrange');
+  
+  const archetypes = ['aggro', 'midrange', 'control', 'ramp'];
+  const archetypeColors = {
+    aggro: '#ef4444',
+    midrange: '#3b82f6', 
+    control: '#8b5cf6',
+    ramp: '#10b981'
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Controls */}
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2">
+          <input 
+            type="checkbox"
+            id="show-meta"
+            checked={showMeta}
+            onChange={(e) => setShowMeta(e.target.checked)}
+            className="rounded bg-gray-800 border-gray-700"
+          />
+          <label htmlFor="show-meta" className="text-gray-300">Show meta curve</label>
+        </div>
+        
+        {showMeta && (
+          <select 
+            value={selectedArchetype}
+            onChange={(e) => setSelectedArchetype(e.target.value)}
+            className="bg-gray-800 rounded px-2 py-1 text-xs border border-gray-700"
+          >
+            {archetypes.map(arch => (
+              <option key={arch} value={arch}>
+                {arch.charAt(0).toUpperCase() + arch.slice(1)}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Chart */}
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="cost" />
+          <YAxis allowDecimals={false} />
+          <Tooltip content={({ active, payload, label }) => {
+            if (active && payload && payload.length > 0) {
+              const data = payload[0].payload;
+              return (
+                <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                  <p className="text-white font-semibold">Cost {label}</p>
+                  <p className="text-emerald-400">Inkable: {data.inkable}</p>
+                  <p className="text-amber-400">Uninkable: {data.uninkable}</p>
+                  <p className="text-gray-300">Total: {data.total}</p>
+                  {showMeta && (
+                    <p className="text-blue-400 mt-1">
+                      Meta ({selectedArchetype}): {Math.round(data[`meta_${selectedArchetype}`] || 0)}
+                    </p>
+                  )}
+                </div>
+              );
+            }
+            return null;
+          }} />
+          <Legend />
+          <Bar dataKey="inkable" stackId="deck" fill="#10b981" name="Inkable" />
+          <Bar dataKey="uninkable" stackId="deck" fill="#f59e0b" name="Uninkable" />
+          {showMeta && (
+            <Bar 
+              dataKey={`meta_${selectedArchetype}`} 
+              fill={archetypeColors[selectedArchetype]} 
+              fillOpacity={0.4}
+              stroke={archetypeColors[selectedArchetype]}
+              strokeWidth={2}
+              name={`Meta ${selectedArchetype.charAt(0).toUpperCase() + selectedArchetype.slice(1)}`}
+            />
+          )}
+        </BarChart>
+      </ResponsiveContainer>
+      
+      {showMeta && (
+        <div className="text-xs text-gray-400 mt-2">
+          Meta curve scaled to your deck size. Overlay shows ideal distribution for {selectedArchetype} archetype.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Draw Probability Calculator Component
+function DrawProbabilityTool({ deck }) {
+  const [selectedCard, setSelectedCard] = useState('');
+  const [targetTurn, setTargetTurn] = useState(4);
+  const [withMulligan, setWithMulligan] = useState(true);
+
+  // Calculate hypergeometric probability
+  const calculateDrawProbability = (cardCopies, deckSize, handSize, targetTurn) => {
+    if (cardCopies === 0 || deckSize === 0) return 0;
+    
+    // Total cards drawn by target turn (opening hand + draws)
+    const totalDrawn = handSize + (targetTurn - 1); // Turn 1 = 7 cards, Turn 2 = 8 cards, etc.
+    const maxDrawn = Math.min(totalDrawn, deckSize);
+    
+    // Probability of NOT drawing the card (hypergeometric)
+    let probabilityOfNotDrawing = 1;
+    const cardsNotInDeck = deckSize - cardCopies;
+    
+    for (let i = 0; i < maxDrawn; i++) {
+      probabilityOfNotDrawing *= (cardsNotInDeck - i) / (deckSize - i);
+    }
+    
+    return (1 - probabilityOfNotDrawing) * 100; // Convert to percentage
+  };
+
+  // Get deck data
+  const deckSize = deck.reduce((sum, entry) => sum + entry.count, 0);
+  const uniqueCards = deck.map(entry => ({
+    name: entry.card.name,
+    copies: entry.count
+  })).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Find selected card copies
+  const selectedCardData = deck.find(entry => entry.card.name === selectedCard);
+  const cardCopies = selectedCardData ? selectedCardData.count : 0;
+
+  // Calculate probabilities
+  const openingHandProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
+  const targetTurnProb = calculateDrawProbability(cardCopies, deckSize, 7, targetTurn);
+  
+  // Mulligan boost (simplified - assuming you mulligan if you don't see the card)
+  const mulliganBoost = withMulligan ? (1 - openingHandProb/100) * openingHandProb/100 : 0;
+  const finalProb = Math.min(targetTurnProb + mulliganBoost * 100, 100);
+
+  return (
+    <div className="space-y-4">
+      <div className="text-sm text-gray-300 mb-3">
+        Calculate the probability of drawing a specific card by a target turn.
+      </div>
+      
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Card Selection */}
+        <div>
+          <label className="block text-xs uppercase text-gray-400 mb-1">Select Card</label>
+          <select 
+            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+            value={selectedCard}
+            onChange={(e) => setSelectedCard(e.target.value)}
+          >
+            <option value="">Choose a card...</option>
+            {uniqueCards.map(card => (
+              <option key={card.name} value={card.name}>
+                {card.name} ({card.copies}x)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Turn Selection */}
+        <div>
+          <label className="block text-xs uppercase text-gray-400 mb-1">
+            Target Turn ({targetTurn})
+          </label>
+          <input 
+            type="range" 
+            min="1" 
+            max="10" 
+            value={targetTurn}
+            onChange={(e) => setTargetTurn(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>Turn 1</span>
+            <span>Turn 10</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mulligan Option */}
+      <div className="flex items-center gap-2">
+        <input 
+          type="checkbox" 
+          id="mulligan" 
+          checked={withMulligan}
+          onChange={(e) => setWithMulligan(e.target.checked)}
+          className="rounded bg-gray-800 border-gray-700"
+        />
+        <label htmlFor="mulligan" className="text-sm text-gray-300">
+          Include mulligan opportunity
+        </label>
+      </div>
+
+      {/* Results */}
+      {selectedCard && (
+        <div className="bg-gray-700 rounded-lg p-4 mt-4">
+          <h4 className="font-semibold mb-3 text-emerald-300">
+            Probability Results for "{selectedCard}"
+          </h4>
+          <div className="grid md:grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {openingHandProb.toFixed(1)}%
+              </div>
+              <div className="text-gray-400">Opening Hand</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {targetTurnProb.toFixed(1)}%
+              </div>
+              <div className="text-gray-400">By Turn {targetTurn}</div>
+            </div>
+            {withMulligan && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-400">
+                  {finalProb.toFixed(1)}%
+                </div>
+                <div className="text-gray-400">With Mulligan</div>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-3 text-xs text-gray-400">
+            <div>• Deck size: {deckSize} cards</div>
+            <div>• Copies in deck: {cardCopies}</div>
+            <div>• Cards drawn by turn {targetTurn}: {Math.min(7 + (targetTurn - 1), deckSize)}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Turn-by-Turn Draw Simulator Component  
+function DrawSimulator({ deck }) {
+  const [maxTurns, setMaxTurns] = useState(5);
+  const [numSimulations, setNumSimulations] = useState(1);
+  const [simulationResults, setSimulationResults] = useState([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  // Build deck array for shuffling
+  const deckCards = useMemo(() => {
+    const cards = [];
+    deck.forEach(entry => {
+      for (let i = 0; i < entry.count; i++) {
+        cards.push({
+          ...entry.card,
+          cost: Number(entry.card.cost || 0),
+          inkable: Boolean(entry.card.inkable ?? entry.card._raw?.inkwell ?? entry.card._raw?.inkable ?? false)
+        });
+      }
+    });
+    return cards;
+  }, [deck]);
+
+  // Simulate a single game
+  const simulateGame = () => {
+    const shuffledDeck = [...deckCards].sort(() => Math.random() - 0.5);
+    const turns = [];
+    
+    // Starting hand (7 cards)
+    let hand = shuffledDeck.splice(0, 7);
+    let deckRemaining = shuffledDeck;
+    let inkwell = 0;
+    
+    for (let turn = 1; turn <= maxTurns; turn++) {
+      // Draw a card (except turn 1)
+      if (turn > 1 && deckRemaining.length > 0) {
+        hand.push(deckRemaining.shift());
+      }
+      
+      // Increment inkwell
+      inkwell = turn;
+      
+      // Analyze hand for this turn
+      const playableCards = hand.filter(card => card.cost <= inkwell);
+      const uninkableCards = hand.filter(card => !card.inkable);
+      const curveHits = hand.filter(card => card.cost === turn);
+      
+      turns.push({
+        turn,
+        handSize: hand.length,
+        inkwell,
+        playableCards: playableCards.length,
+        uninkableCards: uninkableCards.length,
+        curveHits: curveHits.length,
+        averageCost: hand.length > 0 ? (hand.reduce((sum, card) => sum + card.cost, 0) / hand.length).toFixed(1) : 0,
+        cards: [...hand] // Copy for analysis
+      });
+    }
+    
+    return turns;
+  };
+
+  // Run simulation
+  const runSimulation = () => {
+    setIsSimulating(true);
+    
+    // Use setTimeout to prevent UI blocking
+    setTimeout(() => {
+      const results = [];
+      for (let i = 0; i < numSimulations; i++) {
+        results.push(simulateGame());
+      }
+      setSimulationResults(results);
+      setIsSimulating(false);
+    }, 10);
+  };
+
+  // Calculate averages across simulations
+  const averageResults = useMemo(() => {
+    if (simulationResults.length === 0) return [];
+    
+    const turnAverages = [];
+    for (let turn = 1; turn <= maxTurns; turn++) {
+      const turnData = simulationResults.map(sim => sim[turn - 1]);
+      
+      turnAverages.push({
+        turn,
+        avgHandSize: (turnData.reduce((sum, t) => sum + t.handSize, 0) / turnData.length).toFixed(1),
+        avgPlayable: (turnData.reduce((sum, t) => sum + t.playableCards, 0) / turnData.length).toFixed(1),
+        avgUninkable: (turnData.reduce((sum, t) => sum + t.uninkableCards, 0) / turnData.length).toFixed(1),
+        avgCurveHits: (turnData.reduce((sum, t) => sum + t.curveHits, 0) / turnData.length).toFixed(1),
+        avgCost: (turnData.reduce((sum, t) => sum + parseFloat(t.averageCost), 0) / turnData.length).toFixed(1)
+      });
+    }
+    
+    return turnAverages;
+  }, [simulationResults, maxTurns]);
+
+  return (
+    <div className="space-y-4">
+      <div className="text-sm text-gray-300 mb-3">
+        Simulate drawing cards turn by turn to analyze consistency and curve performance.
+      </div>
+      
+      {/* Controls */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-xs uppercase text-gray-400 mb-1">
+            Simulate turns (1-{maxTurns})
+          </label>
+          <input 
+            type="range" 
+            min="3" 
+            max="10" 
+            value={maxTurns}
+            onChange={(e) => setMaxTurns(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-xs uppercase text-gray-400 mb-1">
+            Number of simulations
+          </label>
+          <select 
+            value={numSimulations}
+            onChange={(e) => setNumSimulations(parseInt(e.target.value))}
+            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+          >
+            <option value={1}>1 (Preview)</option>
+            <option value={10}>10 (Quick)</option>
+            <option value={100}>100 (Accurate)</option>
+            <option value={1000}>1000 (Precise)</option>
+          </select>
+        </div>
+        
+        <div className="flex items-end">
+          <button
+            onClick={runSimulation}
+            disabled={isSimulating || deckCards.length === 0}
+            className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white rounded-lg text-sm font-medium"
+          >
+            {isSimulating ? 'Simulating...' : 'Run Simulation'}
+          </button>
+        </div>
+      </div>
+
+      {/* Results */}
+      {simulationResults.length > 0 && (
+        <div className="space-y-4">
+          {numSimulations === 1 ? (
+            // Single simulation - show detailed turn-by-turn
+            <div className="bg-gray-700 rounded-lg p-4">
+              <h4 className="font-semibold mb-3 text-emerald-300">Detailed Simulation Result</h4>
+              <div className="space-y-2">
+                {simulationResults[0].map(turn => (
+                  <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm border-b border-gray-600 pb-2">
+                    <div className="text-center">
+                      <div className="font-medium">Turn {turn.turn}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Hand</div>
+                      <div>{turn.handSize}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Playable</div>
+                      <div className="text-emerald-400">{turn.playableCards}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Uninkable</div>
+                      <div className="text-amber-400">{turn.uninkableCards}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Curve Hits</div>
+                      <div className="text-blue-400">{turn.curveHits}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Avg Cost</div>
+                      <div>{turn.averageCost}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Multiple simulations - show averages
+            <div className="bg-gray-700 rounded-lg p-4">
+              <h4 className="font-semibold mb-3 text-emerald-300">
+                Average Results ({numSimulations} simulations)
+              </h4>
+              <div className="space-y-2">
+                <div className="grid grid-cols-6 gap-2 text-xs text-gray-400 border-b border-gray-600 pb-1">
+                  <div className="text-center">Turn</div>
+                  <div className="text-center">Hand Size</div>
+                  <div className="text-center">Playable</div>
+                  <div className="text-center">Uninkable</div>
+                  <div className="text-center">Curve Hits</div>
+                  <div className="text-center">Avg Cost</div>
+                </div>
+                {averageResults.map(turn => (
+                  <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm">
+                    <div className="text-center font-medium">{turn.turn}</div>
+                    <div className="text-center">{turn.avgHandSize}</div>
+                    <div className="text-center text-emerald-400">{turn.avgPlayable}</div>
+                    <div className="text-center text-amber-400">{turn.avgUninkable}</div>
+                    <div className="text-center text-blue-400">{turn.avgCurveHits}</div>
+                    <div className="text-center">{turn.avgCost}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="text-xs text-gray-400">
+            • <strong>Playable:</strong> Cards you can afford with current ink<br/>
+            • <strong>Uninkable:</strong> Cards that can't be inked (actions/songs)<br/>
+            • <strong>Curve Hits:</strong> Cards that cost exactly the current turn number
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Card grid ------------------------------------------------------------------
 
 function CardGrid({ cards, onAdd, onInspect, deck }) {
@@ -4648,17 +5106,46 @@ function DeckStats({ deck }) {
 
   // --- Enhanced Competitive Analytics ---
   
-  // Curve with inkable/uninkable breakdown
+  // Meta curve templates for comparison
+  const metaCurves = {
+    "Aggro": { "1": 8, "2": 12, "3": 8, "4": 6, "5": 4, "6": 2, "7+": 0 },
+    "Midrange": { "1": 4, "2": 8, "3": 10, "4": 8, "5": 6, "6": 4, "7+": 0 },
+    "Control": { "1": 2, "2": 6, "3": 8, "4": 8, "5": 6, "6": 6, "7+": 4 },
+    "Ramp": { "1": 2, "2": 4, "3": 6, "4": 6, "5": 8, "6": 8, "7+": 6 }
+  };
+
+  // Curve with inkable/uninkable breakdown + meta comparison
   const curveData = useMemo(() => {
     const buckets = {};
+    const deckSize = cards.length;
+    
+    // Initialize buckets
+    const order = ["0","1","2","3","4","5","6","7+"];
+    order.forEach(key => {
+      buckets[key] = { cost: key, inkable: 0, uninkable: 0, total: 0 };
+    });
+    
+    // Fill with deck data
     cards.forEach(c => {
       const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
       const key = cost >= 7 ? "7+" : String(cost);
-      if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
+      buckets[key].total++;
       (c.inkable ? buckets[key].inkable++ : buckets[key].uninkable++);
     });
-    const order = ["0","1","2","3","4","5","6","7+"];
-    return order.filter(k => buckets[k]).map(k => buckets[k]);
+    
+    // Add meta comparison (scaled to deck size)
+    return order.map(k => {
+      const bucket = buckets[k];
+      const result = { ...bucket };
+      
+      // Add meta curves (scaled to percentage of 60-card deck)
+      Object.entries(metaCurves).forEach(([archetype, curve]) => {
+        const metaCount = curve[k] || 0;
+        result[`meta_${archetype.toLowerCase()}`] = deckSize > 0 ? (metaCount / 60) * deckSize : 0;
+      });
+      
+      return result;
+    }).filter(k => k.total > 0 || Object.keys(metaCurves).some(arch => k[`meta_${arch.toLowerCase()}`] > 0));
   }, [cards]);
 
   // Ink pie chart data
@@ -4744,19 +5231,9 @@ function DeckStats({ deck }) {
         <h3 className="text-lg font-semibold mb-4 text-emerald-400">Competitive Analysis</h3>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          {/* Enhanced Curve (Inkable vs Uninkable) */}
-          <ChartCard title="Curve (Inkable vs Uninkable)">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={curveData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="cost" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="inkable" stackId="a" fill="#10b981" />
-                <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Enhanced Curve with Meta Comparison */}
+          <ChartCard title="🏗️ Enhanced Cost Curve">
+            <EnhancedCurveChart data={curveData} />
           </ChartCard>
 
           {/* Ink Colors Pie Chart */}
@@ -4837,6 +5314,16 @@ function DeckStats({ deck }) {
             )}
           </ChartCard>
         </div>
+
+        {/* Draw Probability Tool */}
+        <ChartCard title="🎯 Draw Probability Calculator">
+          <DrawProbabilityTool deck={entries} />
+        </ChartCard>
+
+        {/* Turn-by-Turn Draw Simulator */}
+        <ChartCard title="🎲 Turn-by-Turn Draw Simulator">
+          <DrawSimulator deck={entries} />
+        </ChartCard>
 
         {/* Meta Tools Section */}
         <ChartCard title="Meta Tools">
