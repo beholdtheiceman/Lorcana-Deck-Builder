@@ -3924,6 +3924,7 @@ function DrawProbabilityTool({ deck }) {
   const [selectedCard, setSelectedCard] = useState('');
   const [targetTurn, setTargetTurn] = useState(4);
   const [withMulligan, setWithMulligan] = useState(true);
+  const [mulliganCount, setMulliganCount] = useState(3);
 
   // Calculate hypergeometric probability
   const calculateDrawProbability = (cardCopies, deckSize, handSize, targetTurn) => {
@@ -3959,30 +3960,38 @@ function DrawProbabilityTool({ deck }) {
   const openingHandProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
   const targetTurnProb = calculateDrawProbability(cardCopies, deckSize, 7, targetTurn);
   
-  // Proper mulligan calculation
+  // Advanced mulligan calculation with partial mulligan support
   let finalProb = targetTurnProb;
   
-  if (withMulligan) {
-    // Probability of NOT seeing card in opening hand
-    const noCardInOpening = (100 - openingHandProb) / 100;
+  if (withMulligan && mulliganCount > 0) {
+    // Probability calculations for partial mulligan
+    const cardsKept = 7 - mulliganCount;
+    const cardsDrawn = mulliganCount;
     
-    // If you mulligan, you see 7 NEW cards (hypergeometric again)
-    const mulliganDrawProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
+    // Scenario 1: Card is in the cards you keep (don't mulligan)
+    const probInKept = calculateDrawProbability(cardCopies, deckSize, cardsKept, 1);
     
-    // Probability with mulligan = P(in opening) + P(not in opening) * P(in mulligan) 
-    const probWithMulligan = (openingHandProb/100) + (noCardInOpening * mulliganDrawProb/100);
+    // Scenario 2: Card is NOT in kept cards, but you draw it in mulligan
+    const probNotInKept = 100 - probInKept;
+    const remainingCopies = cardCopies; // Still all copies available for mulligan draw
+    const remainingDeckSize = deckSize - cardsKept; // Cards available for mulligan
+    const probInMulligan = calculateDrawProbability(remainingCopies, remainingDeckSize, cardsDrawn, 1);
     
-    // Then continue to target turn from either scenario
+    // Combined probability after opening + mulligan
+    const probAfterMulligan = probInKept + (probNotInKept/100 * probInMulligan);
+    
+    // Continue to target turn if needed
     const remainingTurns = targetTurn - 1;
     if (remainingTurns > 0) {
-      // If you have the card after opening/mulligan, prob = probWithMulligan
-      // If you don't, continue drawing with remaining deck
-      const noCardAfterMulligan = 1 - probWithMulligan;
-      const remainingDrawProb = calculateDrawProbability(cardCopies, deckSize - 7, remainingTurns, 1);
+      // Calculate probability of drawing in remaining turns
+      const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
+      const cardsSeenSoFar = 7; // Always see 7 cards total after opening+mulligan
+      const remainingDeckForDraw = deckSize - cardsSeenSoFar;
+      const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
       
-      finalProb = (probWithMulligan + noCardAfterMulligan * remainingDrawProb/100) * 100;
+      finalProb = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
     } else {
-      finalProb = probWithMulligan * 100;
+      finalProb = probAfterMulligan;
     }
   }
 
@@ -4027,18 +4036,42 @@ function DrawProbabilityTool({ deck }) {
         </div>
       </div>
 
-      {/* Mulligan Option */}
-      <div className="flex items-center gap-2">
-        <input 
-          type="checkbox" 
-          id="mulligan" 
-          checked={withMulligan}
-          onChange={(e) => setWithMulligan(e.target.checked)}
-          className="rounded bg-gray-800 border-gray-700"
-        />
-        <label htmlFor="mulligan" className="text-sm text-gray-300">
-          Include mulligan opportunity
-        </label>
+      {/* Mulligan Options */}
+      <div className="bg-gray-700 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <input 
+            type="checkbox" 
+            id="mulligan" 
+            checked={withMulligan}
+            onChange={(e) => setWithMulligan(e.target.checked)}
+            className="rounded bg-gray-800 border-gray-700"
+          />
+          <label htmlFor="mulligan" className="text-sm text-gray-300">
+            Include mulligan opportunity
+          </label>
+        </div>
+        
+        {withMulligan && (
+          <div>
+            <label className="block text-xs uppercase text-gray-400 mb-1">
+              Cards to Mulligan
+            </label>
+            <select 
+              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+              value={mulliganCount}
+              onChange={(e) => setMulliganCount(parseInt(e.target.value))}
+            >
+              {Array.from({length: 7}, (_, i) => i + 1).map(count => (
+                <option key={count} value={count}>
+                  {count} card{count !== 1 ? 's' : ''} ({7 - count} kept)
+                </option>
+              ))}
+            </select>
+            <div className="text-xs text-gray-400 mt-1">
+              Assumes optimal mulligan decision for target card
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Results */}
@@ -4065,7 +4098,9 @@ function DrawProbabilityTool({ deck }) {
                 <div className="text-2xl font-bold text-emerald-400">
                   {finalProb.toFixed(1)}%
                 </div>
-                <div className="text-gray-400">With Mulligan</div>
+                <div className="text-gray-400">
+                  With Mulligan ({mulliganCount} cards)
+                </div>
               </div>
             )}
           </div>
@@ -4074,6 +4109,9 @@ function DrawProbabilityTool({ deck }) {
             <div>• Deck size: {deckSize} cards</div>
             <div>• Copies in deck: {cardCopies}</div>
             <div>• Cards drawn by turn {targetTurn}: {Math.min(7 + (targetTurn - 1), deckSize)}</div>
+            {withMulligan && (
+              <div>• Mulligan strategy: Keep {7 - mulliganCount}, redraw {mulliganCount}</div>
+            )}
           </div>
         </div>
       )}
