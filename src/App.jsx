@@ -5662,13 +5662,13 @@ function DeckStats({ deck }) {
 
         {/* Deck Stats */}
         <ChartCard title="📊 Deck Statistics">
-          <DeckStatistics entries={entries} focusCardName={focusCardName} />
+          <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
           <div className="mt-3 pt-3 border-t border-gray-600">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Focus Card for Draw Odds:
             </label>
             <select
-              value={focusCardName}
+              value={focusCardName || ''}
               onChange={(e) => setFocusCardName(e.target.value)}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
@@ -7836,7 +7836,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 {/* Deck Statistics */}
                 <div className="bg-gray-700 rounded-lg p-4 mb-6">
                   <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
-                  <DeckStatistics entries={entries} focusCardName={focusCardName} />
+                  <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
                   <div className="mt-3 pt-3 border-t border-gray-600">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Focus Card for Draw Odds:
