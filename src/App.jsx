@@ -3977,18 +3977,22 @@ function DrawProbabilityTool({ deck }) {
       // Initial hand draw
       let hand = deck.slice(0, handSize);
       let deckIndex = handSize;
+      let allCardsSeen = [...hand]; // Track all unique cards seen
 
       // Mulligan logic (replace specified number of cards)
       if (mulliganCount > 0 && deckIndex + mulliganCount <= deckSize) {
+        const mulliganedCards = hand.slice(0, mulliganCount); // Cards we're mulliganing away
         const newCards = deck.slice(deckIndex, deckIndex + mulliganCount);
         hand = hand.slice(mulliganCount).concat(newCards);
+        allCardsSeen = allCardsSeen.concat(newCards); // Add new cards to total seen
         deckIndex += mulliganCount;
+        // Note: mulliganedCards are already in allCardsSeen from initial hand
       }
 
       // Draw cards for additional turns
       const additionalDraws = Math.min((turnCount - 1) * cardsDrawnPerTurn, deckSize - deckIndex);
       const turnDraws = deck.slice(deckIndex, deckIndex + additionalDraws);
-      const allCardsSeen = hand.concat(turnDraws);
+      allCardsSeen = allCardsSeen.concat(turnDraws);
 
       // Check if target card is present
       if (allCardsSeen.includes('target')) {
@@ -4074,7 +4078,7 @@ function DrawProbabilityTool({ deck }) {
       if (remainingTurns > 0) {
         // Calculate probability of drawing in remaining turns
         const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
-        const cardsSeenSoFar = 7; // Always see 7 cards total after opening+mulligan
+        const cardsSeenSoFar = 7 + mulliganCount; // Total unique cards seen (original + mulligan)
         const remainingDeckForDraw = deckSize - cardsSeenSoFar;
         const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
         
@@ -4299,7 +4303,7 @@ function DrawProbabilityTool({ deck }) {
                         const remainingTurns = turn - 1;
                         if (remainingTurns > 0) {
                           const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
-                          const remainingDeckForDraw = deckSize - 7;
+                          const remainingDeckForDraw = deckSize - (7 + mulliganCount); // Fix: account for all cards seen
                           const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
                           probWithMulligan = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
                         } else {
