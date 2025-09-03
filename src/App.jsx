@@ -7114,6 +7114,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 {/* Roles & Synergies */}
                 <div>
                   <h4 className="text-lg font-semibold mb-3 text-center">Card Roles</h4>
+                  {console.log('[Card Roles Chart] Data being passed to BarChart:', roleData)}
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={roleData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -7129,6 +7130,12 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                             const roleMatch = roleData.find(item => item.role === data.role);
                             const fallbackCards = roleMatch?.cards || [];
                             const finalCards = cards.length > 0 ? cards : fallbackCards;
+                            
+                            console.log('[Card Roles Tooltip] DEBUG DETAILS:');
+                            console.log('  - roleData from outer scope:', roleData);
+                            console.log('  - data.role:', data.role);
+                            console.log('  - roleMatch found:', roleMatch);
+                            console.log('  - roleMatch?.cards:', roleMatch?.cards);
                             
                             console.log('[Card Roles Tooltip]', { 
                               label, 
