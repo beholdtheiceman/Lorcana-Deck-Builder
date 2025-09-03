@@ -364,6 +364,7 @@ function roleForCard(c) {
   const type = (c?.type || "").toLowerCase();
   const lore = Number(c?.lore || c?._raw?.Lore || c?._raw?.lore || c?._raw?.loreValue || 0);
   const cost = Number(c?.cost || 0);
+  const name = c.name || "";
 
   // Debug role assignment
   const debug = {
@@ -384,6 +385,36 @@ function roleForCard(c) {
     }
   };
 
+  // Special case handling for specific problematic cards
+  // Scar: Primary function is draw, banish is just a cost/consequence
+  if (name.toLowerCase().includes("scar") && RX_DRAW.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Draw / Dig (special case - draw prioritized over incidental banish):', debug);
+    return "Draw / Dig";
+  }
+  
+  // Strength of a Raging Fire: Primary function is damage, song is just the casting method
+  if (name.toLowerCase().includes("strength of a raging fire")) {
+    console.log('[Role Debug]', c.name, '→ Interaction (special case - damage song):', debug);
+    return "Interaction";
+  }
+
+  // For cards that have both draw and removal effects, prioritize the primary effect
+  // If a card has draw effects AND the removal is conditional/costly, prioritize draw
+  if (RX_DRAW.test(t) && RX_REMOVAL.test(t)) {
+    // Check if the removal effect is conditional or part of a cost
+    if (t.toLowerCase().includes("if you do") && t.toLowerCase().includes("banish")) {
+      console.log('[Role Debug]', c.name, '→ Draw / Dig (conditional removal, draw prioritized):', debug);
+      return "Draw / Dig";
+    }
+  }
+
+  // For songs that deal damage, prioritize the damage effect over the song mechanic
+  if (RX_SONG.test(t) && RX_REMOVAL.test(t)) {
+    console.log('[Role Debug]', c.name, '→ Interaction (damage song):', debug);
+    return "Interaction";
+  }
+
+  // Standard priority order
   if (RX_REMOVAL.test(t) || type === "action") {
     console.log('[Role Debug]', c.name, '→ Interaction:', debug);
     return "Interaction";
