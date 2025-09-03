@@ -4681,6 +4681,8 @@ function DeckStats({ deck }) {
     });
     const result = Object.entries(counts).map(([role, value]) => ({ role, value, cards: roleCards[role] || [] }));
     console.log('[Role Data]', result);
+    console.log('[Role Data] Sample entry:', result[0]);
+    console.log('[Role Data] Sample cards:', result[0]?.cards);
     return result;
   }, [cards]);
 
