@@ -33,6 +33,9 @@ import {
   Legend,
 } from "recharts";
 
+// --- Competitive analysis functions defined later in file ---
+// See line ~385 for role detection and synergy analysis functions
+
 // Icons (lucide-react) - optional; replace with your icon lib || inline SVGs
 // import { Search, Filter, Settings, X, Download, Upload } from "lucide-react";
 
@@ -4486,6 +4489,11 @@ function DeckRow({ entry, onSetCount, onRemove }) {
 }
 function DeckStats({ deck }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
+  
+  // Convert entries to individual cards for analysis (as per implementation guide)
+  const cards = useMemo(() => 
+    entries.flatMap(e => Array(e.count).fill(e.card))
+  , [entries]);
 
   const costCurve = useMemo(() => {
     const map = new Map();
@@ -4601,107 +4609,282 @@ function DeckStats({ deck }) {
     }));
   }, [entries]);
 
+  // --- Enhanced Competitive Analytics ---
+  
+  // Curve with inkable/uninkable breakdown
+  const curveData = useMemo(() => {
+    const buckets = {};
+    cards.forEach(c => {
+      const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
+      const key = cost >= 7 ? "7+" : String(cost);
+      if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
+      (c.inkable ? buckets[key].inkable++ : buckets[key].uninkable++);
+    });
+    const order = ["0","1","2","3","4","5","6","7+"];
+    return order.filter(k => buckets[k]).map(k => buckets[k]);
+  }, [cards]);
+
+  // Ink pie chart data
+  const inkPieData = useMemo(() => {
+    const counts = new Map();
+    cards.forEach(c => (Array.isArray(c.inks) ? c.inks : [c.inks].filter(Boolean))
+      .forEach(i => counts.set(i, (counts.get(i) || 0) + 1)));
+    return [...counts.entries()].map(([name, value]) => ({ name, value }));
+  }, [cards]);
+
+  // Draw consistency analysis
+  const drawConsistency = useMemo(() => {
+    let drawCount = 0, searchCount = 0, rawDrawPieces = 0;
+    cards.forEach(c => {
+      const t = textOf(c);
+      if (RX_DRAW.test(t)) { drawCount++; rawDrawPieces++; }
+      if (RX_SEARCH.test(t)) { searchCount++; rawDrawPieces++; }
+    });
+    const density = (rawDrawPieces / Math.max(cards.length, 1)) * 100;
+    return { drawCount, searchCount, density: Number(density.toFixed(1)) };
+  }, [cards]);
+
+  // Average lore per card
+  const avgLorePerCard = useMemo(() => {
+    const totalLore = cards.reduce((a, c) => a + Number(c.lore || 0), 0);
+    return Number((totalLore / Math.max(cards.length, 1)).toFixed(2));
+  }, [cards]);
+
+  // Role breakdown
+  const roleData = useMemo(() => {
+    const counts = {};
+    cards.forEach(c => {
+      const r = roleForCard(c);
+      counts[r] = (counts[r] || 0) + 1;
+    });
+    return Object.entries(counts).map(([role, value]) => ({ role, value }));
+  }, [cards]);
+
+  // Synergies detection
+  const synergies = useMemo(() => detectSynergies(cards), [cards]);
+
   const total = entries.reduce((a, b) => a + b.count, 0);
   const avgCost = average(entries, (e) => getCost(e.card)).toFixed(2);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 p-3">
-      <StatCard title="Deck Size" value={total} subtitle={`${DECK_RULES.MIN_SIZE}-${DECK_RULES.MAX_SIZE}`} />
-      <StatCard title="Average Cost" value={avgCost} />
-      <StatCard title="Unique Cards" value={entries.length} />
+    <div className="space-y-6 p-3">
+      {/* Basic Stats Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+        <StatCard title="Deck Size" value={total} subtitle={`${DECK_RULES.MIN_SIZE}-${DECK_RULES.MAX_SIZE}`} />
+        <StatCard title="Average Cost" value={avgCost} />
+        <StatCard title="Unique Cards" value={entries.length} />
+        <StatCard title="Avg Lore/Card" value={avgLorePerCard} subtitle="Efficiency" />
+      </div>
 
-      <ChartCard title="Cost Curve">
-        <div className="w-full h-56">
-                      {console.log('[Chart Debug] Cost curve data:', costCurve)}
-            {console.log('[Chart Debug] Cost curve data structure check:', costCurve.map(item => ({ cost: item.cost, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
-            {console.log('[Chart Debug] Cost curve first item:', costCurve[0])}
-            {console.log('[Chart Debug] Cost curve first item cards:', costCurve[0]?.cards)}
-                      <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={costCurve}>
+      {/* Competitive Analysis Section */}
+      <div className="border-t border-gray-800 pt-4">
+        <h3 className="text-lg font-semibold mb-4 text-emerald-400">Competitive Analysis</h3>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          {/* Enhanced Curve (Inkable vs Uninkable) */}
+          <ChartCard title="Curve (Inkable vs Uninkable)">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={curveData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="cost" />
                 <YAxis allowDecimals={false} />
-                <Bar dataKey="count" fill="#10b981" />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    console.log('[Tooltip Debug] Cost Curve Tooltip called:', { active, payload, label });
-                    if (active && payload && payload.length > 0) {
-                      const data = payload[0].payload;
-                      console.log('[Tooltip Debug] Cost Curve data:', data);
-                      return (
-                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                          <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
-                          {data.cards && data.cards.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-gray-300 text-sm">Cards:</p>
-                              <div className="max-h-32 overflow-y-auto">
-                                {data.cards.map((card, index) => (
-                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="inkable" stackId="a" fill="#10b981" />
+                <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
               </BarChart>
             </ResponsiveContainer>
-        </div>
-      </ChartCard>
+          </ChartCard>
 
-      <ChartCard title="Card Types">
-        <div className="w-full h-56">
-          {console.log('[Chart Debug] Type counts data:', typeCounts)}
-          {console.log('[Chart Debug] Type counts data structure check:', typeCounts.map(item => ({ type: item.type, count: item.count, hasCards: !!item.cards, cardsLength: item.cards?.length || 0 })))}
-                      <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={typeCounts}>
+          {/* Ink Colors Pie Chart */}
+          <ChartCard title="Ink Colors">
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie 
+                  data={inkPieData} 
+                  dataKey="value" 
+                  nameKey="name" 
+                  outerRadius={80} 
+                  label 
+                  fill="#8884d8"
+                />
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          {/* Draw Consistency */}
+          <ChartCard title="Consistency">
+            <div className="space-y-3 text-sm">
+              <div><strong>Draw pieces:</strong> {drawConsistency.drawCount}</div>
+              <div><strong>Search/Dig pieces:</strong> {drawConsistency.searchCount}</div>
+              <div><strong>Card advantage density:</strong> {drawConsistency.density}% of deck</div>
+              <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
+            </div>
+          </ChartCard>
+
+          {/* Role Distribution */}
+          <ChartCard title="Roles">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={roleData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="type" />
-                <YAxis allowDecimals={false} />
-                <Bar dataKey="count" fill="#3b82f6" />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    console.log('[Tooltip Debug] Card Types Tooltip called:', { active, payload, label });
-                    if (active && payload && payload.length > 0) {
-                      const data = payload[0].payload;
-                      console.log('[Tooltip Debug] Card Types data:', data);
-                      return (
-                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                          <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
-                          {data.cards && data.cards.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-gray-300 text-sm">Cards:</p>
-                              <div className="max-h-32 overflow-y-auto">
-                                {data.cards.map((card, index) => (
-                                  <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
+                <XAxis 
+                  dataKey="role" 
+                  interval={0} 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={80}
+                  fontSize={12}
                 />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#8b5cf6" />
               </BarChart>
             </ResponsiveContainer>
-        </div>
-      </ChartCard>
+          </ChartCard>
 
-            <ChartCard title="Inkable vs Uninkable">
-        <div className="flex flex-col items-center justify-center h-56">
-          <div className="text-3xl font-bold text-emerald-400 mb-2">
-            {inkableCounts[0]?.count || 0} Inkable
-          </div>
-          <div className="text-3xl font-bold text-red-400">
-            {inkableCounts[1]?.count || 0} Uninkable
-          </div>
+          {/* Synergies */}
+          <ChartCard title="Synergies">
+            {synergies.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="font-medium mb-2 text-sm text-emerald-300">Detected Synergies:</h4>
+                <ul className="space-y-1 text-sm">
+                  {synergies.map((s, i) => (
+                    <li key={i} className="text-emerald-200 text-xs">• {s}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No obvious synergies detected.</p>
+            )}
+          </ChartCard>
         </div>
-      </ChartCard>
+
+        {/* Meta Tools Section */}
+        <ChartCard title="Meta Tools">
+          <div className="space-y-3">
+            <p className="text-sm text-gray-300 mb-3">
+              Tag your deck against common archetypes and add matchup notes.
+            </p>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs uppercase text-gray-400 mb-1">Archetype tags</label>
+                <input 
+                  className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700" 
+                  placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" 
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase text-gray-400 mb-1">Tech slots (notes)</label>
+                <input 
+                  className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700" 
+                  placeholder="e.g., +2 Banish; +1 Evasive hate" 
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs uppercase text-gray-400 mb-1">Matchup notes</label>
+              <textarea 
+                rows={3} 
+                className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700" 
+                placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." 
+              />
+            </div>
+          </div>
+        </ChartCard>
+      </div>
+
+      {/* Legacy Charts (kept for reference) */}
+      <div className="border-t border-gray-800 pt-4">
+        <h3 className="text-lg font-semibold mb-4 text-gray-400">Additional Details</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <ChartCard title="Cost Curve (Legacy)">
+            <div className="w-full h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={costCurve}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="cost" />
+                  <YAxis allowDecimals={false} />
+                  <Bar dataKey="count" fill="#10b981" />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length > 0) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                            <p className="text-white font-semibold">Cost {data.cost}: {data.count} cards</p>
+                            {data.cards && data.cards.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-gray-300 text-sm">Cards:</p>
+                                <div className="max-h-32 overflow-y-auto">
+                                  {data.cards.map((card, index) => (
+                                    <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          <ChartCard title="Card Types">
+            <div className="w-full h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={typeCounts}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="type" />
+                  <YAxis allowDecimals={false} />
+                  <Bar dataKey="count" fill="#3b82f6" />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length > 0) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
+                            <p className="text-white font-semibold">{data.type}: {data.count} cards</p>
+                            {data.cards && data.cards.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-gray-300 text-sm">Cards:</p>
+                                <div className="max-h-32 overflow-y-auto">
+                                  {data.cards.map((card, index) => (
+                                    <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          <ChartCard title="Inkable vs Uninkable">
+            <div className="flex flex-col items-center justify-center h-56">
+              <div className="text-3xl font-bold text-emerald-400 mb-2">
+                {inkableCounts[0]?.count || 0} Inkable
+              </div>
+              <div className="text-3xl font-bold text-red-400">
+                {inkableCounts[1]?.count || 0} Uninkable
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+      </div>
     </div>
   );
 }
