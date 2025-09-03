@@ -4113,6 +4113,80 @@ function DrawProbabilityTool({ deck }) {
               <div>• Mulligan strategy: Keep {7 - mulliganCount}, redraw {mulliganCount}</div>
             )}
           </div>
+          
+          {/* Turn-by-Turn Probability Curve */}
+          <div className="mt-4 pt-4 border-t border-gray-600">
+            <h5 className="text-sm font-semibold mb-3 text-emerald-300">📈 Probability Curve (Turn 1-10)</h5>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={(() => {
+                  // Generate curve data for turns 1-10
+                  const curveData = [];
+                  for (let turn = 1; turn <= 10; turn++) {
+                    const baseProb = calculateDrawProbability(cardCopies, deckSize, 7, turn);
+                    let probWithMulligan = baseProb;
+                    
+                    if (withMulligan && mulliganCount > 0 && turn >= 1) {
+                      // Apply mulligan calculation for this turn
+                      const cardsKept = 7 - mulliganCount;
+                      const cardsDrawn = mulliganCount;
+                      const probInKept = calculateDrawProbability(cardCopies, deckSize, cardsKept, 1);
+                      const probNotInKept = 100 - probInKept;
+                      const remainingDeckSize = deckSize - cardsKept;
+                      const probInMulligan = calculateDrawProbability(cardCopies, remainingDeckSize, cardsDrawn, 1);
+                      const probAfterMulligan = probInKept + (probNotInKept/100 * probInMulligan);
+                      
+                      const remainingTurns = turn - 1;
+                      if (remainingTurns > 0) {
+                        const noCardAfterMulligan = (100 - probAfterMulligan) / 100;
+                        const remainingDeckForDraw = deckSize - 7;
+                        const remainingDrawProb = calculateDrawProbability(cardCopies, remainingDeckForDraw, remainingTurns, 1);
+                        probWithMulligan = probAfterMulligan + (noCardAfterMulligan * remainingDrawProb);
+                      } else {
+                        probWithMulligan = probAfterMulligan;
+                      }
+                    }
+                    
+                    curveData.push({
+                      turn: `T${turn}`,
+                      baseProb: parseFloat(baseProb.toFixed(1)),
+                      withMulligan: parseFloat(probWithMulligan.toFixed(1))
+                    });
+                  }
+                  return curveData;
+                })()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="turn" stroke="#9CA3AF" fontSize={12} />
+                  <YAxis stroke="#9CA3AF" fontSize={12} domain={[0, 100]} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#374151', border: 'none', borderRadius: '6px' }}
+                    labelStyle={{ color: '#E5E7EB' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="baseProb" 
+                    stroke="#60A5FA" 
+                    strokeWidth={2}
+                    name="Base Probability"
+                    dot={{ fill: '#60A5FA', strokeWidth: 2, r: 3 }}
+                  />
+                  {withMulligan && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="withMulligan" 
+                      stroke="#10B981" 
+                      strokeWidth={2}
+                      name={`With Mulligan (${mulliganCount} cards)`}
+                      dot={{ fill: '#10B981', strokeWidth: 2, r: 3 }}
+                    />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-xs text-gray-400 mt-2">
+              Shows cumulative probability of drawing "{selectedCard}" by each turn
+            </div>
+          </div>
         </div>
       )}
     </div>
