@@ -7826,12 +7826,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 {/* Deck Statistics */}
                 <div className="bg-gray-700 rounded-lg p-4 mb-6">
                   <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
-                  <DeckStatistics entries={entries} focusCardName={''} />
-                  <div className="mt-3 pt-3 border-t border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      Draw odds calculation is handled by the separate DeckStatistics component above.
-                    </p>
-                  </div>
+                  <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
                 </div>
 
                 {/* Draw Probability Calculator */}
@@ -7890,6 +7885,28 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               </div>
             );
           })()}
+        </div>
+
+        {/* Focus Card Selector - Outside IIFE for proper scope access */}
+        <div className="bg-gray-700 rounded-lg p-4 mb-6">
+          <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Focus Card for Draw Odds</h4>
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Select a card to analyze draw odds:
+            </label>
+            <select
+              value={focusCardName || ''}
+              onChange={(e) => setFocusCardName(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="">Select a card...</option>
+              {entries.map((entry) => (
+                <option key={entry.card.id} value={entry.card.name}>
+                  {entry.card.name} ({entry.count} copies)
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
