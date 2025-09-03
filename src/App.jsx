@@ -7823,11 +7823,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   <EnhancedCurveChart data={curveData} />
                 </div>
 
-                {/* Deck Statistics */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
-                  <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
-                </div>
+
 
                 {/* Draw Probability Calculator */}
                 <div className="bg-gray-700 rounded-lg p-4 mb-6">
@@ -7907,6 +7903,12 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Deck Statistics - Outside IIFE for proper scope access */}
+        <div className="bg-gray-700 rounded-lg p-4 mb-6">
+          <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
+          <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
         </div>
 
         {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
