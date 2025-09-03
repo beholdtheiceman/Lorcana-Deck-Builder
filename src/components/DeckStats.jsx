@@ -2,6 +2,8 @@ import React, { useMemo } from "react";
 import { calculateMonteCarloDrawOdds } from "../utils/monteCarloDrawOdds";
 
 const DeckStats = ({ entries, focusCardName = "" }) => {
+  // Force rebuild to clear browser cache - v3
+  console.log('DeckStats component loaded with focusCardName:', focusCardName);
   // Convert entries to individual cards for analysis (same pattern as in App.jsx)
   const cards = useMemo(() => 
     entries.flatMap(e => Array(e.count).fill(e.card))
