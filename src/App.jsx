@@ -7799,15 +7799,29 @@ async function handleRefreshDecks() {
 useEffect(() => {
   console.log('[App] 🚀 DECK INITIALIZATION useEffect triggered!');
   console.log('[App] 🚀 useEffect is actually running!');
+  console.log('[App] 🚀 Auth state:', { user: !!user, authLoading });
+  
+  // Don't run if auth is still loading
+  if (authLoading) {
+    console.log('[App] Auth still loading, skipping deck initialization...');
+    return;
+  }
+  
   const initializeDecks = async () => {
     try {
       console.log('[App] Starting deck initialization with cloud sync...');
       
-      // First try to sync with cloud
-      const syncedDecks = await syncDecksWithCloud();
-      console.log('[App] Cloud sync result:', syncedDecks);
+      // First try to sync with cloud if user is authenticated
+      let syncedDecks = null;
+      if (user) {
+        console.log('[App] User authenticated, attempting cloud sync...');
+        syncedDecks = await syncDecksWithCloud();
+        console.log('[App] Cloud sync result:', syncedDecks);
+      } else {
+        console.log('[App] User not authenticated, skipping cloud sync');
+      }
       
-      // Fall back to local storage if cloud sync fails
+      // Fall back to local storage if cloud sync fails or user not authenticated
       const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
       console.log('[App] Local decks:', localDecks);
       console.log('[App] Local currentDeckId:', localCurrentDeckId);
@@ -7870,98 +7884,9 @@ useEffect(() => {
   };
   
   initializeDecks();
-}, []);
+}, [user, authLoading]);
 
-console.log('[App] 🎯 DECK INITIALIZATION useEffect defined and ready to run');
-console.log('[App] 🔍 Checking if useEffect will run...');
-console.log('[App] 🔍 Current component state at definition time:', { 
-  decks: Object.keys(decks || {}).length, 
-  currentDeckId,
-  hasDeckDispatch: typeof deckDispatch === 'function'
-});
-
-console.log('[App] 🚨 ABOUT TO DEFINE TEST useEffect - if you see this, the component is still running');
-
-// Test if ANY useEffect runs
-useEffect(() => {
-  console.log('[App] 🧪 TEST useEffect is running!');
-}, []);
-
-console.log('[App] 🚨 TEST useEffect defined - if you see this, useEffect was defined successfully');
-
-// SIMPLE TEST - This should run immediately
-useEffect(() => {
-  console.log('[App] 🚨 SIMPLE TEST useEffect is running! This proves useEffect works!');
-}, []);
-
-// Test if component is completing its lifecycle
-console.log('[App] 🚨 COMPONENT RENDER COMPLETE - If you see this, the component finished rendering');
-
-// EMERGENCY DECK LOADING - Since useEffect isn't working, try immediate loading
-console.log('[App] 🚨 EMERGENCY: Attempting immediate deck loading since useEffect is not working...');
-try {
-  const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
-  console.log('[App] 🚨 EMERGENCY: Local decks loaded:', Object.keys(localDecks).length);
-  if (Object.keys(localDecks).length > 0) {
-    console.log('[App] 🚨 EMERGENCY: Setting decks immediately');
-    // We can't call setDecks here since we're in render, but we can see if decks exist
-  }
-} catch (error) {
-  console.error('[App] 🚨 EMERGENCY: Failed to load decks:', error);
-}
-
-// WORKAROUND: Use setTimeout to trigger deck loading since useEffect isn't working
-console.log('[App] 🚨 WORKAROUND: Setting up setTimeout to load decks...');
-console.log('[App] 🚨 WORKAROUND: Auth state - user:', user, 'authLoading:', authLoading);
-
-setTimeout(async () => {
-  console.log('[App] 🚨 WORKAROUND: Timeout triggered, attempting to load decks...');
-  console.log('[App] 🚨 WORKAROUND: Current auth state - user:', user, 'authLoading:', authLoading);
-  
-  try {
-    // First check if we already have decks loaded (to avoid infinite loops)
-    if (Object.keys(decks).length > 0) {
-      console.log('[App] 🚨 WORKAROUND: Decks already loaded, skipping');
-      return;
-    }
-
-    // Wait for auth to finish loading if it's still loading
-    if (authLoading) {
-      console.log('[App] 🚨 WORKAROUND: Auth still loading, waiting...');
-      // Try again after auth loads
-      setTimeout(arguments.callee, 500);
-      return;
-    }
-
-    // Load decks from local storage first
-    const { decks: localDecks, currentDeckId: localCurrentDeckId } = loadAllDecks();
-    console.log('[App] 🚨 WORKAROUND: Local decks loaded:', Object.keys(localDecks).length);
-    
-    if (Object.keys(localDecks).length > 0) {
-      console.log('[App] 🚨 WORKAROUND: Local decks found, setting state...');
-      setDecks(localDecks);
-      if (localCurrentDeckId && localDecks[localCurrentDeckId]) {
-        setCurrentDeckId(localCurrentDeckId);
-      } else {
-        // Use first deck as current
-        const firstDeckId = Object.keys(localDecks)[0];
-        setCurrentDeckId(firstDeckId);
-      }
-      console.log('[App] 🚨 WORKAROUND: Decks state updated successfully');
-    } else if (user) {
-      // User is authenticated, but don't automatically sync if no local decks exist
-      // This prevents deleted decks from being restored automatically
-      console.log('[App] 🚨 WORKAROUND: No local decks but user authenticated - not auto-syncing to avoid restoring deleted decks');
-      console.log('[App] 🚨 WORKAROUND: User can manually refresh if needed');
-    } else {
-      // User not authenticated
-      console.log('[App] 🚨 WORKAROUND: User not authenticated, no cloud decks to load');
-      console.log('[App] 🚨 WORKAROUND: User should login to access their saved decks');
-    }
-  } catch (error) {
-    console.error('[App] 🚨 WORKAROUND: Failed to load decks via timeout:', error);
-  }
-}, 1000); // 1 second delay to ensure component and auth are ready
+// Deck initialization handled by useEffect above with proper auth dependency
 
 // Keyboard shortcuts (basic)
 useEffect(() => {
