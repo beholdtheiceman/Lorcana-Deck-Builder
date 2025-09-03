@@ -349,7 +349,7 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 // --- Role & text helpers ---
 const rx = (p) => new RegExp(p, "i");
-const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage|gain.*card|add.*to.*hand|put.*(?:a\\s+card|cards?).*into\\s+your\\s+hand)");
+const RX_DRAW = rx("(draw|draws|draw a card|draw two|card advantage|gain\\s+a\\s+card|gain\\s+cards|add.*to.*hand|put.*(?:a\\s+card|cards?).*into\\s+your\\s+hand)");
 const RX_SEARCH = rx("(search|look at|reveal|scry|find|choose.*card.*hand|choose.*put.*hand|select.*card.*hand|put.*on top|put.*on bottom|shuffle|arrange)");
 const RX_REMOVAL = rx("(banish|deal \\d+ damage|return .* to (their|its) hand|exert target)");
 const RX_RAMP = rx("(reduce(s)? cost|play .* for free|inkwell|gain ink)");
