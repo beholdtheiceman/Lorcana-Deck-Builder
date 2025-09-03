@@ -3959,9 +3959,32 @@ function DrawProbabilityTool({ deck }) {
   const openingHandProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
   const targetTurnProb = calculateDrawProbability(cardCopies, deckSize, 7, targetTurn);
   
-  // Mulligan boost (simplified - assuming you mulligan if you don't see the card)
-  const mulliganBoost = withMulligan ? (1 - openingHandProb/100) * openingHandProb/100 : 0;
-  const finalProb = Math.min(targetTurnProb + mulliganBoost * 100, 100);
+  // Proper mulligan calculation
+  let finalProb = targetTurnProb;
+  
+  if (withMulligan) {
+    // Probability of NOT seeing card in opening hand
+    const noCardInOpening = (100 - openingHandProb) / 100;
+    
+    // If you mulligan, you see 7 NEW cards (hypergeometric again)
+    const mulliganDrawProb = calculateDrawProbability(cardCopies, deckSize, 7, 1);
+    
+    // Probability with mulligan = P(in opening) + P(not in opening) * P(in mulligan) 
+    const probWithMulligan = (openingHandProb/100) + (noCardInOpening * mulliganDrawProb/100);
+    
+    // Then continue to target turn from either scenario
+    const remainingTurns = targetTurn - 1;
+    if (remainingTurns > 0) {
+      // If you have the card after opening/mulligan, prob = probWithMulligan
+      // If you don't, continue drawing with remaining deck
+      const noCardAfterMulligan = 1 - probWithMulligan;
+      const remainingDrawProb = calculateDrawProbability(cardCopies, deckSize - 7, remainingTurns, 1);
+      
+      finalProb = (probWithMulligan + noCardAfterMulligan * remainingDrawProb/100) * 100;
+    } else {
+      finalProb = probWithMulligan * 100;
+    }
+  }
 
   return (
     <div className="space-y-4">
