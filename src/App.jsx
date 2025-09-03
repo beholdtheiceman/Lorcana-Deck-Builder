@@ -7842,7 +7842,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                       Focus Card for Draw Odds:
                     </label>
                     <select
-                      value={focusCardName}
+                      value={focusCardName || ''}
                       onChange={(e) => setFocusCardName(e.target.value)}
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
