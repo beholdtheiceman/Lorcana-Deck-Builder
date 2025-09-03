@@ -7357,33 +7357,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           })()}
         </div>
 
-        {/* Focus Card Selector - Outside IIFE for proper scope access */}
-        <div className="bg-gray-700 rounded-lg p-4 mb-6">
-          <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Focus Card for Draw Odds</h4>
-          <div className="mt-3">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Select a card to analyze draw odds:
-            </label>
-            <select
-              value={focusCardName || ''}
-              onChange={(e) => setFocusCardName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="">Select a card...</option>
-              {entries.map((entry) => (
-                <option key={entry.card.id} value={entry.card.name}>
-                  {entry.card.name} ({entry.count} copies)
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
-        {/* Deck Statistics - Outside IIFE for proper scope access */}
-        <div className="bg-gray-700 rounded-lg p-4 mb-6">
-          <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
-          <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
-        </div>
 
         {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
         {false && <div className="bg-gray-800 rounded-lg p-6">
@@ -9359,6 +9333,38 @@ useEffect(() => {
               onImport={handleImport}
               onDeckPresentation={handleDeckPresentation}
             />
+
+            {/* Focus Card Selector - Inside AppInner for proper scope access */}
+            <div className="bg-gray-700 rounded-lg p-4 mb-6">
+              <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Focus Card for Draw Odds</h4>
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Select a card to analyze draw odds:
+                </label>
+                <select
+                  value={focusCardName || ''}
+                  onChange={(e) => setFocusCardName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Select a card...</option>
+                  {Object.values(deck?.entries || {}).filter(e => e.count > 0).map((entry) => (
+                    <option key={entry.card.id} value={entry.card.name}>
+                      {entry.card.name} ({entry.count} copies)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Deck Statistics - Inside AppInner for proper scope access */}
+            <div className="bg-gray-700 rounded-lg p-4 mb-6">
+              <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
+              <DeckStatistics 
+                entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)} 
+                focusCardName={focusCardName || ''} 
+              />
+            </div>
+
             <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
               {deckValid
                 ? "Deck is valid."
