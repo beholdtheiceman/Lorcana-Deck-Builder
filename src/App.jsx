@@ -7368,9 +7368,9 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Comp Dashboard - Competitive Analysis */}
-        <div className="bg-gray-800 rounded-lg p-6">
-          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">Competitive Analysis</h3>
+        {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
+        {false && <div className="bg-gray-800 rounded-lg p-6">
+          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">OLD Competitive Analysis</h3>
           
           {/* Comp Dashboard Data Calculations */}
           {(() => {
@@ -7723,7 +7723,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               </div>
             );
           })()}
-        </div>
+        </div>}
         
         {/* Action Buttons - Always Visible */}
         <div className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 mt-6 pt-4 pb-2">
