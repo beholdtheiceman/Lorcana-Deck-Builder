@@ -5484,6 +5484,35 @@ function DeckStats({ deck }) {
     };
   }, [cards]);
 
+  // Deck Consistency Score
+  const consistencyScore = useMemo(() => {
+    const totalCards = cards.length;
+    if (totalCards === 0) return null;
+
+    // --- Inkable Score ---
+    const inkableCount = cards.filter(c => c.inkable).length;
+    const inkablePercent = inkableCount / totalCards;
+
+    // --- Draw/Search Score ---
+    const drawPieces = drawConsistency.drawCount || 0;
+    const searchPieces = drawConsistency.searchCount || 0;
+    const drawDensity = (drawPieces + searchPieces) / totalCards;
+
+    // --- Curve Coverage Score ---
+    const curveBuckets = costCurve.filter(b => b.total > 0);
+    const coveredSlots = new Set(curveBuckets.map(b => b.cost)).size;
+    const coverageScore = coveredSlots / 7; // buckets: 1–6 + 7+
+
+    // --- Weighted Score ---
+    const rawScore = (
+      (inkablePercent * 0.4) +
+      (drawDensity * 0.3) +
+      (coverageScore * 0.3)
+    ) * 100;
+
+    return Math.round(rawScore); // Returns integer between 0-100
+  }, [cards, drawConsistency, costCurve]);
+
   // Average lore per card
   const avgLorePerCard = useMemo(() => {
     const totalLore = cards.reduce((a, c) => a + Number(c.lore || 0), 0);
@@ -5553,6 +5582,24 @@ function DeckStats({ deck }) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          {/* Deck Consistency Score */}
+          <ChartCard title="Deck Consistency Score">
+            <div className="text-center space-y-2">
+              <div className="text-4xl font-bold text-white">
+                {consistencyScore !== null ? `${consistencyScore}/100` : '—'}
+              </div>
+              <div className="text-sm text-gray-400">
+                {(() => {
+                  if (consistencyScore >= 85) return "🔥 Very Consistent";
+                  if (consistencyScore >= 70) return "✅ Solid";
+                  if (consistencyScore >= 50) return "⚠️ Swingy";
+                  if (consistencyScore >= 30) return "❌ Inconsistent";
+                  return "💀 Risky";
+                })()}
+              </div>
+            </div>
+          </ChartCard>
+
           {/* Draw Consistency */}
           <ChartCard title="Consistency">
             <div className="space-y-3 text-sm">
