@@ -31,6 +31,8 @@ import {
   Pie,
   Cell,
   Legend,
+  LineChart,
+  Line,
 } from "recharts";
 
 // --- Competitive analysis functions defined later in file ---
