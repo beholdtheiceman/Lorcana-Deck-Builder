@@ -3349,18 +3349,13 @@ function filterReducer(state, action) {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ deckName, onRename, onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
+function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
   return (
     <div className="flex items-center justify-between gap-4 p-3 bg-gray-900/70 border-b border-gray-800 sticky top-0 z-40 backdrop-blur">
       <div className="flex items-center gap-2">
-        <input
-          className="bg-transparent text-xl font-semibold outline-none border-b border-gray-700 focus:border-emerald-400 transition px-1"
-          value={deckName}
-          onChange={(e) => onRename(e.target.value)}
-        />
-        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
-          v{APP_VERSION}
-        </span>
+        <h1 className="text-xl font-semibold text-emerald-400">
+          Lorcana Deck Builder
+        </h1>
       </div>
 
       {/* Search bar - always visible */}
@@ -5095,6 +5090,7 @@ function PrintableSheet({ deck, onClose }) {
 // Deck Presentation Popup ----------------------------------------------------
 
 function DeckPresentationPopup({ deck, onClose, onSave }) {
+  const [deckName, setDeckName] = useState(deck.name || "Untitled Deck");
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   
   // Lorcanito export constants and functions
@@ -6829,14 +6825,29 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               🖨️ Print
             </button>
 
+            {/* Deck Name Input for Saving */}
+            <div className="flex items-center gap-3 bg-gray-800 p-4 rounded-lg">
+              <label className="text-gray-300 font-medium whitespace-nowrap">
+                Deck Name:
+              </label>
+              <input
+                type="text"
+                value={deckName}
+                onChange={(e) => setDeckName(e.target.value)}
+                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none"
+                placeholder="Enter deck name..."
+              />
+            </div>
+
             {/* Save Button - Saves the current deck */}
             <button
               onClick={() => {
-                if (onSave) {
-                  onSave();
+                if (onSave && deckName.trim()) {
+                  onSave(deckName.trim());
                 }
               }}
-              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-lg font-semibold transition-colors shadow-lg"
+              disabled={!deckName.trim()}
+              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors shadow-lg"
               title="Save deck to storage"
             >
               💾 Save Deck
@@ -7432,7 +7443,7 @@ function handlePrint() {
   setPrintOpen(true);
 }
 
-function handleSaveDeck() {
+function handleSaveDeck(customDeckName = null) {
   try {
     // Ensure the current deck is saved to the decks collection
     if (deck && currentDeckId) {
@@ -7440,7 +7451,9 @@ function handleSaveDeck() {
       console.log('[handleSaveDeck] Current decks state:', decks);
       
       // Update the deck's timestamp and ensure it has the correct ID
-      const updatedDeck = { ...deck, id: currentDeckId, updatedAt: Date.now() };
+      // Use the custom deck name if provided, otherwise keep the existing name
+      const finalDeckName = customDeckName || deck.name || "Untitled Deck";
+      const updatedDeck = { ...deck, id: currentDeckId, name: finalDeckName, updatedAt: Date.now() };
       const updatedDecks = { ...decks, [currentDeckId]: updatedDeck };
       
       console.log('[handleSaveDeck] Updated deck:', updatedDeck);
@@ -7456,13 +7469,15 @@ function handleSaveDeck() {
       // Save to cloud database if user is logged in
       saveDeckToCloud(updatedDeck);
       
-      // Don't call deckDispatch here - let the useEffect handle synchronization
-      // This prevents interference with the deck switching logic
+      // Update the current deck state if we used a custom name
+      if (customDeckName && customDeckName !== deck.name) {
+        deckDispatch({ type: "SET_NAME", name: customDeckName });
+      }
       
       // Show save confirmation popup
       setSaveConfirmationOpen(true);
       
-      addToast(`Deck "${deck.name}" saved successfully! It will now appear in your deck list.`, "success");
+      addToast(`Deck "${finalDeckName}" saved successfully! It will now appear in your deck list.`, "success");
     } else {
       addToast("No deck to save", "error");
     }
@@ -7966,8 +7981,6 @@ useEffect(() => {
           {/* Top Bar */}
           <TopBar
             key={`topbar-${filters?._resetTimestamp ?? "init"}`}
-            deckName={deck?.name ?? "Untitled Deck"}
-            onRename={(name) => deckDispatch({ type: "SET_NAME", name })}
             onResetDeck={handleResetDeck}
             onExport={handleExport}
             onImport={handleImport}
@@ -8365,7 +8378,7 @@ useEffect(() => {
             key={`deck-presentation-${filters?._resetTimestamp ?? "init"}`}
             deck={deck}
             onClose={() => setDeckPresentationOpen(false)}
-            onSave={handleSaveDeck}
+            onSave={(deckName) => handleSaveDeck(deckName)}
           />
 )}
 
