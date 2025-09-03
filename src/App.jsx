@@ -371,7 +371,7 @@ const ROLE_ORDER = [
   "Utility"
 ];
 
-function roleForCard(card) {
+function rolesForCard(card) {
   const t = textOf(card);
   const type = (card?.type || "").toLowerCase();
   const lore = Number(card?.lore || card?._raw?.Lore || card?._raw?.lore || card?._raw?.loreValue || 0);
@@ -380,34 +380,44 @@ function roleForCard(card) {
   const willpower = Number(card?.willpower || card?._raw?.Willpower || card?._raw?.willpower || 0);
   const strength = Number(card?.strength || card?._raw?.Strength || card?._raw?.strength || 0);
 
+  const roles = [];
+
   const isDraw = RX_DRAW.test(t) || RX_SEARCH.test(t);
   const isRamp = RX_RAMP.test(t);
   const isRemoval = RX_REMOVAL.test(t);
   const isSupport = /gets \+\d+|gain strength|gain willpower|support/i.test(t);
   const isWall = willpower >= 5;
   const isAggro = cost <= 3 && strength >= 3;
-  const isCombo = /each time|loop|whenever|copy/i.test(t);
-  const isUtility = /look at opponent|reveal.*deck|shuffle/i.test(t);
-  const isQuest = lore >= 1 && type.includes("character");
+  const isCombo = /each time|loop|whenever|copy|combo|repeat/i.test(t);
+  const isUtility = /reveal|shuffle|look at opponent|toolbox/i.test(t);
+  const isQuest = lore >= 2 && type.includes("character");
 
+  // Handle special overrides first
   const OVERRIDES = {
-    "Scar - Mastermind": "Draw / Dig",
-    "Strength of a Raging Fire": "Interaction",
-    "Let the Storm Rage On": "Ramp / Cost",
+    "Scar - Mastermind": ["Draw / Dig"],
+    "Strength of a Raging Fire": ["Interaction"],
+    "Let the Storm Rage On": ["Ramp / Cost"],
   };
   if (OVERRIDES[name]) return OVERRIDES[name];
 
-  if (isRamp) return "Ramp / Cost";
-  if (isDraw) return "Draw / Dig";
-  if (isRemoval) return "Interaction";
-  if (isSupport) return "Buff / Support";
-  if (isWall) return "Defenders / Walls";
-  if (isAggro) return "Tempo / Aggro Tools";
-  if (isCombo) return "Combo Pieces";
-  if (isQuest) return "Questers";
-  if (isUtility) return "Utility";
+  // Add roles based on card properties
+  if (isQuest) roles.push("Questers");
+  if (isRamp) roles.push("Ramp / Cost");
+  if (isDraw) roles.push("Draw / Dig");
+  if (isRemoval) roles.push("Interaction");
+  if (isSupport) roles.push("Buff / Support");
+  if (isWall) roles.push("Defenders / Walls");
+  if (isAggro) roles.push("Tempo / Aggro Tools");
+  if (isCombo) roles.push("Combo Pieces");
+  if (roles.length === 0 || isUtility) roles.push("Utility");
 
-  return "Utility";
+  return roles;
+}
+
+// Backward compatibility function for existing code
+function roleForCard(card) {
+  const roles = rolesForCard(card);
+  return roles[0] || "Utility";
 }
 
 function detectSynergies(cards) {
@@ -4670,12 +4680,15 @@ function DeckStats({ deck }) {
     return Number((totalLore / Math.max(cards.length, 1)).toFixed(2));
   }, [cards]);
 
-  // Role breakdown
+  // Role breakdown - Multi-role support
   const roleData = useMemo(() => {
     const counts = {};
+    
     cards.forEach(card => {
-      const role = roleForCard(card);
-      counts[role] = (counts[role] || 0) + 1;
+      const roles = rolesForCard(card);
+      roles.forEach(role => {
+        counts[role] = (counts[role] || 0) + 1;
+      });
     });
 
     return ROLE_ORDER.map(role => ({
@@ -7001,18 +7014,20 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               return result;
             })();
 
-            // --- Roles breakdown ---
+            // --- Roles breakdown - Multi-role support ---
             const compDashboardRoleData = (() => {
               const counts = {};
               const roleAssignments = {};
               
               cards.forEach(c => {
-                const r = roleForCard(c);
-                counts[r] = (counts[r]||0)+1;
-                
-                // Track which cards go into which roles
-                if (!roleAssignments[r]) roleAssignments[r] = [];
-                roleAssignments[r].push(c.name);
+                const roles = rolesForCard(c);
+                roles.forEach(role => {
+                  counts[role] = (counts[role] || 0) + 1;
+                  
+                  // Track which cards go into which roles
+                  if (!roleAssignments[role]) roleAssignments[role] = [];
+                  roleAssignments[role].push(c.name);
+                });
               });
               
               return ROLE_ORDER.map(role => ({
