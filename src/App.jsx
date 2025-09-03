@@ -44,7 +44,7 @@ import {
 // Authentication components
 import AuthButton from './components/AuthButton';
 import TeamHub from './components/TeamHub';
-import DeckStats from './components/DeckStats';
+import DeckStatistics from './components/DeckStats';
 
 // -----------------------------------------------------------------------------
 // Local storage & caching
@@ -5662,7 +5662,7 @@ function DeckStats({ deck }) {
 
         {/* Deck Stats */}
         <ChartCard title="📊 Deck Statistics">
-          <DeckStats entries={entries} focusCardName={focusCardName} />
+          <DeckStatistics entries={entries} focusCardName={focusCardName} />
           <div className="mt-3 pt-3 border-t border-gray-600">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Focus Card for Draw Odds:
@@ -7836,7 +7836,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 {/* Deck Statistics */}
                 <div className="bg-gray-700 rounded-lg p-4 mb-6">
                   <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
-                  <DeckStats entries={entries} focusCardName={focusCardName} />
+                  <DeckStatistics entries={entries} focusCardName={focusCardName} />
                   <div className="mt-3 pt-3 border-t border-gray-600">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Focus Card for Draw Odds:
