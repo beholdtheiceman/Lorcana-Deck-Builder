@@ -4635,13 +4635,32 @@ function DeckStats({ deck }) {
   // Draw consistency analysis
   const drawConsistency = useMemo(() => {
     let drawCount = 0, searchCount = 0, rawDrawPieces = 0;
+    const detectedCards = { draw: [], search: [], combined: [] };
+    
     cards.forEach(c => {
       const t = textOf(c);
-      if (RX_DRAW.test(t)) { drawCount++; rawDrawPieces++; }
-      if (RX_SEARCH.test(t)) { searchCount++; rawDrawPieces++; }
+      if (RX_DRAW.test(t)) { 
+        drawCount++; 
+        rawDrawPieces++; 
+        detectedCards.draw.push(c.name);
+        detectedCards.combined.push(c.name);
+      }
+      if (RX_SEARCH.test(t)) { 
+        searchCount++; 
+        rawDrawPieces++; 
+        detectedCards.search.push(c.name);
+        if (!detectedCards.combined.includes(c.name)) {
+          detectedCards.combined.push(c.name);
+        }
+      }
     });
     const density = (rawDrawPieces / Math.max(cards.length, 1)) * 100;
-    return { drawCount, searchCount, density: Number(density.toFixed(1)) };
+    return { 
+      drawCount, 
+      searchCount, 
+      density: Number(density.toFixed(1)),
+      detectedCards 
+    };
   }, [cards]);
 
   // Average lore per card
@@ -4719,9 +4738,21 @@ function DeckStats({ deck }) {
           {/* Draw Consistency */}
           <ChartCard title="Consistency">
             <div className="space-y-3 text-sm">
-              <div><strong>Draw pieces:</strong> {drawConsistency.drawCount}</div>
-              <div><strong>Search/Dig pieces:</strong> {drawConsistency.searchCount}</div>
-              <div><strong>Card advantage density:</strong> {drawConsistency.density}% of deck</div>
+              <HoverableStatLine 
+                label="Draw pieces" 
+                value={drawConsistency.drawCount} 
+                cards={drawConsistency.detectedCards.draw}
+              />
+              <HoverableStatLine 
+                label="Search/Dig pieces" 
+                value={drawConsistency.searchCount} 
+                cards={drawConsistency.detectedCards.search}
+              />
+              <HoverableStatLine 
+                label="Card advantage density" 
+                value={`${drawConsistency.density}% of deck`} 
+                cards={drawConsistency.detectedCards.combined}
+              />
               <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
             </div>
           </ChartCard>
@@ -4897,6 +4928,109 @@ return (
 {subtitle && <div className="text-xs text-gray-500">{subtitle}</div>}
 </div>
 );
+}
+
+// Hoverable stat line component for consistency stats
+function HoverableStatLine({ label, value, cards }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  
+  const handleMouseEnter = (e) => {
+    setShowTooltip(true);
+    setTooltipPosition({ x: e.clientX, y: e.clientY });
+  };
+  
+  const handleMouseMove = (e) => {
+    setTooltipPosition({ x: e.clientX, y: e.clientY });
+  };
+  
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+  };
+  
+  return (
+    <>
+      <div 
+        className="cursor-pointer hover:bg-gray-800 rounded px-2 py-1 transition-colors"
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        <strong>{label}:</strong> {value}
+      </div>
+      
+      {showTooltip && cards && cards.length > 0 && (
+        <div 
+          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg pointer-events-none"
+          style={{
+            left: tooltipPosition.x + 10,
+            top: tooltipPosition.y - 10,
+            maxWidth: '300px'
+          }}
+        >
+          <p className="text-white font-semibold mb-2">{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
+          <div className="max-h-32 overflow-y-auto">
+            <p className="text-gray-300 text-sm mb-1">Cards:</p>
+            {cards.map((card, index) => (
+              <p key={index} className="text-gray-400 text-xs">{card}</p>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Hoverable stat box component for competitive dashboard consistency stats
+function HoverableStatBox({ value, label, color, cards }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  
+  const handleMouseEnter = (e) => {
+    setShowTooltip(true);
+    setTooltipPosition({ x: e.clientX, y: e.clientY });
+  };
+  
+  const handleMouseMove = (e) => {
+    setTooltipPosition({ x: e.clientX, y: e.clientY });
+  };
+  
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+  };
+  
+  return (
+    <>
+      <div 
+        className="cursor-pointer hover:bg-gray-600 rounded p-2 transition-colors"
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div className={`text-2xl font-bold ${color}`}>{value}</div>
+        <div className="text-sm text-gray-400">{label}</div>
+      </div>
+      
+      {showTooltip && cards && cards.length > 0 && (
+        <div 
+          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg pointer-events-none"
+          style={{
+            left: tooltipPosition.x + 10,
+            top: tooltipPosition.y - 10,
+            maxWidth: '300px'
+          }}
+        >
+          <p className="text-white font-semibold mb-2">{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
+          <div className="max-h-32 overflow-y-auto">
+            <p className="text-gray-300 text-sm mb-1">Cards:</p>
+            {cards.map((card, index) => (
+              <p key={index} className="text-gray-400 text-xs">{card}</p>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function ChartCard({ title, children }) {
@@ -6758,7 +6892,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             // --- Draw / consistency ---
             const drawConsistency = (() => {
               let drawCount=0, searchCount=0, rawDrawPieces=0;
-              const detectedCards = { draw: [], search: [] };
+              const detectedCards = { draw: [], search: [], combined: [] };
               
               cards.forEach(c => {
                 // Get card text from various possible fields
@@ -6769,12 +6903,16 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   drawCount++; 
                   rawDrawPieces++; 
                   detectedCards.draw.push(c.name);
+                  detectedCards.combined.push(c.name);
                   console.log('[Comp Dashboard] Draw card detected:', c.name);
                 }
                 if (RX_SEARCH.test(cardText)) { 
                   searchCount++; 
                   rawDrawPieces++; 
                   detectedCards.search.push(c.name);
+                  if (!detectedCards.combined.includes(c.name)) {
+                    detectedCards.combined.push(c.name);
+                  }
                   console.log('[Comp Dashboard] Search card detected:', c.name);
                 }
               });
@@ -6788,7 +6926,12 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 detectedDrawCards: detectedCards.draw,
                 detectedSearchCards: detectedCards.search
               });
-              return { drawCount, searchCount, density: Number(density.toFixed(1)) };
+              return { 
+                drawCount, 
+                searchCount, 
+                density: Number(density.toFixed(1)),
+                detectedCards 
+              };
             })();
 
             // --- Average lore per card ---
@@ -6897,18 +7040,24 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 <div className="bg-gray-700 rounded-lg p-4">
                   <h4 className="text-lg font-semibold mb-3 text-center">Consistency</h4>
                   <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-blue-400">{drawConsistency.drawCount}</div>
-                      <div className="text-sm text-gray-400">Draw pieces</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-400">{drawConsistency.searchCount}</div>
-                      <div className="text-sm text-gray-400">Search/Dig pieces</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-purple-400">{drawConsistency.density}%</div>
-                      <div className="text-sm text-gray-400">Card advantage density</div>
-                    </div>
+                    <HoverableStatBox 
+                      value={drawConsistency.drawCount}
+                      label="Draw pieces"
+                      color="text-blue-400"
+                      cards={drawConsistency.detectedCards?.draw || []}
+                    />
+                    <HoverableStatBox 
+                      value={drawConsistency.searchCount}
+                      label="Search/Dig pieces"
+                      color="text-green-400"
+                      cards={drawConsistency.detectedCards?.search || []}
+                    />
+                    <HoverableStatBox 
+                      value={`${drawConsistency.density}%`}
+                      label="Card advantage density"
+                      color="text-purple-400"
+                      cards={drawConsistency.detectedCards?.combined || []}
+                    />
                   </div>
                   <p className="text-xs text-gray-400 mt-3 text-center">Heuristic: scans rules text for draw/search verbs</p>
                 </div>
