@@ -44,6 +44,7 @@ import {
 // Authentication components
 import AuthButton from './components/AuthButton';
 import TeamHub from './components/TeamHub';
+import DeckStats from './components/DeckStats';
 
 // -----------------------------------------------------------------------------
 // Local storage & caching
@@ -5659,6 +5660,28 @@ function DeckStats({ deck }) {
           </ChartCard>
         </div>
 
+        {/* Deck Stats */}
+        <ChartCard title="📊 Deck Statistics">
+          <DeckStats entries={entries} focusCardName={focusCardName} />
+          <div className="mt-3 pt-3 border-t border-gray-600">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Focus Card for Draw Odds:
+            </label>
+            <select
+              value={focusCardName}
+              onChange={(e) => setFocusCardName(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="">Select a card...</option>
+              {entries.map((entry) => (
+                <option key={entry.card.id} value={entry.card.name}>
+                  {entry.card.name} ({entry.count} copies)
+                </option>
+              ))}
+            </select>
+          </div>
+        </ChartCard>
+
         {/* Draw Probability Tool */}
         <ChartCard title="🎯 Draw Probability Calculator">
           <DrawProbabilityTool deck={entries} />
@@ -7810,6 +7833,29 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                   <EnhancedCurveChart data={curveData} />
                 </div>
 
+                {/* Deck Statistics */}
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
+                  <DeckStats entries={entries} focusCardName={focusCardName} />
+                  <div className="mt-3 pt-3 border-t border-gray-600">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Focus Card for Draw Odds:
+                    </label>
+                    <select
+                      value={focusCardName}
+                      onChange={(e) => setFocusCardName(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">Select a card...</option>
+                      {entries.map((entry) => (
+                        <option key={entry.card.id} value={entry.card.name}>
+                          {entry.card.name} ({entry.count} copies)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Draw Probability Calculator */}
                 <div className="bg-gray-700 rounded-lg p-4 mb-6">
                   <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Draw Probability Calculator</h4>
@@ -8451,6 +8497,7 @@ function AppInner() {
   const [deckPresentationOpen, setDeckPresentationOpen] = useState(false);
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
   const [saveConfirmationOpen, setSaveConfirmationOpen] = useState(false);
+  const [focusCardName, setFocusCardName] = useState('');
 
   // Enhanced deck management state
   const [decks, setDecks] = useState({});
