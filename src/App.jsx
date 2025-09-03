@@ -7534,6 +7534,7 @@ async function saveDeckToCloud(deckData) {
 async function loadDecksFromCloud() {
   try {
     console.log('[loadDecksFromCloud] Attempting to load decks from cloud...');
+    console.log('[loadDecksFromCloud] Current user state:', { hasUser: !!user, userEmail: user?.email });
     
     // With cookie-based auth, we don't need to check for tokens
     // The authSafeFetch will handle authentication via cookies
@@ -7768,6 +7769,7 @@ function handleImportDeck(importedDeck) {
 async function handleRefreshDecks() {
   try {
     console.log('[handleRefreshDecks] Starting deck refresh...');
+    console.log('[handleRefreshDecks] Auth state:', { user: !!user, authLoading, userEmail: user?.email });
     
     // Try cloud sync first if authenticated
     if (user) {
@@ -7824,6 +7826,14 @@ useEffect(() => {
     console.log('[App] Auth still loading, skipping deck initialization...');
     return;
   }
+  
+  // Log what triggered this useEffect
+  console.log('[App] 🔄 Deck initialization triggered by auth state change:', { 
+    userExists: !!user, 
+    userEmail: user?.email, 
+    authLoading,
+    currentDecksCount: Object.keys(decks || {}).length
+  });
   
   const initializeDecks = async () => {
     try {
