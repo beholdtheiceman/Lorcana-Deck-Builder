@@ -5660,25 +5660,15 @@ function DeckStats({ deck }) {
           </ChartCard>
         </div>
 
-        {/* Deck Stats */}
-        <ChartCard title="📊 Deck Statistics">
-          <DeckStatistics entries={entries} focusCardName={focusCardName || ''} />
-          <div className="mt-3 pt-3 border-t border-gray-600">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Focus Card for Draw Odds:
-            </label>
-            <select
-              value={focusCardName || ''}
-              onChange={(e) => setFocusCardName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="">Select a card...</option>
-              {entries.map((entry) => (
-                <option key={entry.card.id} value={entry.card.name}>
-                  {entry.card.name} ({entry.count} copies)
-                </option>
-              ))}
-            </select>
+        {/* Deck Stats - Basic Statistics Only */}
+        <ChartCard title="📊 Basic Deck Statistics">
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <div>Total Cards: {entries.reduce((a, b) => a + b.count, 0)}</div>
+              <div>Unique Cards: {entries.length}</div>
+              <div>Average Cost: {average(entries, (e) => getCost(e.card)).toFixed(1)}</div>
+              <div>Avg Lore/Card: {avgLorePerCard}</div>
+            </div>
           </div>
         </ChartCard>
 
