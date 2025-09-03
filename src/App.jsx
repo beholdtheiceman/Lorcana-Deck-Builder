@@ -4948,6 +4948,20 @@ function HoverableStatLine({ label, value, cards }) {
     setShowTooltip(false);
   };
   
+  // Group cards by name and count occurrences
+  const groupedCards = useMemo(() => {
+    if (!cards || cards.length === 0) return [];
+    
+    const cardCounts = {};
+    cards.forEach(card => {
+      cardCounts[card] = (cardCounts[card] || 0) + 1;
+    });
+    
+    return Object.entries(cardCounts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, count]) => ({ name, count }));
+  }, [cards]);
+  
   return (
     <>
       <div 
@@ -4959,7 +4973,7 @@ function HoverableStatLine({ label, value, cards }) {
         <strong>{label}:</strong> {value}
       </div>
       
-      {showTooltip && cards && cards.length > 0 && (
+      {showTooltip && groupedCards.length > 0 && (
         <div 
           className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg pointer-events-none"
           style={{
@@ -4969,10 +4983,12 @@ function HoverableStatLine({ label, value, cards }) {
           }}
         >
           <p className="text-white font-semibold mb-2">{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
-          <div className="max-h-32 overflow-y-auto">
+          <div>
             <p className="text-gray-300 text-sm mb-1">Cards:</p>
-            {cards.map((card, index) => (
-              <p key={index} className="text-gray-400 text-xs">{card}</p>
+            {groupedCards.map(({ name, count }, index) => (
+              <p key={index} className="text-gray-400 text-xs">
+                {count > 1 ? `${count} - ${name}` : name}
+              </p>
             ))}
           </div>
         </div>
@@ -4999,6 +5015,20 @@ function HoverableStatBox({ value, label, color, cards }) {
     setShowTooltip(false);
   };
   
+  // Group cards by name and count occurrences
+  const groupedCards = useMemo(() => {
+    if (!cards || cards.length === 0) return [];
+    
+    const cardCounts = {};
+    cards.forEach(card => {
+      cardCounts[card] = (cardCounts[card] || 0) + 1;
+    });
+    
+    return Object.entries(cardCounts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, count]) => ({ name, count }));
+  }, [cards]);
+  
   return (
     <>
       <div 
@@ -5011,7 +5041,7 @@ function HoverableStatBox({ value, label, color, cards }) {
         <div className="text-sm text-gray-400">{label}</div>
       </div>
       
-      {showTooltip && cards && cards.length > 0 && (
+      {showTooltip && groupedCards.length > 0 && (
         <div 
           className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg pointer-events-none"
           style={{
@@ -5021,10 +5051,12 @@ function HoverableStatBox({ value, label, color, cards }) {
           }}
         >
           <p className="text-white font-semibold mb-2">{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
-          <div className="max-h-32 overflow-y-auto">
+          <div>
             <p className="text-gray-300 text-sm mb-1">Cards:</p>
-            {cards.map((card, index) => (
-              <p key={index} className="text-gray-400 text-xs">{card}</p>
+            {groupedCards.map(({ name, count }, index) => (
+              <p key={index} className="text-gray-400 text-xs">
+                {count > 1 ? `${count} - ${name}` : name}
+              </p>
             ))}
           </div>
         </div>
