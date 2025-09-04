@@ -223,6 +223,8 @@ export default function StandingsImageImport({
   
   const { bulkAdd, count, records, persist } = useDeckResults(deckId);
   console.log('[StandingsImageImport] useDeckResults returned:', { bulkAdd: !!bulkAdd, count, records: records.length, persist: !!persist });
+  console.log('[StandingsImageImport] bulkAdd type:', typeof bulkAdd);
+  console.log('[StandingsImageImport] bulkAdd function:', bulkAdd);
 
   const [file, setFile] = useState<File | undefined>();
   const [imgUrl, setImgUrl] = useState<string>("");
@@ -361,6 +363,10 @@ export default function StandingsImageImport({
     console.log('[StandingsImageImport] Mapped records:', mapped);
     // You can also open a confirm modal that maps standing rows to matches; here we just save notes.
     console.log('[StandingsImageImport] Calling bulkAdd');
+    if (typeof bulkAdd !== 'function') {
+      console.error('[StandingsImageImport] bulkAdd is not a function:', bulkAdd);
+      return;
+    }
     const added = bulkAdd(mapped);
     console.log('[StandingsImageImport] bulkAdd completed, added:', added, 'records');
     alert(`Imported ${added} rows into deck "${deckName || deckId}". You can edit/adjust inside Logged Matches.`);
