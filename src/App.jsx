@@ -8035,19 +8035,33 @@ function TournamentResultsSection({ deckId, deckName }) {
   const [result, setResult] = useState("win");
   const [pasteText, setPasteText] = useState("");
 
-  // Mock data for demonstration
-  const demoMatches = [
-    { date: "9/1/2025", rnd: 1, res: "W", inks: "Ruby / Sapphire", pod: "First", event: "Set Champs @ Unplugged", notes: "Opp on Brooms" },
-    { date: "9/1/2025", rnd: 2, res: "L", inks: "Amber / Steel", pod: "Second", event: "Set Champs @ Unplugged", notes: "Flooded G3" },
-    { date: "9/1/2025", rnd: 3, res: "W", inks: "Amethyst / Emerald", pod: "First", event: "Set Champs @ Unplugged", notes: "Tight game" },
-  ];
+  // Get actual match data from localStorage
+  const { records } = useDeckResults(deckId);
+  
+  // Calculate stats from actual data
+  const wr = useMemo(() => {
+    const wins = records.filter(r => r.result === 'W').length;
+    const losses = records.filter(r => r.result === 'L').length;
+    const draws = records.filter(r => r.result === 'D').length;
+    return { played: records.length, W: wins, L: losses, D: draws };
+  }, [records]);
 
-  const wr = { played: 28, W: 18, L: 9, D: 1 };
-  const byInk = [
-    { k: "Amber / Steel", W: 6, L: 5 },
-    { k: "Ruby / Sapphire", W: 7, L: 3 },
-    { k: "Amethyst / Emerald", W: 5, L: 1 },
-  ];
+  const byInk = useMemo(() => {
+    const inkStats = {};
+    records.forEach(record => {
+      const inkKey = record.opponentInks || 'Unknown';
+      if (!inkStats[inkKey]) {
+        inkStats[inkKey] = { W: 0, L: 0, D: 0 };
+      }
+      if (record.result === 'W') inkStats[inkKey].W++;
+      else if (record.result === 'L') inkStats[inkKey].L++;
+      else if (record.result === 'D') inkStats[inkKey].D++;
+    });
+    
+    return Object.entries(inkStats)
+      .map(([k, stats]) => ({ k, W: stats.W, L: stats.L, D: stats.D }))
+      .sort((a, b) => (b.W + b.L + b.D) - (a.W + a.L + a.D)); // Sort by total games
+  }, [records]);
 
   const INK_COLORS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"];
 
@@ -8240,17 +8254,27 @@ function TournamentResultsSection({ deckId, deckName }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {demoMatches.map((m, i) => (
-                    <tr key={i} className="border-t border-gray-600">
-                      <td className="px-3 py-2 text-gray-200">{m.date}</td>
-                      <td className="px-3 py-2 text-gray-200">{m.rnd}</td>
-                      <td className="px-3 py-2 font-semibold text-gray-200">{m.res}</td>
-                      <td className="px-3 py-2 text-gray-200">{m.inks}</td>
-                      <td className="px-3 py-2 text-gray-200">{m.pod}</td>
-                      <td className="px-3 py-2 text-gray-200">{m.event}</td>
-                      <td className="px-3 py-2 text-gray-200">{m.notes}</td>
+                  {records.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="px-3 py-8 text-center text-gray-400">
+                        No matches logged yet. Import some results to see them here!
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    records.map((record, i) => (
+                      <tr key={record.id || i} className="border-t border-gray-600">
+                        <td className="px-3 py-2 text-gray-200">
+                          {new Date(record.dateISO).toLocaleDateString()}
+                        </td>
+                        <td className="px-3 py-2 text-gray-200">{record.round}</td>
+                        <td className="px-3 py-2 font-semibold text-gray-200">{record.result}</td>
+                        <td className="px-3 py-2 text-gray-200">{record.opponentInks || 'Unknown'}</td>
+                        <td className="px-3 py-2 text-gray-200">{record.playDraw || 'Unknown'}</td>
+                        <td className="px-3 py-2 text-gray-200">{record.event || 'Unknown'}</td>
+                        <td className="px-3 py-2 text-gray-200">{record.notes || '-'}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
