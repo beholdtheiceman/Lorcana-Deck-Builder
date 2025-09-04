@@ -67,7 +67,7 @@ function useDeckResults(deckId: string) {
     return stamped.length;
   };
   
-  return { bulkAdd, count: records.length };
+  return { bulkAdd, count: records.length, records, persist };
 }
 
 /** ===== Minimal image preprocessor (canvas) =====
@@ -230,7 +230,7 @@ export default function StandingsImageImport({
   deckId,
   deckName,
 }: StandingsImageImportProps) {
-  const { bulkAdd, count } = useDeckResults(deckId);
+  const { bulkAdd, count, records, persist } = useDeckResults(deckId);
 
   const [file, setFile] = useState<File | undefined>();
   const [imgUrl, setImgUrl] = useState<string>("");
@@ -474,6 +474,63 @@ export default function StandingsImageImport({
             <p className="text-xs text-gray-600">
               Tip: For best accuracy, upload a crisp screenshot of the standings area (not a zoomed-out full page). Use the crop sliders to isolate the table.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Stored Match Records Display */}
+      {records.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-lg font-semibold">Stored Match Records ({records.length})</h4>
+            <button
+              onClick={() => {
+                if (confirm('Clear all stored match records for this deck?')) {
+                  persist([]);
+                }
+              }}
+              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Clear All
+            </button>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
+            <div className="space-y-2">
+              {records.map((record, index) => (
+                <div key={record.id} className="bg-white p-3 rounded border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">
+                        Round {record.round}: vs {record.opponent}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Result: {record.result} • {record.notes}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(record.dateISO).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (confirm('Delete this match record?')) {
+                          const updated = records.filter(r => r.id !== record.id);
+                          persist(updated);
+                        }
+                      }}
+                      className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="text-xs text-gray-500">
+            💡 Tip: Match records are stored in localStorage and persist between sessions. 
+            You can edit the opponent name and notes by clicking on them after importing.
           </div>
         </div>
       )}
