@@ -151,7 +151,7 @@ function parseStandingsText(text: string): ParsedRow[] {
   const blocks = t.split(/\n(?=\d+(?:st|nd|rd|th)\b)/i).filter(b => /\d+(?:st|nd|rd|th)\b/i.test(b));
   if (blocks.length) {
     return blocks.map(b => {
-              const rank = Number((b.match(/(\d+)(?:st|nd|rd|th)\b/i)?.[1] || 0);
+      const rank = Number((b.match(/(\d+)(?:st|nd|rd|th)\b/i) || [])[1] || 0);
       const lines = b.split("\n").map(s => s.trim()).filter(Boolean);
       const rankIdx = lines.findIndex(l => /(\d+)(?:st|nd|rd|th)\b/i.test(l));
       const player = (lines.slice(rankIdx + 1).find(l => !/points?:|record|status/i.test(l)) || "").replace(/\.$/, "");
