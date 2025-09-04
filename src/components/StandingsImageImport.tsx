@@ -77,7 +77,8 @@ function useDeckResults(deckId: string) {
 function preprocess(
   img: HTMLImageElement, 
   cropPct: CropSettings, 
-  targetW: number = 1600
+  targetW: number = 1600,
+  mode: 'auto' | 'high-contrast' | 'colored-text' = 'auto'
 ): HTMLCanvasElement {
   const scale = targetW / img.naturalWidth;
   const w = Math.round(img.naturalWidth * scale);
@@ -104,14 +105,42 @@ function preprocess(
   const imgData = bctx.getImageData(cx, cy, cw, ch);
   const data = imgData.data;
 
-  // grayscale + threshold (simple, fast)
-  // You can tweak THRESH if your screenshots are lighter/darker.
-  const THRESH = 180;
+  // Enhanced preprocessing for better OCR accuracy
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
-    const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
-    const v = gray > THRESH ? 255 : 0;
-    data[i] = data[i + 1] = data[i + 2] = v; // binarize
+    
+    let processedValue: number;
+    
+    if (mode === 'colored-text') {
+      // Special handling for colored text on colored backgrounds
+      const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      const isColored = Math.abs(r - g) > 30 || Math.abs(g - b) > 30 || Math.abs(r - b) > 30;
+      
+      if (isColored) {
+        // For colored areas, use a more aggressive approach
+        const maxChannel = Math.max(r, g, b);
+        const minChannel = Math.min(r, g, b);
+        const contrast = maxChannel - minChannel;
+        processedValue = contrast > 50 ? 255 : 0;
+      } else {
+        // For non-colored areas, use standard thresholding
+        processedValue = gray > 150 ? 255 : 0;
+      }
+    } else if (mode === 'high-contrast') {
+      // High contrast mode for dark text on light backgrounds
+      const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      const enhanced = Math.min(255, Math.max(0, (gray - 30) * 2));
+      processedValue = enhanced > 200 ? 255 : 0;
+    } else {
+      // Auto mode - adaptive based on content
+      const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      const enhanced = Math.min(255, Math.max(0, (gray - 50) * 1.5 + 50));
+      const isColored = Math.abs(r - g) > 30 || Math.abs(g - b) > 30 || Math.abs(r - b) > 30;
+      const THRESH = isColored ? 120 : 180;
+      processedValue = enhanced > THRESH ? 255 : 0;
+    }
+    
+    data[i] = data[i + 1] = data[i + 2] = processedValue;
     // keep alpha as is
   }
   ctx.putImageData(imgData, 0, 0);
@@ -209,6 +238,7 @@ export default function StandingsImageImport({
   const [progress, setProgress] = useState<number>(0);
   const [ocrText, setOcrText] = useState<string>("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [preprocessingMode, setPreprocessingMode] = useState<'auto' | 'high-contrast' | 'colored-text'>('auto');
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -224,7 +254,7 @@ export default function StandingsImageImport({
   useEffect(() => {
     const img = imgRef.current;
     if (!img || !img.complete) return;
-    const c = preprocess(img, crop, 1600);
+    const c = preprocess(img, crop, 1600, preprocessingMode);
     const ctx = (canvasRef.current || (canvasRef.current = document.createElement("canvas"))).getContext("2d")!;
     const canvas = canvasRef.current!;
     canvas.width = c.width;
@@ -251,15 +281,19 @@ export default function StandingsImageImport({
     setRows([]);
 
     // get preprocessed canvas
-    const processed = preprocess(img, crop, 1600);
-    // IMPORTANT: to keep everything local, consider self-hosting these paths:
-    // Tesseract.recognize(processed, 'eng', { corePath:'/tess/core/tesseract-core.wasm.js', langPath:'/tess/lang' ... })
+    const processed = preprocess(img, crop, 1600, preprocessingMode);
+    
+    // Enhanced Tesseract configuration for better number recognition
     const { data } = await Tesseract.recognize(processed, "eng", {
       logger: (m) => {
         if (m.status === "recognizing text" && m.progress != null) {
           setProgress(Math.round(m.progress * 100));
         }
       },
+      // OCR engine options for better accuracy
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-:()[]{} ',
+      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK, // Treat as single text block
+      tessedit_ocr_engine_mode: Tesseract.OEM.LSTM_ONLY, // Use LSTM engine for better accuracy
     });
     const text = data.text || "";
     setOcrText(text);
@@ -284,7 +318,7 @@ export default function StandingsImageImport({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Import Standings from Image{deckName ? ` — ${deckName}` : ""}</h3>
-          <p className="text-sm text-gray-600">Upload a screenshot/photo of the STANDINGS table. OCR will run automatically when the image loads.</p>
+          <p className="text-sm text-gray-600">Upload a screenshot/photo of the STANDINGS table. Enhanced preprocessing handles colored text and numbers better. OCR runs automatically when the image loads.</p>
         </div>
         <div className="text-sm text-gray-500">Current entries: {count}</div>
       </div>
@@ -360,6 +394,26 @@ export default function StandingsImageImport({
                 />
               </label>
             </div>
+            
+            {/* Preprocessing Mode Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-600">Preprocessing Mode:</label>
+              <select
+                value={preprocessingMode}
+                onChange={e => setPreprocessingMode(e.target.value as 'auto' | 'high-contrast' | 'colored-text')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="auto">Auto (Recommended)</option>
+                <option value="colored-text">Colored Text (for colored numbers/backgrounds)</option>
+                <option value="high-contrast">High Contrast (for dark text on light backgrounds)</option>
+              </select>
+              <p className="text-xs text-gray-500">
+                {preprocessingMode === 'colored-text' && "Best for colored numbers on colored backgrounds"}
+                {preprocessingMode === 'high-contrast' && "Best for dark text on light backgrounds"}
+                {preprocessingMode === 'auto' && "Automatically detects and adjusts for different image types"}
+              </p>
+            </div>
+            
             {!!progress && progress < 100 && <div className="text-sm text-gray-600">Recognizing… {progress}%</div>}
           </div>
 
