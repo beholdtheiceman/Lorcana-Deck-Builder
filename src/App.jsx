@@ -8081,9 +8081,11 @@ function TournamentResultsSection({ deckId, deckName }) {
   const [playDraw, setPlayDraw] = useState("first");
   const [result, setResult] = useState("win");
   const [pasteText, setPasteText] = useState("");
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   // Get actual match data from localStorage
-  const { records } = useDeckResults(deckId);
+  const { records, persist } = useDeckResults(deckId);
   
   // Calculate stats from actual data
   const wr = useMemo(() => {
@@ -8121,6 +8123,45 @@ function TournamentResultsSection({ deckId, deckName }) {
         ? prev.filter(i => i !== ink)
         : [...prev, ink]
     );
+  };
+
+  // Edit functionality
+  const startEdit = (record) => {
+    setEditingRecord(record.id);
+    setEditForm({
+      round: record.round || '',
+      result: record.result || '',
+      opponentInks: record.opponentInks || '',
+      playDraw: record.playDraw || '',
+      event: record.event || '',
+      notes: record.notes || ''
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingRecord(null);
+    setEditForm({});
+  };
+
+  const saveEdit = () => {
+    if (!editingRecord) return;
+    
+    const updatedRecords = records.map(record => 
+      record.id === editingRecord 
+        ? { ...record, ...editForm }
+        : record
+    );
+    
+    persist(updatedRecords);
+    setEditingRecord(null);
+    setEditForm({});
+  };
+
+  const deleteRecord = (recordId) => {
+    if (confirm('Are you sure you want to delete this match record?')) {
+      const updatedRecords = records.filter(record => record.id !== recordId);
+      persist(updatedRecords);
+    }
   };
 
   return (
@@ -8301,12 +8342,13 @@ function TournamentResultsSection({ deckId, deckName }) {
                     <th className="text-left px-3 py-2 text-gray-200">Play/Draw</th>
                     <th className="text-left px-3 py-2 text-gray-200">Event</th>
                     <th className="text-left px-3 py-2 text-gray-200">Notes</th>
+                    <th className="text-left px-3 py-2 text-gray-200">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="px-3 py-8 text-center text-gray-400">
+                      <td colSpan="8" className="px-3 py-8 text-center text-gray-400">
                         No matches logged yet. Import some results to see them here!
                       </td>
                     </tr>
@@ -8316,12 +8358,118 @@ function TournamentResultsSection({ deckId, deckName }) {
                         <td className="px-3 py-2 text-gray-200">
                           {new Date(record.dateISO).toLocaleDateString()}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">{record.round}</td>
-                        <td className="px-3 py-2 font-semibold text-gray-200">{record.result}</td>
-                        <td className="px-3 py-2 text-gray-200">{record.opponentInks || 'Unknown'}</td>
-                        <td className="px-3 py-2 text-gray-200">{record.playDraw || 'Unknown'}</td>
-                        <td className="px-3 py-2 text-gray-200">{record.event || 'Unknown'}</td>
-                        <td className="px-3 py-2 text-gray-200">{record.notes || '-'}</td>
+                        <td className="px-3 py-2 text-gray-200">
+                          {editingRecord === record.id ? (
+                            <input
+                              type="text"
+                              value={editForm.round}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, round: e.target.value }))}
+                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                            />
+                          ) : (
+                            record.round
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-semibold text-gray-200">
+                          {editingRecord === record.id ? (
+                            <select
+                              value={editForm.result}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, result: e.target.value }))}
+                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                            >
+                              <option value="W">W</option>
+                              <option value="L">L</option>
+                              <option value="D">D</option>
+                            </select>
+                          ) : (
+                            record.result
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-200">
+                          {editingRecord === record.id ? (
+                            <input
+                              type="text"
+                              value={editForm.opponentInks}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, opponentInks: e.target.value }))}
+                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              placeholder="e.g., Amber/Steel"
+                            />
+                          ) : (
+                            record.opponentInks || 'Unknown'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-200">
+                          {editingRecord === record.id ? (
+                            <select
+                              value={editForm.playDraw}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, playDraw: e.target.value }))}
+                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                            >
+                              <option value="first">First</option>
+                              <option value="second">Second</option>
+                              <option value="unknown">Unknown</option>
+                            </select>
+                          ) : (
+                            record.playDraw || 'Unknown'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-200">
+                          {editingRecord === record.id ? (
+                            <input
+                              type="text"
+                              value={editForm.event}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, event: e.target.value }))}
+                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                            />
+                          ) : (
+                            record.event || 'Unknown'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-200">
+                          {editingRecord === record.id ? (
+                            <input
+                              type="text"
+                              value={editForm.notes}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                            />
+                          ) : (
+                            record.notes || '-'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-200">
+                          {editingRecord === record.id ? (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={saveEdit}
+                                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => startEdit(record)}
+                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => deleteRecord(record.id)}
+                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}
