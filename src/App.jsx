@@ -9526,8 +9526,8 @@ useEffect(() => {
 {/* Team Hub */}
 {showTeamHub && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] overflow-hidden">
-      <div className="flex justify-between items-center p-4 border-b border-gray-700">
+    <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+      <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
         <h2 className="text-xl font-semibold text-white">Team Hub</h2>
         <button
           onClick={() => setShowTeamHub(false)}
@@ -9536,7 +9536,7 @@ useEffect(() => {
           ×
         </button>
       </div>
-      <div className="h-full overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <TeamHub />
       </div>
     </div>
