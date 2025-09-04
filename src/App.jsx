@@ -8047,16 +8047,22 @@ function useDeckResults(deckId) {
   }, [deckId]);
   
   const persist = (newRecords) => {
+    console.log('[useDeckResults] persist called with records:', newRecords);
     setRecords(newRecords);
     localStorage.setItem(`lorcana.deckResults.${deckId}`, JSON.stringify(newRecords));
+    console.log('[useDeckResults] Data persisted to localStorage');
   };
   
   const bulkAdd = (newRecords) => {
+    console.log('[useDeckResults] bulkAdd called with records:', newRecords);
     const stamped = newRecords.map(record => ({
       ...record,
       id: record.id || `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       dateISO: record.dateISO || new Date().toISOString(),
+      deckId
     }));
+    console.log('[useDeckResults] bulkAdd - new records after stamping:', stamped);
+    console.log('[useDeckResults] bulkAdd - all records after adding:', [...stamped, ...records]);
     persist([...stamped, ...records]);
     return stamped.length;
   };
