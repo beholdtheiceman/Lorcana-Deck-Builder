@@ -8028,14 +8028,21 @@ function useDeckResults(deckId) {
   const [records, setRecords] = useState([]);
   
   useEffect(() => {
+    console.log('[useDeckResults] Loading data for deckId:', deckId);
     const stored = localStorage.getItem(`lorcana.deckResults.${deckId}`);
+    console.log('[useDeckResults] Raw localStorage data:', stored);
     if (stored) {
       try {
-        setRecords(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        console.log('[useDeckResults] Parsed records:', parsed);
+        setRecords(parsed);
       } catch (e) {
         console.warn('Failed to parse stored deck results:', e);
         setRecords([]);
       }
+    } else {
+      console.log('[useDeckResults] No stored data found');
+      setRecords([]);
     }
   }, [deckId]);
   
@@ -8074,10 +8081,13 @@ function TournamentResultsSection({ deckId, deckName }) {
   
   // Calculate stats from actual data
   const wr = useMemo(() => {
+    console.log('[Performance Summary] Calculating stats from records:', records);
     const wins = records.filter(r => r.result === 'W').length;
     const losses = records.filter(r => r.result === 'L').length;
     const draws = records.filter(r => r.result === 'D').length;
-    return { played: records.length, W: wins, L: losses, D: draws };
+    const stats = { played: records.length, W: wins, L: losses, D: draws };
+    console.log('[Performance Summary] Calculated stats:', stats);
+    return stats;
   }, [records]);
 
   const byInk = useMemo(() => {
