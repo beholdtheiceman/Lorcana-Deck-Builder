@@ -71,7 +71,7 @@ const Pill = ({ children, active = false, onClick }) => (
   </button>
 );
 
-function Bar({ win = 0, loss = 0 }) {
+function WinRateBar({ win = 0, loss = 0 }) {
   const total = Math.max(1, win + loss);
   const winPct = (win / total) * 100;
   return (
@@ -8284,7 +8284,7 @@ function TournamentResultsSection({ deckId, deckName }) {
                 {byInk.map((row) => (
                   <div key={row.k} className="flex items-center justify-between gap-4">
                     <div className="w-40 truncate text-sm">{row.k}</div>
-                    <Bar win={row.W} loss={row.L} />
+                    <WinRateBar win={row.W} loss={row.L} />
                     <div className="text-xs text-slate-500">{row.W + row.L} GP</div>
                   </div>
                 ))}
