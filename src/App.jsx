@@ -8023,6 +8023,40 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
     );
   }
 
+// --- useDeckResults Hook ---
+function useDeckResults(deckId) {
+  const [records, setRecords] = useState([]);
+  
+  useEffect(() => {
+    const stored = localStorage.getItem(`lorcana.deckResults.${deckId}`);
+    if (stored) {
+      try {
+        setRecords(JSON.parse(stored));
+      } catch (e) {
+        console.warn('Failed to parse stored deck results:', e);
+        setRecords([]);
+      }
+    }
+  }, [deckId]);
+  
+  const persist = (newRecords) => {
+    setRecords(newRecords);
+    localStorage.setItem(`lorcana.deckResults.${deckId}`, JSON.stringify(newRecords));
+  };
+  
+  const bulkAdd = (newRecords) => {
+    const stamped = newRecords.map(record => ({
+      ...record,
+      id: record.id || `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      dateISO: record.dateISO || new Date().toISOString(),
+    }));
+    persist([...stamped, ...records]);
+    return stamped.length;
+  };
+  
+  return { bulkAdd, count: records.length, records, persist };
+}
+
 // --- Tournament Results Section Component ---
 function TournamentResultsSection({ deckId, deckName }) {
   const [tab, setTab] = useState("quick");
