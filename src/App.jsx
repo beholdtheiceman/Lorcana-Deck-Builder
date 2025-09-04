@@ -5973,6 +5973,27 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     }
   };
 
+  // Generate Dreamborn-style clipboard format
+  function generateDreambornFormat(deck) {
+    const entries = Object.values(deck.entries || {}).filter(e => e.count > 0);
+    
+    // Sort by cost, then by name
+    const sortedEntries = entries.sort((a, b) => {
+      const costA = getCost(a.card) ?? 0;
+      const costB = getCost(b.card) ?? 0;
+      if (costA !== costB) return costA - costB;
+      return a.card.name.localeCompare(b.card.name);
+    });
+    
+    // Generate lines in Dreamborn format: "4 Nick Wilde - Soggy Fox"
+    return sortedEntries.map(entry => {
+      const card = entry.card;
+      const variant = card.title || card.version || card._raw?.version || card._raw?.Version || card.subname || null;
+      const displayName = variant ? `${card.name} - ${variant}` : card.name;
+      return `${entry.count} ${displayName}`;
+    }).join('\n');
+  }
+
   // Hook up to a button
   async function onExportLorcanito(deck) {
     console.log('[Lorcanito Export] BUTTON CLICKED! Function called with deck:', deck);
@@ -6057,6 +6078,38 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       } else {
         alert(`Error copying deck list: ${error.message}. Please try again.`);
       }
+    }
+  }
+
+  // Copy Dreamborn format to clipboard
+  async function onCopyDreamborn(deck) {
+    try {
+      const text = generateDreambornFormat(deck);
+      
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback to older method
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (!successful) {
+          throw new Error('Fallback clipboard method failed');
+        }
+      }
+      
+      alert("Deck list copied to clipboard in Dreamborn format!");
+    } catch (error) {
+      console.error('Error copying Dreamborn format:', error);
+      alert(`Error copying deck list: ${error.message}. Please try again.`);
     }
   }
   
@@ -7800,51 +7853,32 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           })()}
         </div>}
         
-        {/* Action Buttons - Always Visible */}
-        <div className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 mt-6 pt-4 pb-2">
-          <div className="flex justify-center gap-4 flex-wrap">
+        {/* Action Buttons - Improved Layout */}
+        <div className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 mt-6 pt-6 pb-4">
+          {/* Primary Actions Row */}
+          <div className="flex justify-center gap-3 mb-4">
             {/* Download Image Button */}
             <button
               onClick={generateDeckImage}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors shadow-lg"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Download deck as image (PNG)"
             >
               🖼️ Download Image
             </button>
 
-            {/* Print Button - Opens print dialog */}
+            {/* Print Button */}
             <button
               onClick={() => {
                 window.print();
                 onClose();
               }}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors shadow-lg"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Print deck presentation"
             >
               🖨️ Print
             </button>
 
-            {/* Team Hub Selection */}
-            <div className="flex items-center gap-3 bg-gray-800 p-4 rounded-lg">
-              <label className="text-gray-300 font-medium whitespace-nowrap">
-                Add to Team Hub:
-              </label>
-              <select
-                value={selectedHubId}
-                onChange={(e) => setSelectedHubId(e.target.value)}
-                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-emerald-400 focus:outline-none"
-                disabled={loadingHubs}
-              >
-                <option value="">Select a team hub...</option>
-                {hubs.map(hub => (
-                  <option key={hub.id} value={hub.id}>
-                    {hub.name} ({hub.members.length + 1} members)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Save Button - Saves the current deck */}
+            {/* Save Button */}
             <button
               onClick={() => {
                 if (onSave && deckName.trim()) {
@@ -7852,25 +7886,34 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 }
               }}
               disabled={!deckName.trim()}
-              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors shadow-lg"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Save deck to storage"
             >
               💾 Save Deck
             </button>
+          </div>
 
-            {/* Save to Team Hub Button */}
+          {/* Copy Actions Row */}
+          <div className="flex justify-center gap-3 mb-4">
+            {/* Copy Dreamborn Format Button */}
             <button
-              onClick={handleSaveToHub}
-              disabled={!selectedHubId || !deckName.trim() || savingToHub}
-              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors shadow-lg"
-              title="Save deck to selected team hub"
+              onClick={() => onCopyDreamborn(deck)}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              title="Copy decklist in Dreamborn format (e.g., '4 Nick Wilde - Soggy Fox')"
             >
-              {savingToHub ? '🔄 Saving...' : '👥 Save to Team Hub'}
+              📋 Copy for Dreamborn
             </button>
 
+            {/* Copy for Lorcanito Button */}
+            <button
+              onClick={() => onExportLorcanito(deck)}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              title="Copy decklist in Lorcanito format"
+            >
+              📋 Copy for Lorcanito
+            </button>
 
-
-            {/* Copy Stats Button - Copies deck statistics */}
+            {/* Copy Stats Button */}
             <button
               onClick={() => {
                 // Copy deck stats to clipboard
@@ -7882,24 +7925,44 @@ Average Cost: ${averageCost.toFixed(1)}
 Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)})
 Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
                 navigator.clipboard.writeText(stats);
-                // You could add a toast here if you have access to it
               }}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors shadow-lg"
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Copy deck statistics to clipboard"
             >
-              📋 Copy Stats
+              📊 Copy Stats
             </button>
+          </div>
 
-            {/* Copy for Lorcanito Button - Copies plain text decklist */}
-              <button
-                onClick={() => onExportLorcanito(deck)}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors shadow-lg"
-                title="Copy decklist in Lorcanito format"
+          {/* Team Hub Section */}
+          <div className="flex justify-center">
+            <div className="flex items-center gap-3 bg-gray-800 p-4 rounded-lg max-w-md w-full">
+              <label className="text-gray-300 font-medium whitespace-nowrap text-sm">
+                Add to Team Hub:
+              </label>
+              <select
+                value={selectedHubId}
+                onChange={(e) => setSelectedHubId(e.target.value)}
+                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-emerald-400 focus:outline-none text-sm"
+                disabled={loadingHubs}
               >
-                📋 Copy for Lorcanito
+                <option value="">Select a team hub...</option>
+                {hubs.map(hub => (
+                  <option key={hub.id} value={hub.id}>
+                    {hub.name} ({hub.members.length + 1} members)
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleSaveToHub}
+                disabled={!selectedHubId || !deckName.trim() || savingToHub}
+                className="px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
+                title="Save deck to selected team hub"
+              >
+                {savingToHub ? '🔄' : '👥'} {savingToHub ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
+        </div>
           
           {/* Print Header */}
           <div className="hidden print:block text-center border-t pt-4 mt-4">
