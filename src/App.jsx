@@ -3118,6 +3118,10 @@ function deckReducer(state, action) {
       console.log('[deckReducer] Returning new state:', newState);
       return newState;
     }
+    case "UPDATE_DECK": {
+      const next = { ...state, ...action.deck, updatedAt: Date.now() };
+      return next;
+    }
     default:
       return state;
   }
@@ -8436,11 +8440,28 @@ async function saveDeckToCloud(deckData) {
       const responseData = await response.json();
       console.log('[saveDeckToCloud] Deck saved to cloud successfully:', responseData);
       
-      // If this was a new deck creation, we might want to update the local deck with the new database ID
-      if (!isUpdate && responseData.deck && responseData.deck.id) {
-        console.log('[saveDeckToCloud] New deck created with database ID:', responseData.deck.id);
-        // Note: We could update the local deck here with the database ID, but that would require
-        // more complex state management. For now, the sync will handle this.
+      // Update the local deck with the database ID for future updates
+      if (responseData.deck && responseData.deck.id) {
+        console.log('[saveDeckToCloud] Updating local deck with database ID:', responseData.deck.id);
+        
+        // Update the deck in the local state with the database ID
+        const updatedDeck = { 
+          ...deckData, 
+          _dbId: responseData.deck.id,
+          _cloudId: responseData.deck.id
+        };
+        
+        // Update the decks state with the new database ID
+        const updatedDecks = { ...decks, [currentDeckId]: updatedDeck };
+        setDecks(updatedDecks);
+        
+        // Save to localStorage with the updated database ID
+        saveAllDecks(updatedDecks);
+        
+        // Update the current deck state if it's the same deck
+        if (deck && deck.id === deckData.id) {
+          deckDispatch({ type: "UPDATE_DECK", deck: updatedDeck });
+        }
       }
     } else {
       console.warn('[saveDeckToCloud] Failed to save to cloud, but local save succeeded');
