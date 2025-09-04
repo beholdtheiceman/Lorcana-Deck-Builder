@@ -56,18 +56,7 @@ function useDeckResults(deckId: string) {
     } catch {} 
   };
   
-  const bulkAdd = (rows: Omit<MatchRecord, "id" | "dateISO" | "deckId">[]) => {
-    const stamped = rows.map(r => ({
-      ...r, 
-      id: uid(), 
-      dateISO: new Date().toISOString(), 
-      deckId
-    }));
-    persist([...stamped, ...records]);
-    return stamped.length;
-  };
-  
-  return { bulkAdd, count: records.length, records, persist };
+  return { count: records.length, records, persist };
 }
 
 /** ===== Minimal image preprocessor (canvas) =====
