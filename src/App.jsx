@@ -7901,7 +7901,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Copy decklist in Dreamborn format (e.g., '4 Nick Wilde - Soggy Fox')"
             >
-              📋 Copy for Dreamborn
+              📋 Copy to Clipboard
             </button>
 
             {/* Copy for Lorcanito Button */}
