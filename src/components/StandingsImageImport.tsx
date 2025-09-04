@@ -34,7 +34,7 @@ interface CropSettings {
 }
 
 /** ===== Storage helpers (local, per deck) ===== */
-const keyForDeck = (deckId: string) => `ldb:results:${deckId}`;
+const keyForDeck = (deckId: string) => `lorcana.deckResults.${deckId}`;
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 function useDeckResults(deckId: string) {
