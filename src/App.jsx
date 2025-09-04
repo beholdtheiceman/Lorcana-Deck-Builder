@@ -5205,9 +5205,9 @@ function DeckRow({ entry, onSetCount, onRemove }) {
   const imgSrc = getCardImg(c);
 
   return (
-    <div className="flex items-center gap-3 p-3 relative">
-      {/* Enhanced Card Image with Count Bubble */}
-      <div className="relative">
+    <div className="flex items-center gap-3 p-3">
+      {/* Card Image with Count Bubble - Fixed width to prevent overlap */}
+      <div className="relative w-16 flex-shrink-0">
         {imgSrc ? (
           <img 
             src={imgSrc} 
@@ -5233,12 +5233,14 @@ function DeckRow({ entry, onSetCount, onRemove }) {
         </div>
         
         {/* Rounded Count Bubble - positioned at top-right corner of image */}
-        <div className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg">
+        <div className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-700 shadow-lg z-10">
           {entry.count}
         </div>
       </div>
-      <div className="flex-1">
-        <div className="text-sm font-semibold">{c.name}</div>
+      
+      {/* Card Info - Takes remaining space */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold truncate">{c.name}</div>
         <div className="text-xs text-gray-400">
           {c.set} • #{c.number} • Cost {getCost(c)} • {c.type} • {c.rarity}
         </div>
@@ -5251,7 +5253,9 @@ function DeckRow({ entry, onSetCount, onRemove }) {
           </div>
         )}
       </div>
-      <div className="flex items-center gap-1">
+      
+      {/* Controls - Fixed width to prevent overlap */}
+      <div className="flex items-center gap-1 flex-shrink-0">
         <input
           className="w-10 text-center rounded-md bg-gray-800 border border-gray-700"
           type="number"
@@ -9290,87 +9294,6 @@ useEffect(() => {
         : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
     </div>
             </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex">
-          {/* Left Panel - Card Grid */}
-          <div className="flex-1 p-4">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="text-2xl text-gray-400">Loading cards...</div>
-              </div>
-            ) : (
-              <>
-                <CardGrid
-                  cards={shownCards}
-                  onAdd={handleAdd}
-                  onInspect={setInspectCard}
-                  deck={deck}
-                />
-
-                {hasActiveFilters && (
-                  <div className="mt-4 text-center">
-                    <button
-                      onClick={() => filterDispatch({ type: "RESET" })}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-sm"
-                    >
-                      Clear All Filters
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Right Panel - Deck */}
-          <div className="w-96 bg-gray-900/50 border-l border-gray-800 p-4">
-            <DeckPanel
-              deck={deck}
-              onSetCount={handleSetCount}
-              onRemove={handleRemove}
-              onExport={handleExport}
-              onImport={handleImport}
-              onDeckPresentation={handleDeckPresentation}
-            />
-
-            {/* Focus Card Selector - Inside AppInner for proper scope access */}
-            <div className="bg-gray-700 rounded-lg p-4 mb-6">
-              <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Focus Card for Draw Odds</h4>
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Select a card to analyze draw odds:
-                </label>
-                <select
-                  value={focusCardName || ''}
-                  onChange={(e) => setFocusCardName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">Select a card...</option>
-                  {Object.values(deck?.entries || {}).filter(e => e.count > 0).map((entry) => (
-                    <option key={entry.card.id} value={entry.card.name}>
-                      {entry.card.name} ({entry.count} copies)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Deck Statistics - Inside AppInner for proper scope access */}
-            <div className="bg-gray-700 rounded-lg p-4 mb-6">
-              <h4 className="text-lg font-semibold mb-3 text-emerald-300">📊 Deck Statistics</h4>
-              <DeckStatistics 
-                entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)} 
-                focusCardName={focusCardName || ''} 
-              />
-            </div>
-
-            <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
-              {deckValid
-                ? "Deck is valid."
-                : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
-            </div>
-          </div>
         </div>
 
         {/* Modals */}
