@@ -56,7 +56,21 @@ function useDeckResults(deckId: string) {
     } catch {} 
   };
   
-  return { count: records.length, records, persist };
+  const bulkAdd = (newRecords: Omit<MatchRecord, "id" | "dateISO" | "deckId">[]) => {
+    console.log('[useDeckResults] bulkAdd called with records:', newRecords);
+    const stamped = newRecords.map(record => ({
+      ...record,
+      id: record.id || `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      dateISO: record.dateISO || new Date().toISOString(),
+      deckId
+    }));
+    console.log('[useDeckResults] bulkAdd - new records after stamping:', stamped);
+    console.log('[useDeckResults] bulkAdd - all records after adding:', [...stamped, ...records]);
+    persist([...stamped, ...records]);
+    return stamped.length;
+  };
+  
+  return { bulkAdd, count: records.length, records, persist };
 }
 
 /** ===== Minimal image preprocessor (canvas) =====
