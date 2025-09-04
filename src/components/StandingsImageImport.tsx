@@ -242,6 +242,7 @@ export default function StandingsImageImport({
   const [ocrText, setOcrText] = useState<string>("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [preprocessingMode, setPreprocessingMode] = useState<'auto' | 'high-contrast' | 'colored-text'>('auto');
+  const [isProcessing, setIsProcessing] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -281,13 +282,13 @@ export default function StandingsImageImport({
     console.log('[StandingsImageImport] Canvas updated, dimensions:', c.width, 'x', c.height);
     
     // Auto-run OCR when image is loaded and processed
-    if (imgUrl && !ocrText) {
+    if (imgUrl && !ocrText && !isProcessing) {
       console.log('[StandingsImageImport] Auto-running OCR, imgUrl exists and no ocrText yet');
       doOCR();
     } else {
-      console.log('[StandingsImageImport] Not running OCR - imgUrl:', !!imgUrl, 'ocrText:', !!ocrText);
+      console.log('[StandingsImageImport] Not running OCR - imgUrl:', !!imgUrl, 'ocrText:', !!ocrText, 'isProcessing:', isProcessing);
     }
-  }, [imgUrl, crop]);
+  }, [imgUrl, crop, preprocessingMode]);
 
   const onDrop = (e: React.DragEvent) => {
     console.log('[StandingsImageImport] onDrop triggered');
@@ -297,6 +298,9 @@ export default function StandingsImageImport({
     if (f && f.type.startsWith("image/")) {
       console.log('[StandingsImageImport] Setting file state');
       setFile(f);
+      setIsProcessing(false);
+      setOcrText("");
+      setRows([]);
     } else {
       console.log('[StandingsImageImport] File rejected - not an image');
     }
@@ -304,6 +308,10 @@ export default function StandingsImageImport({
 
   const doOCR = async () => {
     console.log('[StandingsImageImport] doOCR function called');
+    if (isProcessing) {
+      console.log('[StandingsImageImport] OCR already processing, skipping');
+      return;
+    }
     const img = imgRef.current;
     console.log('[StandingsImageImport] Image ref in doOCR:', img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : 'null');
     if (!img) {
@@ -311,6 +319,7 @@ export default function StandingsImageImport({
       return;
     }
     console.log('[StandingsImageImport] Starting OCR process');
+    setIsProcessing(true);
     setProgress(0);
     setOcrText("");
     setRows([]);
@@ -344,6 +353,7 @@ export default function StandingsImageImport({
     const parsed = parseStandingsText(text);
     console.log('[StandingsImageImport] Parsed rows:', parsed);
     setRows(parsed);
+    setIsProcessing(false);
   };
 
   const importRows = () => {
@@ -393,6 +403,9 @@ export default function StandingsImageImport({
             if (f && f.type.startsWith("image/")) {
               console.log('[StandingsImageImport] Setting file state');
               setFile(f);
+              setIsProcessing(false);
+              setOcrText("");
+              setRows([]);
             } else {
               console.log('[StandingsImageImport] File rejected - not an image');
             }
