@@ -9233,9 +9233,10 @@ useEffect(() => {
   </div>
 )}
 
-{/* Main content grid */}
-<div key={`main-content-${filters?._resetTimestamp ?? "init"}`} className="grid grid-cols-1 lg:grid-cols-[1fr_380px]">
-  <div>
+{/* Main content area with sticky deck panel */}
+<div key={`main-content-${filters?._resetTimestamp ?? "init"}`} className="flex relative">
+  {/* Card grid - takes remaining space */}
+  <div className="flex-1 lg:pr-4 pb-20 lg:pb-0">
     {loading ? (
       <div className="p-6 text-center text-gray-400">
         <div className="flex items-center justify-center gap-3">
@@ -9274,8 +9275,33 @@ useEffect(() => {
     )}
   </div>
 
-  {/* Deck column */}
-  <div className="border-l border-gray-800 min-h-[60vh]">
+  {/* Sticky Deck Panel - Fixed width, sticky to bottom of viewport */}
+  <div className="hidden lg:block w-96 flex-shrink-0">
+    <div className="sticky bottom-0 border-l border-gray-800 bg-gray-950/95 backdrop-blur-sm">
+      <DeckPanel
+        deck={deck}
+        onSetCount={handleSetCount}
+        onRemove={handleRemove}
+        onExport={() => setExportOpen(true)}
+        onImport={() => setImportOpen(true)}
+        onDeckPresentation={handleDeckPresentation}
+      />
+      <DeckStatistics
+        entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}
+        focusCardName={focusCardName || ""}
+      />
+      <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
+        {deckValid
+          ? "Deck is valid."
+          : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* Mobile Deck Panel - Sticky to bottom on small screens */}
+<div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-950/95 backdrop-blur-sm border-t border-gray-800">
+  <div className="max-h-96 overflow-y-auto">
     <DeckPanel
       deck={deck}
       onSetCount={handleSetCount}
@@ -9293,8 +9319,8 @@ useEffect(() => {
         ? "Deck is valid."
         : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
     </div>
-            </div>
-        </div>
+  </div>
+</div>
 
         {/* Modals */}
         <>
