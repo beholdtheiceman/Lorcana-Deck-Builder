@@ -142,7 +142,7 @@ function parseStandingsText(text: string): ParsedRow[] {
       const rank = Number((cells[idx.rank] || "").replace(/\D+/g, "")) || 0;
       const player = cells[idx.player] || "";
       const points = cells[idx.points] ? Number(String(cells[idx.points]).replace(/\D+/g, "")) : undefined;
-      const record = cells[idx.record] ? String(cells[idx.record]).match(/\b\d+-\d+(?:-\d+)?\b/)?.[0] : undefined;
+      const record = cells[idx.record] ? (String(cells[idx.record]).match(/\b\d+-\d+(?:-\d+)?\b/) || [])[0] : undefined;
       return { rank, player, points, record };
     }).filter(r => r.rank && r.player);
   }
@@ -151,12 +151,12 @@ function parseStandingsText(text: string): ParsedRow[] {
   const blocks = t.split(/\n(?=\d+(?:st|nd|rd|th)\b)/i).filter(b => /\d+(?:st|nd|rd|th)\b/i.test(b));
   if (blocks.length) {
     return blocks.map(b => {
-      const rank = Number((b.match(/(\d+)(?:st|nd|rd|th)\b/i)?.[1]) || 0;
+              const rank = Number((b.match(/(\d+)(?:st|nd|rd|th)\b/i)?.[1] || 0);
       const lines = b.split("\n").map(s => s.trim()).filter(Boolean);
       const rankIdx = lines.findIndex(l => /(\d+)(?:st|nd|rd|th)\b/i.test(l));
       const player = (lines.slice(rankIdx + 1).find(l => !/points?:|record|status/i.test(l)) || "").replace(/\.$/, "");
-      const points = b.match(/points?\s*:\s*([0-9]+)/i)?.[1];
-      const record = b.match(/\b([0-9]+-[0-9]+(?:-[0-9]+)?)\b/)?.[1];
+      const points = (b.match(/points?\s*:\s*([0-9]+)/i) || [])[1];
+      const record = (b.match(/\b([0-9]+-[0-9]+(?:-[0-9]+)?)\b/) || [])[1];
       return { 
         rank, 
         player, 
@@ -169,9 +169,9 @@ function parseStandingsText(text: string): ParsedRow[] {
   // Case C: loose lines "1 Name 6pts 3-1-0"
   const rows: ParsedRow[] = [];
   for (const L of t.split("\n")) {
-    const rank = Number(L.match(/^\s*(\d+)\b/)?.[1] || 0);
-    const record = L.match(/\b(\d+-\d+(?:-\d+)?)\b/)?.[1];
-    const points = L.match(/points?\s*:?\s*([0-9]+)/i)?.[1] ?? L.match(/\b([0-9]+)\s*pts?\b/i)?.[1];
+    const rank = Number((L.match(/^\s*(\d+)\b/) || [])[1] || 0);
+    const record = (L.match(/\b(\d+-\d+(?:-\d+)?)\b/) || [])[1];
+    const points = (L.match(/points?\s*:?\s*([0-9]+)/i) || [])[1] ?? (L.match(/\b([0-9]+)\s*pts?\b/i) || [])[1];
     // crude player pick: drop rank/points/record tokens
     let player = L.replace(/^\s*\d+\b\.?\s*/, "")
                   .replace(/\bpoints?\s*:?\s*\d+/i, "")
