@@ -230,7 +230,10 @@ export default function StandingsImageImport({
   deckId,
   deckName,
 }: StandingsImageImportProps) {
+  console.log('[StandingsImageImport] Component initialized with deckId:', deckId, 'deckName:', deckName);
+  
   const { bulkAdd, count, records, persist } = useDeckResults(deckId);
+  console.log('[StandingsImageImport] useDeckResults returned:', { bulkAdd: !!bulkAdd, count, records: records.length, persist: !!persist });
 
   const [file, setFile] = useState<File | undefined>();
   const [imgUrl, setImgUrl] = useState<string>("");
@@ -244,48 +247,84 @@ export default function StandingsImageImport({
 
   // Load preview URL
   useEffect(() => {
-    if (!file) return;
+    console.log('[StandingsImageImport] File useEffect triggered, file:', file ? { name: file.name, type: file.type, size: file.size } : 'none');
+    if (!file) {
+      console.log('[StandingsImageImport] No file, returning early');
+      return;
+    }
+    console.log('[StandingsImageImport] Creating object URL for file');
     const url = URL.createObjectURL(file);
+    console.log('[StandingsImageImport] Setting imgUrl to:', url);
     setImgUrl(url);
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      console.log('[StandingsImageImport] Cleaning up object URL');
+      URL.revokeObjectURL(url);
+    };
   }, [file]);
 
   // Render preprocessed crop into canvas for visual feedback and auto-run OCR
   useEffect(() => {
+    console.log('[StandingsImageImport] Image processing useEffect triggered, imgUrl:', imgUrl, 'crop:', crop);
     const img = imgRef.current;
-    if (!img || !img.complete) return;
+    console.log('[StandingsImageImport] Image ref:', img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : 'null');
+    if (!img || !img.complete) {
+      console.log('[StandingsImageImport] Image not ready, returning early');
+      return;
+    }
+    console.log('[StandingsImageImport] Preprocessing image with mode:', preprocessingMode);
     const c = preprocess(img, crop, 1600, preprocessingMode);
     const ctx = (canvasRef.current || (canvasRef.current = document.createElement("canvas"))).getContext("2d")!;
     const canvas = canvasRef.current!;
     canvas.width = c.width;
     canvas.height = c.height;
     ctx.drawImage(c, 0, 0);
+    console.log('[StandingsImageImport] Canvas updated, dimensions:', c.width, 'x', c.height);
     
     // Auto-run OCR when image is loaded and processed
     if (imgUrl && !ocrText) {
+      console.log('[StandingsImageImport] Auto-running OCR, imgUrl exists and no ocrText yet');
       doOCR();
+    } else {
+      console.log('[StandingsImageImport] Not running OCR - imgUrl:', !!imgUrl, 'ocrText:', !!ocrText);
     }
   }, [imgUrl, crop]);
 
   const onDrop = (e: React.DragEvent) => {
+    console.log('[StandingsImageImport] onDrop triggered');
     e.preventDefault();
     const f = e.dataTransfer.files?.[0];
-    if (f && f.type.startsWith("image/")) setFile(f);
+    console.log('[StandingsImageImport] Dropped file:', f ? { name: f.name, type: f.type, size: f.size } : 'none');
+    if (f && f.type.startsWith("image/")) {
+      console.log('[StandingsImageImport] Setting file state');
+      setFile(f);
+    } else {
+      console.log('[StandingsImageImport] File rejected - not an image');
+    }
   };
 
   const doOCR = async () => {
+    console.log('[StandingsImageImport] doOCR function called');
     const img = imgRef.current;
-    if (!img) return;
+    console.log('[StandingsImageImport] Image ref in doOCR:', img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : 'null');
+    if (!img) {
+      console.log('[StandingsImageImport] No image ref, returning early');
+      return;
+    }
+    console.log('[StandingsImageImport] Starting OCR process');
     setProgress(0);
     setOcrText("");
     setRows([]);
 
     // get preprocessed canvas
+    console.log('[StandingsImageImport] Preprocessing image for OCR with mode:', preprocessingMode);
     const processed = preprocess(img, crop, 1600, preprocessingMode);
+    console.log('[StandingsImageImport] Preprocessed canvas dimensions:', processed.width, 'x', processed.height);
     
     // Enhanced Tesseract configuration for better number recognition
+    console.log('[StandingsImageImport] Starting Tesseract recognition');
     const { data } = await Tesseract.recognize(processed, "eng", {
       logger: (m) => {
+        console.log('[StandingsImageImport] Tesseract progress:', m.status, m.progress);
         if (m.status === "recognizing text" && m.progress != null) {
           setProgress(Math.round(m.progress * 100));
         }
@@ -295,21 +334,36 @@ export default function StandingsImageImport({
       tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK, // Treat as single text block
       tessedit_ocr_engine_mode: Tesseract.OEM.LSTM_ONLY, // Use LSTM engine for better accuracy
     });
+    
     const text = data.text || "";
+    console.log('[StandingsImageImport] OCR completed, text length:', text.length);
+    console.log('[StandingsImageImport] OCR text:', text);
     setOcrText(text);
-    setRows(parseStandingsText(text));
+    
+    console.log('[StandingsImageImport] Parsing standings text');
+    const parsed = parseStandingsText(text);
+    console.log('[StandingsImageImport] Parsed rows:', parsed);
+    setRows(parsed);
   };
 
   const importRows = () => {
-    if (!rows.length) return;
+    console.log('[StandingsImageImport] importRows called with rows:', rows);
+    if (!rows.length) {
+      console.log('[StandingsImageImport] No rows to import, returning early');
+      return;
+    }
+    console.log('[StandingsImageImport] Mapping rows to match records');
     const mapped: Omit<MatchRecord, "id" | "dateISO" | "deckId">[] = rows.map(r => ({
       result: "W", // unknown per-row; set default, user can edit later if needed
       round: r.rank, // treat 'rank' as round when importing player list? If your screenshot is a STANDINGS table, we can't infer W/L/D per match.
       opponent: r.player,
       notes: r.record ? `Record: ${r.record}${r.points != null ? `, Points: ${r.points}` : ""}` : (r.points != null ? `Points: ${r.points}` : undefined),
     }));
+    console.log('[StandingsImageImport] Mapped records:', mapped);
     // You can also open a confirm modal that maps standing rows to matches; here we just save notes.
+    console.log('[StandingsImageImport] Calling bulkAdd');
     const added = bulkAdd(mapped);
+    console.log('[StandingsImageImport] bulkAdd completed, added:', added, 'records');
     alert(`Imported ${added} rows into deck "${deckName || deckId}". You can edit/adjust inside Logged Matches.`);
   };
 
@@ -332,7 +386,17 @@ export default function StandingsImageImport({
         <input
           type="file"
           accept="image/*"
-          onChange={e => setFile(e.target.files?.[0])}
+          onChange={e => {
+            console.log('[StandingsImageImport] File input onChange triggered');
+            const f = e.target.files?.[0];
+            console.log('[StandingsImageImport] Selected file:', f ? { name: f.name, type: f.type, size: f.size } : 'none');
+            if (f && f.type.startsWith("image/")) {
+              console.log('[StandingsImageImport] Setting file state');
+              setFile(f);
+            } else {
+              console.log('[StandingsImageImport] File rejected - not an image');
+            }
+          }}
           className="hidden"
           id="standings-file"
         />
