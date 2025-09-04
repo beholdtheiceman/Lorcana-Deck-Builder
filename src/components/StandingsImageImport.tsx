@@ -227,11 +227,13 @@ function parseStandingsText(text: string): ParsedRow[] {
 interface StandingsImageImportProps {
   deckId: string;
   deckName?: string;
+  onRecordsUpdated?: () => void;
 }
 
 export default function StandingsImageImport({
   deckId,
   deckName,
+  onRecordsUpdated,
 }: StandingsImageImportProps) {
   console.log('[StandingsImageImport] Component initialized with deckId:', deckId, 'deckName:', deckName);
   
@@ -437,6 +439,12 @@ export default function StandingsImageImport({
     }
     const added = bulkAdd(mapped);
     console.log('[StandingsImageImport] bulkAdd completed, added:', added, 'records');
+    
+    // Notify parent component that records were updated
+    if (onRecordsUpdated) {
+      onRecordsUpdated();
+    }
+    
     alert(`Imported ${added} matches into deck "${deckName || deckId}". You can edit/adjust inside Logged Matches.`);
   };
 

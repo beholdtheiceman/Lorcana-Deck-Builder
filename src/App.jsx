@@ -8087,6 +8087,12 @@ function TournamentResultsSection({ deckId, deckName }) {
   // Get actual match data from localStorage
   const { records, persist } = useDeckResults(deckId);
   
+  // Force refresh when records change (for OCR updates)
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    setRefreshKey(prev => prev + 1);
+  }, [records.length]);
+  
   // Calculate stats from actual data
   const wr = useMemo(() => {
     console.log('[Performance Summary] Calculating stats from records:', records);
@@ -8155,12 +8161,14 @@ function TournamentResultsSection({ deckId, deckName }) {
     persist(updatedRecords);
     setEditingRecord(null);
     setEditForm({});
+    setRefreshKey(prev => prev + 1);
   };
 
   const deleteRecord = (recordId) => {
     if (confirm('Are you sure you want to delete this match record?')) {
       const updatedRecords = records.filter(record => record.id !== recordId);
       persist(updatedRecords);
+      setRefreshKey(prev => prev + 1);
     }
   };
 
@@ -8325,6 +8333,7 @@ function TournamentResultsSection({ deckId, deckName }) {
                 <StandingsImageImport 
                   deckId={deckId} 
                   deckName={deckName}
+                  onRecordsUpdated={() => setRefreshKey(prev => prev + 1)}
                 />
               </div>
             )}
