@@ -14,6 +14,10 @@ const TeamHub = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hubToDelete, setHubToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [hubToTransfer, setHubToTransfer] = useState(null);
+  const [transferring, setTransferring] = useState(false);
+  const [selectedNewOwner, setSelectedNewOwner] = useState('');
 
   // Form states
   const [hubName, setHubName] = useState('');
@@ -143,6 +147,91 @@ const TeamHub = () => {
     setShowDeleteConfirm(true);
   };
 
+  const removeMember = async (hubId, memberId) => {
+    try {
+      const response = await fetch(`/api/hubs/${hubId}/members`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ memberId })
+      });
+
+      if (response.ok) {
+        // Refresh hubs to update the member list
+        fetchHubs();
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to remove member');
+      }
+    } catch (error) {
+      setError('Error removing member');
+    }
+  };
+
+  const leaveHub = async (hubId) => {
+    try {
+      const response = await fetch(`/api/hubs/${hubId}/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'leave' })
+      });
+
+      if (response.ok) {
+        // Remove hub from local state
+        setHubs(prev => prev.filter(hub => hub.id !== hubId));
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to leave hub');
+      }
+    } catch (error) {
+      setError('Error leaving hub');
+    }
+  };
+
+  const transferOwnership = async () => {
+    if (!hubToTransfer || !selectedNewOwner) return;
+
+    try {
+      setTransferring(true);
+      const response = await fetch(`/api/hubs/${hubToTransfer.id}/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          action: 'transfer_ownership',
+          newOwnerId: selectedNewOwner
+        })
+      });
+
+      if (response.ok) {
+        // Refresh hubs to update ownership
+        fetchHubs();
+        setShowTransferModal(false);
+        setHubToTransfer(null);
+        setSelectedNewOwner('');
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to transfer ownership');
+      }
+    } catch (error) {
+      setError('Error transferring ownership');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const confirmTransferOwnership = (hub) => {
+    setHubToTransfer(hub);
+    setShowTransferModal(true);
+  };
+
   if (!user) {
     return (
       <div className="text-center py-8">
@@ -235,14 +324,52 @@ const TeamHub = () => {
               {/* Members List */}
               <div className="mt-3">
                 <h4 className="text-sm font-medium text-gray-300 mb-2">Members:</h4>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
-                    {hub.owner.email} (Owner)
-                  </span>
-                  {hub.members.map(member => (
-                    <span key={member.id} className="px-2 py-1 bg-gray-600 text-white rounded text-xs">
-                      {member.user.email}
+                <div className="space-y-2">
+                  {/* Owner */}
+                  <div className="flex items-center justify-between bg-blue-600 rounded px-3 py-2">
+                    <span className="text-white text-sm font-medium">
+                      {hub.owner.email} (Owner)
                     </span>
+                    <div className="flex gap-2">
+                      {hub.owner.id === user.id && hub.members.length > 0 && (
+                        <button
+                          onClick={() => confirmTransferOwnership(hub)}
+                          className="px-2 py-1 bg-blue-700 text-white rounded text-xs hover:bg-blue-800"
+                          title="Transfer ownership"
+                        >
+                          Transfer
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Members */}
+                  {hub.members.map(member => (
+                    <div key={member.id} className="flex items-center justify-between bg-gray-600 rounded px-3 py-2">
+                      <span className="text-white text-sm">
+                        {member.user.email}
+                      </span>
+                      <div className="flex gap-2">
+                        {hub.owner.id === user.id && (
+                          <button
+                            onClick={() => removeMember(hub.id, member.user.id)}
+                            className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                            title="Remove member"
+                          >
+                            Remove
+                          </button>
+                        )}
+                        {member.user.id === user.id && (
+                          <button
+                            onClick={() => leaveHub(hub.id)}
+                            className="px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+                            title="Leave hub"
+                          >
+                            Leave
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -363,6 +490,56 @@ const TeamHub = () => {
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? 'Deleting...' : 'Delete Hub'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Ownership Modal */}
+      {showTransferModal && hubToTransfer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold text-white mb-4">Transfer Ownership</h2>
+            <p className="text-gray-300 mb-4">
+              Transfer ownership of <strong>"{hubToTransfer.name}"</strong> to another member.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Select New Owner:
+              </label>
+              <select
+                value={selectedNewOwner}
+                onChange={(e) => setSelectedNewOwner(e.target.value)}
+                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
+                disabled={transferring}
+              >
+                <option value="">Choose a member...</option>
+                {hubToTransfer.members.map(member => (
+                  <option key={member.user.id} value={member.user.id}>
+                    {member.user.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setHubToTransfer(null);
+                  setSelectedNewOwner('');
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                disabled={transferring}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={transferOwnership}
+                disabled={!selectedNewOwner || transferring}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {transferring ? 'Transferring...' : 'Transfer Ownership'}
               </button>
             </div>
           </div>
