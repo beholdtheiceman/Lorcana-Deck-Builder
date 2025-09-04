@@ -47,6 +47,43 @@ import TeamHub from './components/TeamHub';
 import DeckStatistics from './components/DeckStats';
 import StandingsImageImport from './components/StandingsImageImport';
 
+// --- Helper components for Tournament Results UI ---
+const Section = ({ title, subtitle, children }) => (
+  <div className="p-4 md:p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="mb-3">
+      <h3 className="text-base md:text-lg font-semibold text-slate-900">{title}</h3>
+      {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+    </div>
+    {children}
+  </div>
+);
+
+const Pill = ({ children, active = false, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-full text-sm border transition ${
+      active
+        ? "bg-slate-900 text-white border-slate-900"
+        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+    }`}
+  >
+    {children}
+  </button>
+);
+
+function Bar({ win = 0, loss = 0 }) {
+  const total = Math.max(1, win + loss);
+  const winPct = (win / total) * 100;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-2 w-48 bg-slate-200 rounded overflow-hidden">
+        <div className="h-full bg-slate-900" style={{ width: `${winPct}%` }} />
+      </div>
+      <div className="text-xs text-slate-500 w-12 text-right">{Math.round(winPct)}%</div>
+    </div>
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Local storage & caching
 // -----------------------------------------------------------------------------
@@ -7856,9 +7893,9 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           })()}
         </div>}
         
-        {/* OCR Image Import Section */}
+        {/* Tournament Results Import & Management */}
         <div className="bg-gray-800 rounded-lg p-6 mt-6">
-          <StandingsImageImport 
+          <TournamentResultsSection 
             deckId={deck.id || 'temp-deck'} 
             deckName={deckName || deck.name}
           />
@@ -7985,6 +8022,288 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
       </Modal>
     );
   }
+
+// --- Tournament Results Section Component ---
+function TournamentResultsSection({ deckId, deckName }) {
+  const [tab, setTab] = useState("quick");
+  const [event, setEvent] = useState("Set Champs @ Unplugged Games");
+  const [round, setRound] = useState("1");
+  const [opponent, setOpponent] = useState("");
+  const [opponentDeck, setOpponentDeck] = useState("Amber/Steel Brooms");
+  const [selectedInks, setSelectedInks] = useState([]);
+  const [playDraw, setPlayDraw] = useState("first");
+  const [result, setResult] = useState("win");
+  const [pasteText, setPasteText] = useState("");
+
+  // Mock data for demonstration
+  const demoMatches = [
+    { date: "9/1/2025", rnd: 1, res: "W", inks: "Ruby / Sapphire", pod: "First", event: "Set Champs @ Unplugged", notes: "Opp on Brooms" },
+    { date: "9/1/2025", rnd: 2, res: "L", inks: "Amber / Steel", pod: "Second", event: "Set Champs @ Unplugged", notes: "Flooded G3" },
+    { date: "9/1/2025", rnd: 3, res: "W", inks: "Amethyst / Emerald", pod: "First", event: "Set Champs @ Unplugged", notes: "Tight game" },
+  ];
+
+  const wr = { played: 28, W: 18, L: 9, D: 1 };
+  const byInk = [
+    { k: "Amber / Steel", W: 6, L: 5 },
+    { k: "Ruby / Sapphire", W: 7, L: 3 },
+    { k: "Amethyst / Emerald", W: 5, L: 1 },
+  ];
+
+  const INK_COLORS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"];
+
+  const toggleInk = (ink) => {
+    setSelectedInks(prev => 
+      prev.includes(ink) 
+        ? prev.filter(i => i !== ink)
+        : [...prev, ink]
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">🎯 Tournament Results</h3>
+      
+      {/* Content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        {/* Left column: Import + Logging */}
+        <div className="space-y-6 lg:col-span-2">
+          <Section
+            title="Import Tournament Results"
+            subtitle="Add results in seconds: paste text, quick log, or upload a standings screenshot (OCR runs locally)."
+          >
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Pill active={tab === "quick"} onClick={() => setTab("quick")}>Quick Log</Pill>
+              <Pill active={tab === "paste"} onClick={() => setTab("paste")}>Paste Text</Pill>
+              <Pill active={tab === "image"} onClick={() => setTab("image")}>From Image</Pill>
+            </div>
+
+            {tab === "quick" && (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-600">Event (optional)</label>
+                  <input 
+                    className="w-full border rounded-xl px-3 py-2" 
+                    placeholder="Set Champs @ Unplugged Games"
+                    value={event}
+                    onChange={(e) => setEvent(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-600">Round (optional)</label>
+                  <input 
+                    className="w-full border rounded-xl px-3 py-2" 
+                    placeholder="1"
+                    value={round}
+                    onChange={(e) => setRound(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-600">Opponent (optional)</label>
+                  <input 
+                    className="w-full border rounded-xl px-3 py-2" 
+                    placeholder="Player handle"
+                    value={opponent}
+                    onChange={(e) => setOpponent(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-600">Opponent Deck (optional)</label>
+                  <input 
+                    className="w-full border rounded-xl px-3 py-2" 
+                    placeholder="Amber/Steel Brooms"
+                    value={opponentDeck}
+                    onChange={(e) => setOpponentDeck(e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-full">
+                  <div className="text-sm text-slate-600 mb-2">Opponent Inks</div>
+                  <div className="flex flex-wrap gap-2">
+                    {INK_COLORS.map((ink) => (
+                      <button 
+                        key={ink} 
+                        onClick={() => toggleInk(ink)}
+                        className={`px-3 py-1.5 rounded-full border text-sm ${
+                          selectedInks.includes(ink)
+                            ? "bg-slate-900 text-white border-slate-900"
+                            : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        {ink}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="col-span-full flex items-center gap-2">
+                  <span className="text-sm text-slate-600">Play/Draw:</span>
+                  <button 
+                    onClick={() => setPlayDraw("first")}
+                    className={`px-3 py-1.5 rounded-full border text-sm ${
+                      playDraw === "first"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    Went First
+                  </button>
+                  <button 
+                    onClick={() => setPlayDraw("second")}
+                    className={`px-3 py-1.5 rounded-full border text-sm ${
+                      playDraw === "second"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    Went Second
+                  </button>
+                  <button 
+                    onClick={() => setPlayDraw("unknown")}
+                    className={`px-3 py-1.5 rounded-full border text-sm ${
+                      playDraw === "unknown"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    Unknown
+                  </button>
+                </div>
+
+                <div className="col-span-full flex flex-wrap gap-2 pt-2">
+                  <button 
+                    onClick={() => setResult("win")}
+                    className={`px-4 py-2 rounded-xl ${
+                      result === "win" ? "bg-emerald-600" : "bg-emerald-100 text-emerald-700"
+                    } text-white`}
+                  >
+                    Win
+                  </button>
+                  <button 
+                    onClick={() => setResult("loss")}
+                    className={`px-4 py-2 rounded-xl ${
+                      result === "loss" ? "bg-rose-600" : "bg-rose-100 text-rose-700"
+                    } text-white`}
+                  >
+                    Loss
+                  </button>
+                  <button 
+                    onClick={() => setResult("draw")}
+                    className={`px-4 py-2 rounded-xl ${
+                      result === "draw" ? "bg-slate-700" : "bg-slate-100 text-slate-700"
+                    } text-white`}
+                  >
+                    Draw
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {tab === "paste" && (
+              <div className="space-y-3">
+                <textarea 
+                  className="w-full h-36 border rounded-xl p-3 font-mono" 
+                  placeholder={`Paste lines like:\nR1 W vs Ruby/Sapphire (first)\n2 L vs Amber Steel - flooded\nR3 D vs Amethyst/Emerald, second`}
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">
+                    {pasteText.split('\n').filter(line => line.trim()).length} line(s) detected
+                  </span>
+                  <button className="px-3 py-1.5 rounded-xl bg-slate-900 text-white">Import</button>
+                </div>
+              </div>
+            )}
+
+            {tab === "image" && (
+              <div className="space-y-4">
+                <StandingsImageImport 
+                  deckId={deckId} 
+                  deckName={deckName}
+                />
+              </div>
+            )}
+          </Section>
+
+          <Section title="Logged Matches" subtitle="Recent entries for this deck (local to your browser).">
+            <div className="border rounded-2xl overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left px-3 py-2">Date</th>
+                    <th className="text-left px-3 py-2">Rnd</th>
+                    <th className="text-left px-3 py-2">Res</th>
+                    <th className="text-left px-3 py-2">Opp Inks</th>
+                    <th className="text-left px-3 py-2">Play/Draw</th>
+                    <th className="text-left px-3 py-2">Event</th>
+                    <th className="text-left px-3 py-2">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demoMatches.map((m, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="px-3 py-2">{m.date}</td>
+                      <td className="px-3 py-2">{m.rnd}</td>
+                      <td className="px-3 py-2 font-semibold">{m.res}</td>
+                      <td className="px-3 py-2">{m.inks}</td>
+                      <td className="px-3 py-2">{m.pod}</td>
+                      <td className="px-3 py-2">{m.event}</td>
+                      <td className="px-3 py-2">{m.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+        </div>
+
+        {/* Right column: Summary */}
+        <div className="space-y-6">
+          <Section title="Performance Summary" subtitle="At-a-glance stats for this deck.">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-1">
+                <div className="text-xs text-slate-500">Games Played</div>
+                <div className="text-2xl font-bold">{wr.played}</div>
+                <div className="text-xs text-slate-500">W {wr.W} / L {wr.L} / D {wr.D}</div>
+              </div>
+              <div className="col-span-1">
+                <div className="text-xs text-slate-500">WR (excl. draws)</div>
+                <div className="text-2xl font-bold">{Math.round((wr.W / Math.max(1, wr.W + wr.L)) * 100)}%</div>
+                <div className="text-xs text-slate-500">Draws count as 0</div>
+              </div>
+              <div className="col-span-1">
+                <div className="text-xs text-slate-500">WR (½ draw)</div>
+                <div className="text-2xl font-bold">{Math.round(((wr.W + wr.D * 0.5) / Math.max(1, wr.played)) * 100)}%</div>
+                <div className="text-xs text-slate-500">Draws count as ½</div>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="font-medium mb-2">By Opponent Inks</div>
+              <div className="space-y-2">
+                {byInk.map((row) => (
+                  <div key={row.k} className="flex items-center justify-between gap-4">
+                    <div className="w-40 truncate text-sm">{row.k}</div>
+                    <Bar win={row.W} loss={row.L} />
+                    <div className="text-xs text-slate-500">{row.W + row.L} GP</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Tips" subtitle="Quick ways to keep your data clean.">
+            <ul className="text-sm text-slate-600 list-disc pl-5 space-y-2">
+              <li>Use <span className="font-medium">Quick Log</span> for live events; add inks & play/draw for better splits.</li>
+              <li>Bulk results? Paste your notes or Discord lines in <span className="font-medium">Paste Text</span>.</li>
+              <li>Event standings screenshot? Try <span className="font-medium">From Image</span> — OCR runs in your browser.</li>
+            </ul>
+          </Section>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Root App -------------------------------------------------------------------
 
