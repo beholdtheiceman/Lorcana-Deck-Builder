@@ -19,25 +19,26 @@
     "vercel-build:prod": "prisma generate && vite build"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "@prisma/client": "^5.7.1",
     "bcrypt": "^5.1.1",
-    "zod": "^3.22.4",
-    "jsonwebtoken": "^9.0.2",
     "cookie": "^0.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "recharts": "^2.8.0",
-    "tailwindcss": "^3.4.0"
+    "tailwindcss": "^3.4.0",
+    "tesseract.js": "^6.0.1",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "prisma": "^5.7.1",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.5",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.0.8",
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32"
+    "postcss": "^8.4.32",
+    "prisma": "^5.7.1",
+    "vite": "^5.0.8"
   }
 }

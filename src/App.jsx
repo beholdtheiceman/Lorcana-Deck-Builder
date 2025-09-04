@@ -45,6 +45,7 @@ import {
 import AuthButton from './components/AuthButton';
 import TeamHub from './components/TeamHub';
 import DeckStatistics from './components/DeckStats';
+import StandingsImageImport from './components/StandingsImageImport';
 
 // -----------------------------------------------------------------------------
 // Local storage & caching
@@ -7299,7 +7300,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
         
         {/* Additional Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4">
+          {/* Cost Analysis - Hidden per user request */}
+          {/* <div className="bg-gray-800 rounded-lg p-4">
             <h4 className="font-semibold mb-2 text-center">Cost Analysis</h4>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
@@ -7315,7 +7317,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                 <span className="font-semibold">{totalCost}</span>
               </div>
             </div>
-          </div>
+          </div> */}
           
           <div className="bg-gray-800 rounded-lg p-4">
             <h4 className="font-semibold mb-2 text-center">Deck Composition</h4>
@@ -7473,8 +7475,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     </div>
                   </div>
 
-                  {/* Synergies */}
-                  <div className="bg-gray-700 rounded-lg p-4">
+                  {/* Synergies - Hidden per user request */}
+                  {/* <div className="bg-gray-700 rounded-lg p-4">
                     <h4 className="text-lg font-semibold mb-3 text-emerald-300">Synergies</h4>
                     {synergies.length > 0 ? (
                       <div className="space-y-2">
@@ -7487,7 +7489,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     ) : (
                       <p className="text-sm text-gray-400">No obvious synergies detected.</p>
                     )}
-                  </div>
+                  </div> */}
                 </div>
               </div>
             );
@@ -7813,7 +7815,8 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     </BarChart>
                   </ResponsiveContainer>
 
-                  {synergies.length > 0 ? (
+                  {/* Synergies - Hidden per user request */}
+                  {/* {synergies.length > 0 ? (
                     <div className="mt-4 bg-gray-700 rounded-lg p-4">
                       <h5 className="font-semibold mb-2 text-center">Detected Synergies</h5>
                       <ul className="list-disc ml-6 text-sm space-y-1">
@@ -7824,7 +7827,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
                     <div className="mt-4 bg-gray-700 rounded-lg p-4 text-center">
                       <p className="text-sm text-gray-400">No obvious synergies detected</p>
                     </div>
-                  )}
+                  )} */}
                 </div>
 
                 {/* Meta Tools (stub) */}
@@ -7852,6 +7855,14 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
             );
           })()}
         </div>}
+        
+        {/* OCR Image Import Section */}
+        <div className="bg-gray-800 rounded-lg p-6 mt-6">
+          <StandingsImageImport 
+            deckId={deck.id || 'temp-deck'} 
+            deckName={deckName || deck.name}
+          />
+        </div>
         
         {/* Action Buttons - Improved Layout */}
         <div className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 mt-6 pt-6 pb-4">
