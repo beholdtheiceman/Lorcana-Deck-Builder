@@ -11,6 +11,9 @@ const TeamHub = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showHubDetail, setShowHubDetail] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [hubToDelete, setHubToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form states
   const [hubName, setHubName] = useState('');
@@ -110,6 +113,36 @@ const TeamHub = () => {
     setError('Regenerate invite code not implemented yet');
   };
 
+  const handleDeleteHub = async () => {
+    if (!hubToDelete) return;
+
+    try {
+      setDeleting(true);
+      const response = await fetch(`/api/hubs?hubId=${hubToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setHubs(prev => prev.filter(hub => hub.id !== hubToDelete.id));
+        setShowDeleteConfirm(false);
+        setHubToDelete(null);
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to delete hub');
+      }
+    } catch (error) {
+      setError('Error deleting hub');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirmDeleteHub = (hub) => {
+    setHubToDelete(hub);
+    setShowDeleteConfirm(true);
+  };
+
   if (!user) {
     return (
       <div className="text-center py-8">
@@ -172,12 +205,20 @@ const TeamHub = () => {
                 </div>
                 <div className="space-x-2">
                   {hub.owner.id === user.id && (
-                    <button
-                      onClick={() => regenerateInviteCode(hub.id)}
-                      className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                    >
-                      Regenerate Code
-                    </button>
+                    <>
+                      <button
+                        onClick={() => regenerateInviteCode(hub.id)}
+                        className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                      >
+                        Regenerate Code
+                      </button>
+                      <button
+                        onClick={() => confirmDeleteHub(hub)}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                      >
+                        Delete Hub
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => {
@@ -294,6 +335,38 @@ const TeamHub = () => {
             // No additional state management needed here
           }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && hubToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold text-white mb-4">Delete Team Hub</h2>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to delete the team hub <strong>"{hubToDelete.name}"</strong>? 
+              This action cannot be undone and will remove all associated data.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setHubToDelete(null);
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteHub}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Hub'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* The new approach handles deck viewing directly in HubDetailModal */}
