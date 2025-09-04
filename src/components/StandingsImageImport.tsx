@@ -368,14 +368,68 @@ export default function StandingsImageImport({
       return;
     }
     console.log('[StandingsImageImport] Mapping rows to match records');
-    const mapped: Omit<MatchRecord, "id" | "dateISO" | "deckId">[] = rows.map(r => ({
-      result: "W", // unknown per-row; set default, user can edit later if needed
-      round: r.rank, // treat 'rank' as round when importing player list? If your screenshot is a STANDINGS table, we can't infer W/L/D per match.
-      opponent: r.player,
-      notes: r.record ? `Record: ${r.record}${r.points != null ? `, Points: ${r.points}` : ""}` : (r.points != null ? `Points: ${r.points}` : undefined),
-    }));
+    
+    const mapped: Omit<MatchRecord, "id" | "dateISO" | "deckId">[] = [];
+    
+    rows.forEach(r => {
+      // Parse record like "2-3-0" into individual matches
+      if (r.record) {
+        const [wins, losses, draws] = r.record.split('-').map(Number);
+        console.log('[StandingsImageImport] Parsing record:', r.record, '->', { wins, losses, draws });
+        
+        // Add wins
+        for (let i = 0; i < wins; i++) {
+          mapped.push({
+            result: "W",
+            round: `${r.rank}-${i + 1}`,
+            opponent: r.player,
+            opponentInks: "Unknown",
+            playDraw: "Unknown",
+            event: "Tournament",
+            notes: `Win ${i + 1}/${wins} vs ${r.player}`
+          });
+        }
+        
+        // Add losses
+        for (let i = 0; i < losses; i++) {
+          mapped.push({
+            result: "L",
+            round: `${r.rank}-${wins + i + 1}`,
+            opponent: r.player,
+            opponentInks: "Unknown",
+            playDraw: "Unknown",
+            event: "Tournament",
+            notes: `Loss ${i + 1}/${losses} vs ${r.player}`
+          });
+        }
+        
+        // Add draws
+        for (let i = 0; i < draws; i++) {
+          mapped.push({
+            result: "D",
+            round: `${r.rank}-${wins + losses + i + 1}`,
+            opponent: r.player,
+            opponentInks: "Unknown",
+            playDraw: "Unknown",
+            event: "Tournament",
+            notes: `Draw ${i + 1}/${draws} vs ${r.player}`
+          });
+        }
+      } else {
+        // Fallback: single match if no record
+        mapped.push({
+          result: "W",
+          round: r.rank?.toString() || "1",
+          opponent: r.player,
+          opponentInks: "Unknown",
+          playDraw: "Unknown",
+          event: "Tournament",
+          notes: r.points != null ? `Points: ${r.points}` : undefined
+        });
+      }
+    });
+    
     console.log('[StandingsImageImport] Mapped records:', mapped);
-    // You can also open a confirm modal that maps standing rows to matches; here we just save notes.
     console.log('[StandingsImageImport] Calling bulkAdd');
     if (typeof bulkAdd !== 'function') {
       console.error('[StandingsImageImport] bulkAdd is not a function:', bulkAdd);
@@ -383,7 +437,7 @@ export default function StandingsImageImport({
     }
     const added = bulkAdd(mapped);
     console.log('[StandingsImageImport] bulkAdd completed, added:', added, 'records');
-    alert(`Imported ${added} rows into deck "${deckName || deckId}". You can edit/adjust inside Logged Matches.`);
+    alert(`Imported ${added} matches into deck "${deckName || deckId}". You can edit/adjust inside Logged Matches.`);
   };
 
   return (
