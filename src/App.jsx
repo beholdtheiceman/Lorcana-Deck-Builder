@@ -5807,6 +5807,10 @@ function PrintableSheet({ deck, onClose }) {
 
 function DeckPresentationPopup({ deck, onClose, onSave }) {
   const [deckName, setDeckName] = useState(deck.name || "Untitled Deck");
+  const [selectedHubId, setSelectedHubId] = useState('');
+  const [hubs, setHubs] = useState([]);
+  const [loadingHubs, setLoadingHubs] = useState(false);
+  const [savingToHub, setSavingToHub] = useState(false);
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   
   // Lorcanito export constants and functions
@@ -5907,6 +5911,67 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       throw error;
     }
   }
+
+  // Fetch user's hubs
+  useEffect(() => {
+    const fetchHubs = async () => {
+      try {
+        setLoadingHubs(true);
+        const response = await fetch('/api/hubs');
+        if (response.ok) {
+          const data = await response.json();
+          setHubs(data);
+        }
+      } catch (error) {
+        console.error('Error fetching hubs:', error);
+      } finally {
+        setLoadingHubs(false);
+      }
+    };
+
+    fetchHubs();
+  }, []);
+
+  // Save deck to team hub
+  const handleSaveToHub = async () => {
+    if (!selectedHubId || !deckName.trim()) return;
+
+    try {
+      setSavingToHub(true);
+      
+      // First save the deck locally
+      if (onSave && deckName.trim()) {
+        onSave(deckName.trim());
+      }
+
+      // Then save to the selected hub by creating a new deck
+      const response = await fetch('/api/decks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: deckName.trim(),
+          data: deck
+        })
+      });
+
+      if (response.ok) {
+        // Success - could show a toast here
+        console.log('Deck saved to hub successfully');
+        onClose();
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to save deck to hub:', errorData.error);
+        // Could show error toast here
+      }
+    } catch (error) {
+      console.error('Error saving deck to hub:', error);
+      // Could show error toast here
+    } finally {
+      setSavingToHub(false);
+    }
+  };
 
   // Hook up to a button
   async function onExportLorcanito(deck) {
@@ -6628,9 +6693,20 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   return (
     <Modal open={true} onClose={onClose} title="Deck Presentation" size="full">
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header with Deck Name Edit */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-emerald-400">{deck.name}</h1>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Deck Name:
+            </label>
+            <input
+              type="text"
+              value={deckName}
+              onChange={(e) => setDeckName(e.target.value)}
+              className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none text-center text-2xl font-bold"
+              placeholder="Enter deck name..."
+            />
+          </div>
           <p className="text-gray-400 mt-2">A Lorcana Deck</p>
           {deck.updatedAt && (
             <p className="text-xs text-gray-500 mt-1">
@@ -7748,18 +7824,24 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               🖨️ Print
             </button>
 
-            {/* Deck Name Input for Saving */}
+            {/* Team Hub Selection */}
             <div className="flex items-center gap-3 bg-gray-800 p-4 rounded-lg">
               <label className="text-gray-300 font-medium whitespace-nowrap">
-                Deck Name:
+                Add to Team Hub:
               </label>
-              <input
-                type="text"
-                value={deckName}
-                onChange={(e) => setDeckName(e.target.value)}
-                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none"
-                placeholder="Enter deck name..."
-              />
+              <select
+                value={selectedHubId}
+                onChange={(e) => setSelectedHubId(e.target.value)}
+                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-emerald-400 focus:outline-none"
+                disabled={loadingHubs}
+              >
+                <option value="">Select a team hub...</option>
+                {hubs.map(hub => (
+                  <option key={hub.id} value={hub.id}>
+                    {hub.name} ({hub.members.length + 1} members)
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Save Button - Saves the current deck */}
@@ -7774,6 +7856,16 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
               title="Save deck to storage"
             >
               💾 Save Deck
+            </button>
+
+            {/* Save to Team Hub Button */}
+            <button
+              onClick={handleSaveToHub}
+              disabled={!selectedHubId || !deckName.trim() || savingToHub}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors shadow-lg"
+              title="Save deck to selected team hub"
+            >
+              {savingToHub ? '🔄 Saving...' : '👥 Save to Team Hub'}
             </button>
 
 
