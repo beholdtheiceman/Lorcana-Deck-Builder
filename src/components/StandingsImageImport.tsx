@@ -463,7 +463,10 @@ export default function StandingsImageImport({
     
     // Notify parent component that records were updated
     if (onRecordsUpdated) {
+      console.log('[StandingsImageImport] Calling onRecordsUpdated callback');
       onRecordsUpdated();
+    } else {
+      console.log('[StandingsImageImport] onRecordsUpdated callback not provided');
     }
     
     // Hide import button after successful import
