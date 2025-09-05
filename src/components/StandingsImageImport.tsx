@@ -250,6 +250,7 @@ export default function StandingsImageImport({
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [preprocessingMode, setPreprocessingMode] = useState<'auto' | 'high-contrast' | 'colored-text'>('auto');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showImportButton, setShowImportButton] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -258,12 +259,14 @@ export default function StandingsImageImport({
     console.log('[StandingsImageImport] File useEffect triggered, file:', file ? { name: file.name, type: file.type, size: file.size } : 'none');
     if (!file) {
       console.log('[StandingsImageImport] No file, returning early');
+      setShowImportButton(false);
       return;
     }
     console.log('[StandingsImageImport] Creating object URL for file');
     const url = URL.createObjectURL(file);
     console.log('[StandingsImageImport] Setting imgUrl to:', url);
     setImgUrl(url);
+    setShowImportButton(true); // Show import button immediately when file is loaded
     return () => {
       console.log('[StandingsImageImport] Cleaning up object URL');
       URL.revokeObjectURL(url);
@@ -308,6 +311,7 @@ export default function StandingsImageImport({
       setIsProcessing(false);
       setOcrText("");
       setRows([]);
+      setShowImportButton(false); // Will be set to true in useEffect when file is processed
     } else {
       console.log('[StandingsImageImport] File rejected - not an image');
     }
@@ -445,6 +449,9 @@ export default function StandingsImageImport({
       onRecordsUpdated();
     }
     
+    // Hide import button after successful import
+    setShowImportButton(false);
+    
     alert(`Imported ${added} matches into deck "${deckName || deckId}". You can edit/adjust inside Logged Matches.`);
   };
 
@@ -477,6 +484,7 @@ export default function StandingsImageImport({
               setIsProcessing(false);
               setOcrText("");
               setRows([]);
+              setShowImportButton(false); // Will be set to true in useEffect when file is processed
             } else {
               console.log('[StandingsImageImport] File rejected - not an image');
             }
@@ -589,13 +597,15 @@ export default function StandingsImageImport({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">Parsed Rows</div>
-              <button
-                onClick={importRows}
-                disabled={!rows.length}
-                className={`px-3 py-1.5 rounded border ${rows.length ? "bg-black text-white" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
-              >
-                Import {rows.length} row(s) to deck
-              </button>
+              {showImportButton && (
+                <button
+                  onClick={importRows}
+                  disabled={!rows.length}
+                  className={`px-3 py-1.5 rounded border ${rows.length ? "bg-black text-white" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                >
+                  Import {rows.length} row(s) to deck
+                </button>
+              )}
             </div>
             <div className="overflow-auto border rounded">
               <table className="min-w-full text-sm">
