@@ -8045,6 +8045,29 @@ function useDeckResults(deckId) {
       setRecords([]);
     }
   }, [deckId]);
+
+  // Also load data on initial mount if deckId exists
+  useEffect(() => {
+    console.log('[useDeckResults] Initial mount effect - deckId:', deckId);
+    if (deckId) {
+      console.log('[useDeckResults] Initial load for deckId:', deckId);
+      const stored = localStorage.getItem(`lorcana.deckResults.${deckId}`);
+      console.log('[useDeckResults] Initial load - raw data:', stored);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          console.log('[useDeckResults] Initial load - parsed records:', parsed);
+          setRecords(parsed);
+        } catch (e) {
+          console.warn('Failed to parse stored deck results on initial load:', e);
+        }
+      } else {
+        console.log('[useDeckResults] Initial load - no stored data found');
+      }
+    } else {
+      console.log('[useDeckResults] Initial mount - no deckId yet');
+    }
+  }, []); // Empty dependency array - only run on mount
   
   const persist = (newRecords) => {
     console.log('[useDeckResults] persist called with records:', newRecords);
