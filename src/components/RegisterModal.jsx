@@ -76,7 +76,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
             {error && (
               <div className="bg-red-900 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">
                 {error}
@@ -85,44 +85,53 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
 
             {/* Email Field - First and Most Important */}
             <div className="bg-yellow-900/30 p-4 rounded-lg border-2 border-yellow-500">
-              <label className="block text-lg font-bold text-yellow-300 mb-3">
+              <label htmlFor="register-email" className="block text-lg font-bold text-yellow-300 mb-3">
                 🚨 EMAIL ADDRESS REQUIRED 🚨
               </label>
               <input
+                id="register-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg bg-white text-black placeholder-gray-600 border-2 border-yellow-400 focus:border-yellow-300 focus:outline-none text-lg font-medium"
                 placeholder="Enter your email address here"
+                autoComplete="email"
                 required
               />
               <p className="text-sm text-yellow-200 mt-2 font-medium">This will be your login username</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="register-password" className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
               <input
+                id="register-password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
                 placeholder="Create a password (min 8 characters)"
+                autoComplete="new-password"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-300 mb-2">
                 Confirm Password
               </label>
               <input
+                id="register-confirm-password"
+                name="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
                 placeholder="Confirm your password"
+                autoComplete="new-password"
                 required
               />
             </div>
