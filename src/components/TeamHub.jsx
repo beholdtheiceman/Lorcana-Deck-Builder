@@ -453,6 +453,7 @@ const TeamHub = () => {
       {showHubDetail && selectedHub && (
         <HubDetailModal
           hub={selectedHub}
+          user={user}
           onClose={() => {
             setShowHubDetail(false);
             setSelectedHub(null);
