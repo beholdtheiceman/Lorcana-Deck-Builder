@@ -2299,7 +2299,7 @@ function generateDeckId() {
 function createNewDeck(name = "Untitled Deck") {
   return {
     id: generateDeckId(),
-    name: name.trim() || "Untitled Deck",
+    name: String(name).trim() || "Untitled Deck",
     entries: {},
     total: 0,
     createdAt: Date.now(),
@@ -4808,8 +4808,8 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
   });
 
   const handleNewDeck = () => {
-    if (newDeckName.trim()) {
-      onNewDeck(newDeckName.trim());
+    if (String(newDeckName).trim()) {
+      onNewDeck(String(newDeckName).trim());
       setNewDeckName("");
       setShowNewDeckForm(false);
     }
