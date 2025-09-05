@@ -5977,12 +5977,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
     try {
       setSavingToHub(true);
       
-      // First save the deck locally
-      if (onSave && deckName.trim()) {
-        onSave(deckName.trim());
-      }
-
-      // Then save to the selected hub by creating a new deck
+      // Save to the selected hub by creating a new deck (this will also save locally via saveDeckToCloud)
       const response = await fetch('/api/decks', {
         method: 'POST',
         headers: {
