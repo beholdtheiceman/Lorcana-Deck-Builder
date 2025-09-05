@@ -8094,6 +8094,7 @@ function TournamentResultsSection({ deckId, deckName }) {
   }, [records.length]);
   
   // Calculate stats from actual data
+  console.log('[Performance Summary Debug] Records before useMemo:', records);
   const wr = useMemo(() => {
     console.log('[Performance Summary] Calculating stats from records:', records);
     const wins = records.filter(r => r.result === 'W').length;
@@ -8333,7 +8334,10 @@ function TournamentResultsSection({ deckId, deckName }) {
                 <StandingsImageImport 
                   deckId={deckId} 
                   deckName={deckName}
-                  onRecordsUpdated={() => setRefreshKey(prev => prev + 1)}
+                  onRecordsUpdated={() => {
+                    console.log('[TournamentResultsSection] onRecordsUpdated callback triggered, incrementing refreshKey');
+                    setRefreshKey(prev => prev + 1);
+                  }}
                 />
               </div>
             )}
