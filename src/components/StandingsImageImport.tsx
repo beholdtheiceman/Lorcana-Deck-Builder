@@ -267,6 +267,7 @@ export default function StandingsImageImport({
     console.log('[StandingsImageImport] Setting imgUrl to:', url);
     setImgUrl(url);
     setShowImportButton(true); // Show import button immediately when file is loaded
+    console.log('[StandingsImageImport] showImportButton set to true');
     return () => {
       console.log('[StandingsImageImport] Cleaning up object URL');
       URL.revokeObjectURL(url);
@@ -472,6 +473,7 @@ export default function StandingsImageImport({
         className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-gray-50"
       >
         <input
+          key={file ? 'has-file' : 'no-file'}
           type="file"
           accept="image/*"
           onChange={e => {
@@ -485,8 +487,10 @@ export default function StandingsImageImport({
               setOcrText("");
               setRows([]);
               setShowImportButton(false); // Will be set to true in useEffect when file is processed
+            } else if (f) {
+              console.log('[StandingsImageImport] File rejected - not an image:', f.type);
             } else {
-              console.log('[StandingsImageImport] File rejected - not an image');
+              console.log('[StandingsImageImport] No file selected (input cleared)');
             }
           }}
           className="hidden"
@@ -597,6 +601,7 @@ export default function StandingsImageImport({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">Parsed Rows</div>
+              {console.log('[StandingsImageImport] Rendering button section - showImportButton:', showImportButton, 'rows.length:', rows.length)}
               {showImportButton && (
                 <button
                   onClick={importRows}
