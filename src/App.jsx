@@ -8024,11 +8024,11 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
   }
 
 // --- useDeckResults Hook ---
-function useDeckResults(deckId) {
+function useDeckResults(deckId, refreshKey = 0) {
   const [records, setRecords] = useState([]);
   
   useEffect(() => {
-    console.log('[useDeckResults] Loading data for deckId:', deckId);
+    console.log('[useDeckResults] Loading data for deckId:', deckId, 'refreshKey:', refreshKey);
     const stored = localStorage.getItem(`lorcana.deckResults.${deckId}`);
     console.log('[useDeckResults] Raw localStorage data:', stored);
     if (stored) {
@@ -8044,7 +8044,7 @@ function useDeckResults(deckId) {
       console.log('[useDeckResults] No stored data found');
       setRecords([]);
     }
-  }, [deckId]);
+  }, [deckId, refreshKey]);
 
   // Also load data on initial mount if deckId exists
   useEffect(() => {
@@ -8107,11 +8107,11 @@ function TournamentResultsSection({ deckId, deckName }) {
   const [editingRecord, setEditingRecord] = useState(null);
   const [editForm, setEditForm] = useState({});
 
-  // Get actual match data from localStorage
-  const { records, persist } = useDeckResults(deckId);
-  
   // Force refresh when records change (for OCR updates)
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Get actual match data from localStorage
+  const { records, persist } = useDeckResults(deckId, refreshKey);
   
   
   // Calculate stats from actual data
