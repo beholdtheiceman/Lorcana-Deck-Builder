@@ -279,10 +279,25 @@ export default function StandingsImageImport({
     console.log('[StandingsImageImport] Image processing useEffect triggered, imgUrl:', imgUrl, 'crop:', crop);
     const img = imgRef.current;
     console.log('[StandingsImageImport] Image ref:', img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : 'null');
-    if (!img || !img.complete) {
-      console.log('[StandingsImageImport] Image not ready, returning early');
+    if (!img || !imgUrl) {
+      console.log('[StandingsImageImport] Image ref or imgUrl missing, returning early');
       return;
     }
+    
+    // Wait for image to be fully loaded
+    if (!img.complete || img.naturalWidth === 0) {
+      console.log('[StandingsImageImport] Image not fully loaded yet, waiting...');
+      const handleLoad = () => {
+        console.log('[StandingsImageImport] Image loaded, processing...');
+        processImage();
+      };
+      img.addEventListener('load', handleLoad);
+      return () => img.removeEventListener('load', handleLoad);
+    }
+    
+    processImage();
+    
+    function processImage() {
     console.log('[StandingsImageImport] Preprocessing image with mode:', preprocessingMode);
     const c = preprocess(img, crop, 1600, preprocessingMode);
     const ctx = (canvasRef.current || (canvasRef.current = document.createElement("canvas"))).getContext("2d")!;
@@ -292,12 +307,13 @@ export default function StandingsImageImport({
     ctx.drawImage(c, 0, 0);
     console.log('[StandingsImageImport] Canvas updated, dimensions:', c.width, 'x', c.height);
     
-    // Auto-run OCR when image is loaded and processed
-    if (imgUrl && !ocrText && !isProcessing) {
-      console.log('[StandingsImageImport] Auto-running OCR, imgUrl exists and no ocrText yet');
-      doOCR();
-    } else {
-      console.log('[StandingsImageImport] Not running OCR - imgUrl:', !!imgUrl, 'ocrText:', !!ocrText, 'isProcessing:', isProcessing);
+      // Auto-run OCR when image is loaded and processed
+      if (imgUrl && !ocrText && !isProcessing) {
+        console.log('[StandingsImageImport] Auto-running OCR, imgUrl exists and no ocrText yet');
+        doOCR();
+      } else {
+        console.log('[StandingsImageImport] Not running OCR - imgUrl:', !!imgUrl, 'ocrText:', !!ocrText, 'isProcessing:', isProcessing);
+      }
     }
   }, [imgUrl, crop, preprocessingMode]);
 
