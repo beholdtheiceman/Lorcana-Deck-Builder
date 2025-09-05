@@ -15,8 +15,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "vercel-build": "prisma generate && vite build --config vite.config.js",
-    "vercel-build:prod": "prisma generate && vite build"
+    "build:vercel": "prisma generate && vite build --config vite.config.js",
+    "build:prod": "prisma generate && vite build"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
