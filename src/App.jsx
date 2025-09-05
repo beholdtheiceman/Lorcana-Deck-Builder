@@ -332,49 +332,57 @@ const INK_ORDER = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
 const SET_CODE_ORDER = ["1","2","3","4","5","6","7","8","9","D100"]; // extend as new sets arrive
 
 function primaryInk(card){
-  return (Array.isArray(card.inks) && card.inks[0]) || card.ink || card._raw?.ink || "";
+  const ink = (Array.isArray(card.inks) && card.inks[0]) || card.ink || card._raw?.ink || "";
+  return String(ink);
 }
 
 function collectorParts(card){
-  const raw = (card.number ?? card.collector_number ?? card._raw?.collector_number ?? "").toString();
+  const raw = String(card.number ?? card.collector_number ?? card._raw?.collector_number ?? "");
   const m = raw.match(/^(\d+)([A-Za-z]*)$/);
-  return { num: m ? parseInt(m[1],10) : Number.MAX_SAFE_INTEGER, suf: m ? m[2].toLowerCase() : "" };
+  return { num: m ? parseInt(m[1],10) : Number.MAX_SAFE_INTEGER, suf: m ? String(m[2]).toLowerCase() : "" };
 }
 
 
 
 function cardComparator(a, b) {
   // 1) Ink
-  const ia = INK_ORDER.indexOf(primaryInk(a)), ib = INK_ORDER.indexOf(primaryInk(b));
+  const inkA = primaryInk(a);
+  const inkB = primaryInk(b);
+  const ia = INK_ORDER.indexOf(inkA);
+  const ib = INK_ORDER.indexOf(inkB);
   if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
 
   // 2) Set: prefer numeric code, else explicit order list
-  const ac = (a.setCode || "").toUpperCase();
-  const bc = (b.setCode || "").toUpperCase();
+  const ac = String(a.setCode || "").toUpperCase();
+  const bc = String(b.setCode || "").toUpperCase();
   const an = /^\d+$/.test(ac) ? Number(ac) : null;
   const bn = /^\d+$/.test(bc) ? Number(bc) : null;
   if (an != null && bn != null && an !== bn) return an - bn;
 
-  const sa = SET_CODE_ORDER.indexOf(ac), sb = SET_CODE_ORDER.indexOf(bc);
+  const sa = SET_CODE_ORDER.indexOf(ac);
+  const sb = SET_CODE_ORDER.indexOf(bc);
   if (sa !== sb) return (sa === -1 ? 999 : sa) - (sb === -1 ? 999 : sb);
 
   // 3) Collector number (numeric then suffix)
-  const ca = collectorParts(a), cb = collectorParts(b);
+  const ca = collectorParts(a);
+  const cb = collectorParts(b);
   if (ca.num !== cb.num) return ca.num - cb.num;
-  if (ca.suf !== cb.suf) return ca.suf < cb.suf ? -1 : 1;
+  if (ca.suf !== cb.suf) return String(ca.suf) < String(cb.suf) ? -1 : 1;
 
   // 4) Name tiebreaker
-  return String(a.name).localeCompare(String(b.name));
+  const nameA = String(a.name || "");
+  const nameB = String(b.name || "");
+  return nameA.localeCompare(nameB);
 }
 
 // Helper to extract normalized set code and name from any card
 function getSetCodeAndName(card) {
   const code =
-    (card.setCode || card.set || card._raw?.set?.code || card._raw?.set_code || "")
-      .toString().toUpperCase().trim();
+    String(card.setCode || card.set || card._raw?.set?.code || card._raw?.set_code || "")
+      .toUpperCase().trim();
   const name =
-    (card.setName || card._raw?.set?.name || card._raw?.set_name || "")
-      .toString().toLowerCase().trim();
+    String(card.setName || card._raw?.set?.name || card._raw?.set_name || "")
+      .toLowerCase().trim();
   return { code, name };
 }
 
@@ -752,10 +760,10 @@ function getInks(card) {
 // Normalize inks from either Lorcast (card.inks array) or lorcana-api (Color string)
 function getCardInks(card) {
   if (Array.isArray(card.inks) && card.inks.length) {
-    return new Set(card.inks.map(s => s.trim()));
+    return new Set(card.inks.map(s => String(s).trim()));
   }
   if (typeof card.Color === "string" && card.Color.length) {
-    return new Set(card.Color.split(",").map(s => s.trim()));
+    return new Set(card.Color.split(",").map(s => String(s).trim()));
   }
   return new Set(); // fallback
 }
@@ -2291,7 +2299,7 @@ function generateDeckId() {
 function createNewDeck(name = "Untitled Deck") {
   return {
     id: generateDeckId(),
-    name: name.trim() || "Untitled Deck",
+    name: String(name).trim() || "Untitled Deck",
     entries: {},
     total: 0,
     createdAt: Date.now(),
@@ -4800,8 +4808,8 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
   });
 
   const handleNewDeck = () => {
-    if (newDeckName.trim()) {
-      onNewDeck(newDeckName.trim());
+    if (String(newDeckName).trim()) {
+      onNewDeck(String(newDeckName).trim());
       setNewDeckName("");
       setShowNewDeckForm(false);
     }
