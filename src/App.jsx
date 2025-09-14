@@ -5851,7 +5851,7 @@ function PrintableSheet({ deck, onClose }) {
 
 // Deck Presentation Popup ----------------------------------------------------
 
-function DeckPresentationPopup({ deck, onClose, onSave }) {
+function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
   const [deckName, setDeckName] = useState(deck.name || "Untitled Deck");
   const [selectedHubId, setSelectedHubId] = useState('');
   const [hubs, setHubs] = useState([]);
@@ -6345,387 +6345,6 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
   const mostExpensive = sortedByCost[0];
   const cheapest = sortedByCost[sortedByCost.length - 1];
   
-  // Function to generate deck image
-  async function generateDeckImage() {
-    try {
-      // Get the button element to show loading state
-      const button = event?.target;
-      const originalText = button?.textContent;
-      const originalDisabled = button?.disabled;
-      
-      if (button) {
-        button.disabled = true;
-        button.textContent = '🔄 Generating...';
-      }
-      // Create canvas for deck image
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Layout constants - tune these for the exact look you want
-      const posterW = 1400;       // Fixed width like your clean mock
-      const columns = 8;          // 8 across for more compact layout
-      const gap = 16;             // Space between cards
-      const margin = 32;          // Outer edge margin
-      const headerH = 120;        // Title band height
-      const cardAR = 63/88;       // Lorcana card aspect ratio
-      
-      // Calculate card size from width/columns (no dead space)
-      const cardWidth = Math.floor((posterW - margin * 2 - gap * (columns - 1)) / columns);
-      const cardHeight = Math.floor(cardWidth / cardAR);
-      const cardsPerRow = columns;
-      
-      // Get grouped entries for sorting
-      const groupedEntries = groupAndSortForText(entries);
-      
-      // Flatten all entries into one continuous list, maintaining order
-      const allEntries = [];
-      try {
-        for (const { entries: list } of groupedEntries) {
-          // Sort each group by cost, then by name for consistent ordering
-          const sortedList = [...list].sort((a, b) => {
-            const costA = getCost(a.card) ?? 0;
-            const costB = getCost(b.card) ?? 0;
-            if (costA !== costB) {
-              return costA - costB; // Sort by cost first
-            }
-            // If costs are equal, sort by name
-            return a.card.name.localeCompare(b.card.name);
-          });
-          allEntries.push(...sortedList);
-        }
-        
-        // Debug: log the entries we're working with
-        console.log(`[Deck Image] Total entries to draw:`, allEntries.length);
-      } catch (sortError) {
-        console.error(`[Deck Image] Error sorting entries:`, sortError);
-        // Fallback: just use the original entries without sorting
-        for (const { entries: list } of groupedEntries) {
-          allEntries.push(...list);
-        }
-      }
-      
-      // Calculate exact grid dimensions (no dead space)
-      const totalRows = Math.ceil(allEntries.length / cardsPerRow);
-      const gridHeight = totalRows * cardHeight + (totalRows - 1) * gap;
-      
-      // Compute exact poster height (no hard-coded values)
-      const posterH = headerH + margin + gridHeight + margin;
-      
-      // Set canvas dimensions exactly
-      canvas.width = posterW;
-      canvas.height = posterH;
-      
-      // Debug logging for dimensions
-      console.log(`[Deck Image] Layout calculation:`, {
-        posterW,
-        posterH,
-        columns,
-        cardWidth,
-        cardHeight,
-        gap,
-        margin,
-        headerH,
-        totalRows,
-        totalCards: allEntries.length
-      });
-      
-      // Background
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Title and username on same row, centered
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 56px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(deck.name || 'Untitled Deck', canvas.width / 2, margin);
-      
-      // Username on same row, centered below title
-      ctx.font = '500 32px Inter, system-ui, sans-serif';
-      ctx.fillStyle = '#cdd2e0';
-      const username = deck.createdBy || deck.username || 'Unknown User';
-      ctx.fillText(`by ${username}`, canvas.width / 2, margin + 70);
-      
-      // Draw cards in grid - one continuous grid without section breaks
-      let currentRow = 0;
-      let currentCol = 0;
-      const yOffset = headerH + margin;
-      
-      // Draw all cards in one continuous grid
-      for (const entry of allEntries) {
-        const x = margin + currentCol * (cardWidth + gap);
-        const y = yOffset + currentRow * (cardHeight + gap);
-        
-        // Draw card background
-        ctx.fillStyle = '#2d3748';
-        ctx.fillRect(x, y, cardWidth, cardHeight);
-        ctx.strokeStyle = '#718096';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, cardWidth, cardHeight);
-        
-        // Draw card image if available - try multiple image sources
-        const card = entry.card;
-        let imageDrawn = false;
-        
-        // Try multiple image sources in order of preference
-        const imageSources = [
-          card.image_url,
-          card.image,
-          card._imageFromAPI,
-          card._raw?.image_uris?.digital?.large,
-          card._raw?.image_uris?.digital?.normal,
-          card._raw?.image_uris?.large,
-          card._raw?.image_uris?.normal,
-          // Try to generate Lorcast URLs if we have set/number
-          card.set && card.number ? `https://cards.lorcast.io/card/digital/large/crd_${card.set}_${card.number.toString().padStart(3, '0')}.avif` : null,
-          card.set && card.number ? `https://api.lorcast.com/v0/cards/${card.set}/${card.number}/image` : null
-        ].filter(Boolean);
-        
-        // Debug: log what image sources we have
-        console.log(`[Deck Image] Card: ${card.name}, Image sources:`, imageSources);
-        
-        for (const imageSrc of imageSources) {
-          if (imageSrc && !imageDrawn) {
-            try {
-              console.log(`[Deck Image] Trying image source: ${imageSrc}`);
-              
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              
-              // Try to use proxy for CORS issues
-              let finalImageSrc = imageSrc;
-              if (imageSrc.includes('cards.lorcast.io') || imageSrc.includes('api.lorcast.com')) {
-                try {
-                  // Use the existing proxy function if available
-                  if (typeof proxyImageUrl === 'function') {
-                    finalImageSrc = proxyImageUrl(imageSrc);
-                    console.log(`[Deck Image] Using proxy URL: ${finalImageSrc}`);
-                  } else {
-                    // Fallback proxy
-                    finalImageSrc = `https://images.weserv.nl/?url=${encodeURIComponent(imageSrc)}&output=jpg`;
-                    console.log(`[Deck Image] Using fallback proxy: ${finalImageSrc}`);
-                  }
-                } catch (proxyError) {
-                  console.warn(`[Deck Image] Proxy failed, using original: ${imageSrc}`);
-                }
-              }
-              
-              await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 5000);
-                img.onload = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Successfully loaded image: ${finalImageSrc}`);
-                  resolve();
-                };
-                img.onerror = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Failed to load image: ${finalImageSrc}`);
-                  reject(new Error('Image failed to load'));
-                };
-                img.src = finalImageSrc;
-              });
-              
-              // Draw image maintaining aspect ratio
-              const imgAspect = img.width / img.height;
-              const cardAspect = cardWidth / cardHeight;
-              
-              let drawWidth = cardWidth;
-              let drawHeight = cardHeight;
-              let drawX = x;
-              let drawY = y;
-              
-              if (imgAspect > cardAspect) {
-                drawHeight = cardWidth / imgAspect;
-                drawY = y + (cardHeight - drawHeight) / 2;
-              } else {
-                drawWidth = cardHeight * imgAspect;
-                drawX = x + (cardWidth - drawWidth) / 2;
-              }
-              
-              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-              imageDrawn = true;
-              console.log(`[Deck Image] Successfully drew image for ${card.name}`);
-              break; // Successfully drew image, stop trying other sources
-              
-            } catch (error) {
-              console.warn(`[Deck Image] Failed to load image from ${imageSrc}:`, error);
-              continue; // Try next image source
-            }
-          }
-        }
-        
-        // If no image was drawn, try one more approach with existing functions
-        if (!imageDrawn) {
-          try {
-            // Try to use the existing image loading functions from the codebase
-            if (typeof getWorkingImageUrl === 'function') {
-              const workingUrl = await getWorkingImageUrl(card);
-              if (workingUrl) {
-                console.log(`[Deck Image] Trying getWorkingImageUrl: ${workingUrl}`);
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                await new Promise((resolve, reject) => {
-                  const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
-                  img.onload = resolve;
-                  img.onerror = reject;
-                  img.src = workingUrl;
-                });
-                
-                // Draw the image
-                const imgAspect = img.width / img.height;
-                const cardAspect = cardWidth / cardHeight;
-                
-                let drawWidth = cardWidth;
-                let drawHeight = cardHeight;
-                let drawX = x;
-                let drawY = y;
-                
-                if (imgAspect > cardAspect) {
-                  drawHeight = cardWidth / imgAspect;
-                  drawY = y + (cardHeight - drawHeight) / 2;
-                } else {
-                  drawWidth = cardHeight * imgAspect;
-                  drawX = x + (cardWidth - drawWidth) / 2;
-                }
-                
-                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                imageDrawn = true;
-                console.log(`[Deck Image] Successfully drew image using getWorkingImageUrl for ${card.name}`);
-              }
-            }
-          } catch (error) {
-            console.warn(`[Deck Image] getWorkingImageUrl failed for ${card.name}:`, error);
-          }
-        }
-        
-        // If still no image was drawn, try one more time with a simpler approach
-        if (!imageDrawn) {
-          try {
-            // Try to load image directly from the card data
-            const simpleImageSrc = card.image_url || card.image || card._imageFromAPI;
-            if (simpleImageSrc) {
-              console.log(`[Deck Image] Final attempt with simple image source: ${simpleImageSrc}`);
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              
-              await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
-                img.onload = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Successfully loaded image on final attempt: ${simpleImageSrc}`);
-                  resolve();
-                };
-                img.onerror = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Final image attempt failed: ${simpleImageSrc}`);
-                  reject(new Error('Image failed to load'));
-                };
-                img.src = simpleImageSrc;
-              });
-              
-              // Draw the image
-              const imgAspect = img.width / img.height;
-              const cardAspect = cardWidth / cardHeight;
-              
-              let drawWidth = cardWidth;
-              let drawHeight = cardHeight;
-              let drawX = x;
-              let drawY = y;
-              
-              if (imgAspect > cardAspect) {
-                drawHeight = cardWidth / imgAspect;
-                drawY = y + (cardHeight - drawHeight) / 2;
-              } else {
-                drawWidth = cardHeight * imgAspect;
-                drawX = x + (cardWidth - drawWidth) / 2;
-              }
-              
-              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-              imageDrawn = true;
-              console.log(`[Deck Image] Successfully drew image on final attempt for ${card.name}`);
-            }
-          } catch (error) {
-            console.warn(`[Deck Image] Final image attempt failed for ${card.name}:`, error);
-          }
-        }
-        
-        // If still no image was drawn, use fallback
-        if (!imageDrawn) {
-          drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
-        }
-        
-        // Draw count indicator - Rounded bubble positioned exactly on card corner
-        if (entry.count > 1) {
-          const bubbleSize = 20;
-          const bubbleX = x + cardWidth - bubbleSize;
-          const bubbleY = y;
-          const bubbleRadius = bubbleSize / 2;
-          
-          // Draw rounded rectangle (bubble) with fallback for older browsers
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            // Modern browsers support roundRect
-            ctx.roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, bubbleRadius);
-          } else {
-            // Fallback for older browsers - draw a circle
-            ctx.arc(bubbleX + bubbleRadius, bubbleY + bubbleRadius, bubbleRadius, 0, 2 * Math.PI);
-          }
-          ctx.fillStyle = '#10b981'; // emerald-600
-          ctx.fill();
-          
-          // Draw border
-          ctx.strokeStyle = '#047857'; // emerald-700
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Draw count text
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 12px Arial, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(entry.count.toString(), bubbleX + bubbleRadius, bubbleY + bubbleRadius);
-        }
-        
-        // Move to next position
-        currentCol++;
-        if (currentCol >= cardsPerRow) {
-          currentCol = 0;
-          currentRow++;
-        }
-      }
-      
-      // Convert to blob and download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${deck.name || 'deck'}_${new Date().toISOString().split('T')[0]}.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-        
-        // Restore button state
-        if (button) {
-          button.disabled = originalDisabled;
-          button.textContent = originalText;
-        }
-      }, 'image/png');
-      
-    } catch (error) {
-      console.error('Failed to generate deck image:', error);
-      alert('Failed to generate deck image. Please try again.');
-      
-      // Restore button state on error
-      if (button) {
-        button.disabled = originalDisabled;
-        button.textContent = originalText;
-      }
-    }
-  }
   
   // Helper function to draw fallback card content
   function drawFallbackCard(ctx, x, y, width, height, card) {
@@ -7910,7 +7529,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           <div className="flex justify-center gap-3 mb-4">
             {/* Download Image Button */}
             <button
-              onClick={generateDeckImage}
+              onClick={(event) => onGenerateImage(event)}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Download deck as image (PNG)"
             >
@@ -8570,6 +8189,429 @@ function AppInner() {
   console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
   const { user, loading: authLoading } = useAuth();
+  
+  // Function to generate deck image
+  async function generateDeckImage(event) {
+    // Get the button element to show loading state
+    const button = event?.target;
+    const originalText = button?.textContent;
+    const originalDisabled = button?.disabled;
+    
+    try {
+      
+      if (button) {
+        button.disabled = true;
+        button.textContent = '🔄 Generating...';
+      }
+      // Create canvas for deck image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Layout constants - tune these for the exact look you want
+      const posterW = 1400;       // Fixed width like your clean mock
+      const columns = 8;          // 8 across for more compact layout
+      const gap = 16;             // Space between cards
+      const margin = 32;          // Outer edge margin
+      const headerH = 120;        // Title band height
+      const cardAR = 63/88;       // Lorcana card aspect ratio
+      
+      // Calculate card size from width/columns (no dead space)
+      const cardWidth = Math.floor((posterW - margin * 2 - gap * (columns - 1)) / columns);
+      const cardHeight = Math.floor(cardWidth / cardAR);
+      const cardsPerRow = columns;
+      
+      // Get deck entries
+      const entries = Object.values(deck.entries || {}).filter(e => e.count > 0);
+      
+      // Simple grouping for deck image generation
+      const groupedEntries = [
+        { entries: entries.filter(e => normalizedType(e.card) === 'Character') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Action') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Song') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Item') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Location') },
+        { entries: entries.filter(e => !['Character', 'Action', 'Song', 'Item', 'Location'].includes(normalizedType(e.card))) }
+      ];
+      
+      // Flatten all entries into one continuous list, maintaining order
+      const allEntries = [];
+      try {
+        for (const { entries: list } of groupedEntries) {
+          // Sort each group by cost, then by name for consistent ordering
+          const sortedList = [...list].sort((a, b) => {
+            const costA = getCost(a.card) ?? 0;
+            const costB = getCost(b.card) ?? 0;
+            if (costA !== costB) {
+              return costA - costB; // Sort by cost first
+            }
+            // If costs are equal, sort by name
+            return a.card.name.localeCompare(b.card.name);
+          });
+          allEntries.push(...sortedList);
+        }
+        
+        // Debug: log the entries we're working with
+        console.log(`[Deck Image] Total entries to draw:`, allEntries.length);
+      } catch (sortError) {
+        console.error(`[Deck Image] Error sorting entries:`, sortError);
+        // Fallback: just use the original entries without sorting
+        for (const { entries: list } of groupedEntries) {
+          allEntries.push(...list);
+        }
+      }
+      
+      // Calculate exact grid dimensions (no dead space)
+      const totalRows = Math.ceil(allEntries.length / cardsPerRow);
+      const gridHeight = totalRows * cardHeight + (totalRows - 1) * gap;
+      
+      // Compute exact poster height (no hard-coded values)
+      const posterH = headerH + margin + gridHeight + margin;
+      
+      // Set canvas dimensions exactly
+      canvas.width = posterW;
+      canvas.height = posterH;
+      
+      // Debug logging for dimensions
+      console.log(`[Deck Image] Layout calculation:`, {
+        posterW,
+        posterH,
+        columns,
+        cardWidth,
+        cardHeight,
+        gap,
+        margin,
+        headerH,
+        totalRows,
+        totalCards: allEntries.length
+      });
+      
+      // Background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Title and username on same row, centered
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 56px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(deck.name || 'Untitled Deck', canvas.width / 2, margin);
+      
+      // Username on same row, centered below title
+      ctx.font = '500 32px Inter, system-ui, sans-serif';
+      ctx.fillStyle = '#cdd2e0';
+      const username = user?.email || deck.createdBy || deck.username || 'Unknown User';
+      ctx.fillText(`by ${username}`, canvas.width / 2, margin + 70);
+      
+      // Draw cards in grid - one continuous grid without section breaks
+      let currentRow = 0;
+      let currentCol = 0;
+      const yOffset = headerH + margin;
+      
+      // Draw all cards in one continuous grid
+      for (const entry of allEntries) {
+        const x = margin + currentCol * (cardWidth + gap);
+        const y = yOffset + currentRow * (cardHeight + gap);
+        
+        // Draw card background
+        ctx.fillStyle = '#2d3748';
+        ctx.fillRect(x, y, cardWidth, cardHeight);
+        ctx.strokeStyle = '#718096';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cardWidth, cardHeight);
+        
+        // Draw card image if available - try multiple image sources
+        const card = entry.card;
+        let imageDrawn = false;
+        
+        // Try multiple image sources in order of preference
+        const imageSources = [
+          card.image_url,
+          card.image,
+          card._imageFromAPI,
+          card._raw?.image_uris?.digital?.large,
+          card._raw?.image_uris?.digital?.normal,
+          card._raw?.image_uris?.large,
+          card._raw?.image_uris?.normal,
+          // Try to generate Lorcast URLs if we have set/number
+          card.set && card.number ? `https://cards.lorcast.io/card/digital/large/crd_${card.set}_${card.number.toString().padStart(3, '0')}.avif` : null,
+          card.set && card.number ? `https://api.lorcast.com/v0/cards/${card.set}/${card.number}/image` : null
+        ].filter(Boolean);
+        
+        // Debug: log what image sources we have
+        console.log(`[Deck Image] Card: ${card.name}, Image sources:`, imageSources);
+        
+        for (const imageSrc of imageSources) {
+          if (imageSrc && !imageDrawn) {
+            try {
+              console.log(`[Deck Image] Trying image source: ${imageSrc}`);
+              
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              // Try to use proxy for CORS issues
+              let finalImageSrc = imageSrc;
+              if (imageSrc.includes('cards.lorcast.io') || imageSrc.includes('api.lorcast.com')) {
+                try {
+                  // Use the existing proxy function if available
+                  if (typeof proxyImageUrl === 'function') {
+                    finalImageSrc = proxyImageUrl(imageSrc);
+                    console.log(`[Deck Image] Using proxy URL: ${finalImageSrc}`);
+                  } else {
+                    // Fallback proxy
+                    finalImageSrc = `https://images.weserv.nl/?url=${encodeURIComponent(imageSrc)}&output=jpg`;
+                    console.log(`[Deck Image] Using fallback proxy: ${finalImageSrc}`);
+                  }
+                } catch (proxyError) {
+                  console.warn(`[Deck Image] Proxy failed, using original: ${imageSrc}`);
+                }
+              }
+              
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 5000);
+                img.onload = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Successfully loaded image: ${finalImageSrc}`);
+                  resolve();
+                };
+                img.onerror = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Failed to load image: ${finalImageSrc}`);
+                  reject(new Error('Image failed to load'));
+                };
+                img.src = finalImageSrc;
+              });
+              
+              // Draw image maintaining aspect ratio
+              const imgAspect = img.width / img.height;
+              const cardAspect = cardWidth / cardHeight;
+              
+              let drawWidth = cardWidth;
+              let drawHeight = cardHeight;
+              let drawX = x;
+              let drawY = y;
+              
+              if (imgAspect > cardAspect) {
+                drawHeight = cardWidth / imgAspect;
+                drawY = y + (cardHeight - drawHeight) / 2;
+              } else {
+                drawWidth = cardHeight * imgAspect;
+                drawX = x + (cardWidth - drawWidth) / 2;
+              }
+              
+              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+              imageDrawn = true;
+              console.log(`[Deck Image] Successfully drew image for ${card.name}`);
+              break; // Successfully drew image, stop trying other sources
+              
+            } catch (error) {
+              console.warn(`[Deck Image] Failed to load image from ${imageSrc}:`, error);
+              continue; // Try next image source
+            }
+          }
+        }
+        
+        // If no image was drawn, try one more approach with existing functions
+        if (!imageDrawn) {
+          try {
+            // Try to use the existing image loading functions from the codebase
+            if (typeof getWorkingImageUrl === 'function') {
+              const workingUrl = await getWorkingImageUrl(card);
+              if (workingUrl) {
+                console.log(`[Deck Image] Trying getWorkingImageUrl: ${workingUrl}`);
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                await new Promise((resolve, reject) => {
+                  const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
+                  img.onload = resolve;
+                  img.onerror = reject;
+                  img.src = workingUrl;
+                });
+                
+                // Draw the image
+                const imgAspect = img.width / img.height;
+                const cardAspect = cardWidth / cardHeight;
+                
+                let drawWidth = cardWidth;
+                let drawHeight = cardHeight;
+                let drawX = x;
+                let drawY = y;
+                
+                if (imgAspect > cardAspect) {
+                  drawHeight = cardWidth / imgAspect;
+                  drawY = y + (cardHeight - drawHeight) / 2;
+                } else {
+                  drawWidth = cardHeight * imgAspect;
+                  drawX = x + (cardWidth - drawWidth) / 2;
+                }
+                
+                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                imageDrawn = true;
+                console.log(`[Deck Image] Successfully drew image using getWorkingImageUrl for ${card.name}`);
+              }
+            }
+          } catch (error) {
+            console.warn(`[Deck Image] getWorkingImageUrl failed for ${card.name}:`, error);
+          }
+        }
+        
+        // If still no image was drawn, try one more time with a simpler approach
+        if (!imageDrawn) {
+          try {
+            // Try to load image directly from the card data
+            const simpleImageSrc = card.image_url || card.image || card._imageFromAPI;
+            if (simpleImageSrc) {
+              console.log(`[Deck Image] Final attempt with simple image source: ${simpleImageSrc}`);
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
+                img.onload = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Successfully loaded image on final attempt: ${simpleImageSrc}`);
+                  resolve();
+                };
+                img.onerror = () => {
+                  clearTimeout(timeout);
+                  console.log(`[Deck Image] Final image attempt failed: ${simpleImageSrc}`);
+                  reject(new Error('Image failed to load'));
+                };
+                img.src = simpleImageSrc;
+              });
+              
+              // Draw the image
+              const imgAspect = img.width / img.height;
+              const cardAspect = cardWidth / cardHeight;
+              
+              let drawWidth = cardWidth;
+              let drawHeight = cardHeight;
+              let drawX = x;
+              let drawY = y;
+              
+              if (imgAspect > cardAspect) {
+                drawHeight = cardWidth / imgAspect;
+                drawY = y + (cardHeight - drawHeight) / 2;
+              } else {
+                drawWidth = cardHeight * imgAspect;
+                drawX = x + (cardWidth - drawWidth) / 2;
+              }
+              
+              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+              imageDrawn = true;
+              console.log(`[Deck Image] Successfully drew image on final attempt for ${card.name}`);
+            }
+          } catch (error) {
+            console.warn(`[Deck Image] Final image attempt failed for ${card.name}:`, error);
+          }
+        }
+        
+        // If still no image was drawn, use fallback
+        if (!imageDrawn) {
+          // Draw fallback card content
+          ctx.fillStyle = '#1a202c';
+          ctx.fillRect(x, y, cardWidth, cardHeight);
+          
+          // Card border
+          ctx.strokeStyle = '#4a5568';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, cardWidth, cardHeight);
+          
+          // Card name
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 12px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const nameLines = card.name.split(' ').reduce((lines, word) => {
+            const testLine = lines[lines.length - 1] + (lines[lines.length - 1] ? ' ' : '') + word;
+            ctx.font = 'bold 12px Arial, sans-serif';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > cardWidth - 8) {
+              lines.push(word);
+            } else {
+              lines[lines.length - 1] = testLine;
+            }
+            return lines;
+          }, ['']);
+          
+          const lineHeight = 14;
+          const startY = y + cardHeight / 2 - (nameLines.length - 1) * lineHeight / 2;
+          nameLines.forEach((line, i) => {
+            ctx.fillText(line, x + cardWidth / 2, startY + i * lineHeight);
+          });
+        }
+        
+        // Draw count indicator - Rounded bubble positioned exactly on card corner
+        if (entry.count > 1) {
+          const bubbleSize = 20;
+          const bubbleX = x + cardWidth - bubbleSize;
+          const bubbleY = y;
+          const bubbleRadius = bubbleSize / 2;
+          
+          // Draw rounded rectangle (bubble) with fallback for older browsers
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            // Modern browsers support roundRect
+            ctx.roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, bubbleRadius);
+          } else {
+            // Fallback for older browsers - draw a circle
+            ctx.arc(bubbleX + bubbleRadius, bubbleY + bubbleRadius, bubbleRadius, 0, 2 * Math.PI);
+          }
+          ctx.fillStyle = '#10b981'; // emerald-600
+          ctx.fill();
+          
+          // Draw border
+          ctx.strokeStyle = '#047857'; // emerald-700
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Draw count text
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 12px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(entry.count.toString(), bubbleX + bubbleRadius, bubbleY + bubbleRadius);
+        }
+        
+        // Move to next position
+        currentCol++;
+        if (currentCol >= cardsPerRow) {
+          currentCol = 0;
+          currentRow++;
+        }
+      }
+      
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${deck.name || 'deck'}_${new Date().toISOString().split('T')[0]}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+        
+        // Restore button state
+        if (button) {
+          button.disabled = originalDisabled;
+          button.textContent = originalText;
+        }
+      }, 'image/png');
+      
+    } catch (error) {
+      console.error('Failed to generate deck image:', error);
+      alert('Failed to generate deck image. Please try again.');
+      
+      // Restore button state on error
+      if (button) {
+        button.disabled = originalDisabled;
+        button.textContent = originalText;
+      }
+    }
+  }
   
   // Debug: Track component lifecycle
   console.log('[App] ===== COMPONENT LIFECYCLE DEBUG =====');
@@ -10125,6 +10167,7 @@ useEffect(() => {
             deck={deck}
             onClose={() => setDeckPresentationOpen(false)}
             onSave={(deckName) => handleSaveDeck(deckName)}
+            onGenerateImage={generateDeckImage}
           />
 )}
 
