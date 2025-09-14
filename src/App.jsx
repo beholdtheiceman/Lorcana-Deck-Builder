@@ -6443,7 +6443,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
       // Username on same row, centered below title
       ctx.font = '500 32px Inter, system-ui, sans-serif';
       ctx.fillStyle = '#cdd2e0';
-      const username = deck.createdBy || deck.username || 'Unknown User';
+      const username = user?.email || deck.createdBy || deck.username || 'Unknown User';
       ctx.fillText(`by ${username}`, canvas.width / 2, margin + 70);
       
       // Draw cards in grid - one continuous grid without section breaks
