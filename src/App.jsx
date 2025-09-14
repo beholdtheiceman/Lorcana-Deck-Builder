@@ -8192,11 +8192,12 @@ function AppInner() {
   
   // Function to generate deck image
   async function generateDeckImage(event) {
+    // Get the button element to show loading state
+    const button = event?.target;
+    const originalText = button?.textContent;
+    const originalDisabled = button?.disabled;
+    
     try {
-      // Get the button element to show loading state
-      const button = event?.target;
-      const originalText = button?.textContent;
-      const originalDisabled = button?.disabled;
       
       if (button) {
         button.disabled = true;
@@ -8219,8 +8220,18 @@ function AppInner() {
       const cardHeight = Math.floor(cardWidth / cardAR);
       const cardsPerRow = columns;
       
-      // Get grouped entries for sorting
-      const groupedEntries = groupAndSortForText(entries);
+      // Get deck entries
+      const entries = Object.values(deck.entries || {}).filter(e => e.count > 0);
+      
+      // Simple grouping for deck image generation
+      const groupedEntries = [
+        { entries: entries.filter(e => normalizedType(e.card) === 'Character') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Action') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Song') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Item') },
+        { entries: entries.filter(e => normalizedType(e.card) === 'Location') },
+        { entries: entries.filter(e => !['Character', 'Action', 'Song', 'Item', 'Location'].includes(normalizedType(e.card))) }
+      ];
       
       // Flatten all entries into one continuous list, maintaining order
       const allEntries = [];
@@ -8497,7 +8508,37 @@ function AppInner() {
         
         // If still no image was drawn, use fallback
         if (!imageDrawn) {
-          drawFallbackCard(ctx, x, y, cardWidth, cardHeight, card);
+          // Draw fallback card content
+          ctx.fillStyle = '#1a202c';
+          ctx.fillRect(x, y, cardWidth, cardHeight);
+          
+          // Card border
+          ctx.strokeStyle = '#4a5568';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, cardWidth, cardHeight);
+          
+          // Card name
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 12px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const nameLines = card.name.split(' ').reduce((lines, word) => {
+            const testLine = lines[lines.length - 1] + (lines[lines.length - 1] ? ' ' : '') + word;
+            ctx.font = 'bold 12px Arial, sans-serif';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > cardWidth - 8) {
+              lines.push(word);
+            } else {
+              lines[lines.length - 1] = testLine;
+            }
+            return lines;
+          }, ['']);
+          
+          const lineHeight = 14;
+          const startY = y + cardHeight / 2 - (nameLines.length - 1) * lineHeight / 2;
+          nameLines.forEach((line, i) => {
+            ctx.fillText(line, x + cardWidth / 2, startY + i * lineHeight);
+          });
         }
         
         // Draw count indicator - Rounded bubble positioned exactly on card corner
