@@ -5851,7 +5851,7 @@ function PrintableSheet({ deck, onClose }) {
 
 // Deck Presentation Popup ----------------------------------------------------
 
-function DeckPresentationPopup({ deck, onClose, onSave }) {
+function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
   const [deckName, setDeckName] = useState(deck.name || "Untitled Deck");
   const [selectedHubId, setSelectedHubId] = useState('');
   const [hubs, setHubs] = useState([]);
@@ -7529,7 +7529,7 @@ function DeckPresentationPopup({ deck, onClose, onSave }) {
           <div className="flex justify-center gap-3 mb-4">
             {/* Download Image Button */}
             <button
-              onClick={(event) => generateDeckImage(event)}
+              onClick={(event) => onGenerateImage(event)}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Download deck as image (PNG)"
             >
@@ -10126,6 +10126,7 @@ useEffect(() => {
             deck={deck}
             onClose={() => setDeckPresentationOpen(false)}
             onSave={(deckName) => handleSaveDeck(deckName)}
+            onGenerateImage={generateDeckImage}
           />
 )}
 
