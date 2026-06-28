@@ -2261,7 +2261,7 @@ function ToastProvider({ children }) {
                 ? "bg-red-900/80 text-red-100 border border-red-700"
                 : t.type === "success"
                 ? "bg-emerald-900/80 text-emerald-100 border border-emerald-700"
-                : "bg-gray-800/80 text-gray-100 border border-gray-700"
+                : "bg-gray-800/80 text-gray-100 border border-white/10"
             }`}
           >
             {t.message}
@@ -3508,7 +3508,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
         </button>
         
         {/* Authentication Button */}
-        <div className="ml-4 border-l border-gray-700 pl-4">
+        <div className="ml-4 border-l border-white/10 pl-4">
           <AuthButton />
         </div>
       </div>
@@ -3520,7 +3520,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
 
 function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
   return (
-    <div className="p-3 bg-gray-900/50 border-b border-gray-800">
+    <div className="p-3 bg-white/[0.02] border-b border-white/10">
       <div className="flex items-center gap-2 mb-2">
         <input
           className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 placeholder:text-gray-500"
@@ -3529,7 +3529,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
           onChange={(e) => onSearchChange(e.target.value)}
         />
         <button
-          className="px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+          className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 transition"
           onClick={() => {
             console.log('[Reset Button] Clicked, dispatching RESET action');
             console.log('[Reset Button] Current filter state before reset:', state);
@@ -3550,7 +3550,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
 
       {/* Inkable Checkboxes - Top Priority */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Inkable Status</legend>
           <div className="flex flex-col gap-2 mt-2">
             <label className="flex items-center gap-2">
@@ -3575,7 +3575,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Ink Colors */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Ink Colors</legend>
           <div className="flex flex-wrap gap-2 mt-2">
             {INK_COLORS.map((ink) => (
@@ -3590,7 +3590,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 2. Cost Selection */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Cost</legend>
           <div className="flex flex-wrap gap-2 mt-2">
             {Array.from({ length: 11 }, (_, i) => (
@@ -3605,7 +3605,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 3. Types */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Types</legend>
           <div className="flex flex-wrap gap-2 mt-2">
             {CARD_TYPES.map((t) => (
@@ -3620,10 +3620,10 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 4. Legality */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Legality</legend>
           <select
-            className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+            className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
             value={state.gamemode}
             onChange={(e) => dispatch({ type: "SET_GAMEMODE", value: e.target.value })}
           >
@@ -3637,7 +3637,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 5. Classifications */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Classifications</legend>
           <div className="flex flex-wrap gap-2 mt-2">
             {CLASSIFICATIONS.map((classification) => (
@@ -3652,7 +3652,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 6. Abilities */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Abilities</legend>
           <div className="flex flex-wrap gap-2 mt-2">
             {ABILITIES.map((ability) => (
@@ -3676,12 +3676,12 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 4. Lore Range */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Lore Range</legend>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
-              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               placeholder="Min"
               min="0"
               value={state.loreMin}
@@ -3690,7 +3690,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
             <span className="text-gray-400">to</span>
             <input
               type="number"
-              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               placeholder="Max"
               min="0"
               value={state.loreMax}
@@ -3700,12 +3700,12 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 5. Strength Range */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Strength Range</legend>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
-              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               placeholder="Min"
               min="0"
               value={state.strengthMin}
@@ -3714,7 +3714,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
             <span className="text-gray-400">to</span>
             <input
               type="number"
-              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               placeholder="Max"
               min="0"
               value={state.strengthMax}
@@ -3724,12 +3724,12 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
         </fieldset>
 
         {/* 6. Willpower Range */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Willpower Range</legend>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
-              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               placeholder="Min"
               min="0"
               value={state.willpowerMin}
@@ -3738,7 +3738,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
             <span className="text-gray-400">to</span>
             <input
               type="number"
-              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="w-20 px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               placeholder="Max"
               min="0"
               value={state.willpowerMax}
@@ -3747,7 +3747,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
           </div>
         </fieldset>
 
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Sets</legend>
           <div className="space-y-3">
             {/* Set Selection */}
@@ -3770,7 +3770,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               <div className="text-xs text-gray-400 mb-2">Card Number:</div>
               <input
                 type="text"
-                className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-gray-700 text-sm"
+                className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-white/10 text-sm"
                 placeholder="e.g., 1, 2, 3..."
                 value={state.setNumber}
                 onChange={(e) => dispatch({ type: "SET_SET_NUMBER", value: e.target.value })}
@@ -3823,7 +3823,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
 
 
         {/* 7. Rarity */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Rarity</legend>
           <div className="flex flex-wrap gap-2 mt-2">
             {RARITIES.map((rar) => (
@@ -3842,11 +3842,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
 
         {/* Sort section hidden but functionality preserved */}
-        {/* <fieldset className="bg-gray-900 rounded-xl p-3 border border-gray-800">
+        {/* <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
           <legend className="text-sm text-gray-300">Sort</legend> */}
           <div className="flex items-center gap-2 mt-2">
             <select
-              className="px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               value={state.sortBy}
               onChange={(e) => dispatch({ type: "SET_SORT", sortBy: e.target.value })}
             >
@@ -3857,7 +3857,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               <option value="rarity">Rarity</option>
             </select>
             <select
-              className="px-2 py-1 rounded-lg bg-gray-800 border border-gray-700"
+              className="px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
               value={state.sortDir}
               onChange={(e) => dispatch({ type: "SET_SORT", sortDir: e.target.value })}
             >
@@ -3877,7 +3877,7 @@ function TogglePill({ label, active, onClick }) {
       className={`px-3 py-1.5 rounded-full border text-sm ${
         active
           ? "bg-emerald-900/80 border-emerald-700 text-emerald-100"
-          : "bg-gray-800 border-gray-700 text-gray-200"
+          : "bg-gray-800 border-white/10 text-gray-200"
       }`}
       onClick={onClick}
     >
@@ -3909,7 +3909,7 @@ function EnhancedCurveChart({ data }) {
             id="show-meta"
             checked={showMeta}
             onChange={(e) => setShowMeta(e.target.checked)}
-            className="rounded bg-gray-800 border-gray-700"
+            className="rounded bg-gray-800 border-white/10"
           />
           <label htmlFor="show-meta" className="text-gray-300">Show meta curve</label>
         </div>
@@ -3918,7 +3918,7 @@ function EnhancedCurveChart({ data }) {
           <select 
             value={selectedArchetype}
             onChange={(e) => setSelectedArchetype(e.target.value)}
-            className="bg-gray-800 rounded px-2 py-1 text-xs border border-gray-700"
+            className="bg-gray-800 rounded px-2 py-1 text-xs border border-white/10"
           >
             {archetypes.map(arch => (
               <option key={arch} value={arch}>
@@ -4158,7 +4158,7 @@ function DrawProbabilityTool({ deck }) {
         <div>
           <label className="block text-xs uppercase text-gray-400 mb-1">Select Card</label>
           <select 
-            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
             value={selectedCard}
             onChange={(e) => setSelectedCard(e.target.value)}
           >
@@ -4175,7 +4175,7 @@ function DrawProbabilityTool({ deck }) {
         <div>
           <label className="block text-xs uppercase text-gray-400 mb-1">Target Turn</label>
           <select 
-            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
             value={targetTurn}
             onChange={(e) => setTargetTurn(parseInt(e.target.value))}
           >
@@ -4196,7 +4196,7 @@ function DrawProbabilityTool({ deck }) {
             id="mulligan" 
             checked={withMulligan}
             onChange={(e) => setWithMulligan(e.target.checked)}
-            className="rounded bg-gray-800 border-gray-700"
+            className="rounded bg-gray-800 border-white/10"
           />
           <label htmlFor="mulligan" className="text-sm text-gray-300">
             Include mulligan opportunity
@@ -4209,7 +4209,7 @@ function DrawProbabilityTool({ deck }) {
               Cards to Mulligan
             </label>
             <select 
-              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
               value={mulliganCount}
               onChange={(e) => setMulliganCount(parseInt(e.target.value))}
             >
@@ -4234,7 +4234,7 @@ function DrawProbabilityTool({ deck }) {
             id="monte-carlo" 
             checked={useMonteCarloSim}
             onChange={(e) => setUseMonteCarloSim(e.target.checked)}
-            className="rounded bg-gray-800 border-gray-700"
+            className="rounded bg-gray-800 border-white/10"
           />
           <label htmlFor="monte-carlo" className="text-sm text-gray-300">
             🎲 Use Monte Carlo simulation
@@ -4247,7 +4247,7 @@ function DrawProbabilityTool({ deck }) {
               Number of Simulations
             </label>
             <select 
-              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
               value={simulations}
               onChange={(e) => setSimulations(parseInt(e.target.value))}
             >
@@ -4542,7 +4542,7 @@ function DrawSimulator({ deck }) {
           <select 
             value={numSimulations}
             onChange={(e) => setNumSimulations(parseInt(e.target.value))}
-            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700"
+            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
           >
             <option value={1}>1 (Preview)</option>
             <option value={10}>10 (Quick)</option>
@@ -4701,7 +4701,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
   if (!card || typeof card !== 'object' || !card.name) {
     console.warn('[CardTile] Invalid card object, showing fallback:', card);
     return (
-      <div className="group relative bg-gray-900 rounded-xl border border-gray-800 overflow-hidden w-full h-96 flex items-center justify-center">
+      <div className="group relative bg-gray-900 rounded-xl border border-white/10 overflow-hidden w-full h-96 flex items-center justify-center">
         <div className="text-center text-gray-400">
           <div className="text-sm mb-2">Invalid Card</div>
           <div className="text-xs">Missing or corrupted data</div>
@@ -4884,8 +4884,8 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-xl border border-gray-700 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-xl border border-white/10 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-xl font-semibold">Deck Manager</h2>
           <button
             onClick={onClose}
@@ -4897,7 +4897,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
         <div className="flex h-96">
           {/* Left side - Deck list */}
-          <div className="w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
+          <div className="w-1/3 border-r border-white/10 p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Your Decks</h3>
               <div className="flex items-center gap-2">
@@ -5047,7 +5047,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                     Duplicate Deck
                   </button>
 
-                  <div className="border-t border-gray-700 pt-3">
+                  <div className="border-t border-white/10 pt-3">
                     <h4 className="font-medium mb-2">Export</h4>
                     <div className="flex gap-2 mb-2">
                       <select
@@ -5069,7 +5069,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-700 pt-3">
+                  <div className="border-t border-white/10 pt-3">
                     <h4 className="font-medium mb-2">Import</h4>
                     <div className="space-y-2">
                       <select
@@ -5236,8 +5236,8 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
         {Object.keys(groupedByCost)
           .sort((a, b) => parseInt(a) - parseInt(b))
           .map((cost) => (
-            <div key={cost} className="bg-gray-900 rounded-xl border border-gray-800">
-              <div className="px-3 py-2 font-semibold border-b border-gray-800">
+            <div key={cost} className="bg-gray-900 rounded-xl border border-white/10">
+              <div className="px-3 py-2 font-semibold border-b border-white/10">
                 Cost {cost}
               </div>
               <div className="divide-y divide-gray-800">
@@ -5269,7 +5269,7 @@ function DeckRow({ entry, onSetCount, onRemove }) {
           <img 
             src={imgSrc} 
             alt={c.name} 
-            className="w-16 h-22 object-cover rounded-lg border border-gray-700 hover:border-gray-600 transition-colors" 
+            className="w-16 h-22 object-cover rounded-lg border border-white/10 hover:border-gray-600 transition-colors" 
             onError={(e) => {
               // Fallback to text display if image fails to load
               e.target.style.display = 'none';
@@ -5279,7 +5279,7 @@ function DeckRow({ entry, onSetCount, onRemove }) {
         ) : null}
         {/* Fallback display when no image */}
         <div 
-          className={`w-16 h-22 bg-gray-800 rounded-lg border border-gray-700 flex items-center justify-center ${
+          className={`w-16 h-22 bg-gray-800 rounded-lg border border-white/10 flex items-center justify-center ${
             imgSrc ? 'hidden' : 'flex'
           }`}
         >
@@ -5512,9 +5512,9 @@ function Modal({ open, onClose, title, children, footer, size = "md" }) {
   };
   
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className={`bg-gray-900 border border-gray-800 rounded-2xl ${sizeClasses[size]} shadow-2xl`}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className={`bg-[#11151f] border border-white/10 rounded-2xl ${sizeClasses[size]} shadow-2xl`}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div className="text-lg font-semibold font-display">{title}</div>
           <button
             className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
@@ -5524,7 +5524,7 @@ function Modal({ open, onClose, title, children, footer, size = "md" }) {
           </button>
         </div>
         <div className="p-4 overflow-y-auto overflow-x-hidden max-h-[calc(95vh-120px)]">{children}</div>
-        {footer && <div className="px-4 py-3 border-t border-gray-800">{footer}</div>}
+        {footer && <div className="px-4 py-3 border-t border-white/10">{footer}</div>}
       </div>
     </div>
   );
@@ -5543,14 +5543,14 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   console.log('[InspectCardModal] Card version:', card.version);
   
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="relative flex justify-center w-full">
         {/* Card Image Container - this will be the positioning context for the X button */}
         <div className="relative">
           <img 
             src={imgSrc} 
             alt={card.name} 
-            className="w-auto h-auto max-w-[99.5%] max-h-[calc(90vh-100px)] object-contain rounded-xl border border-gray-800"
+            className="w-auto h-auto max-w-[99.5%] max-h-[calc(90vh-100px)] object-contain rounded-xl border border-white/10"
           />
           
           {/* Close Button - positioned relative to the card image */}
@@ -5597,7 +5597,7 @@ return (
   <div>
     <div className="text-sm text-gray-400 mb-1">Deck JSON</div>
     <textarea
-      className="w-full h-64 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
+      className="w-full h-64 px-3 py-2 rounded-xl bg-gray-800 border border-white/10 font-mono text-xs"
       readOnly
       value={json}
     />
@@ -5748,7 +5748,7 @@ function ImportModal({ open, onClose, onImport }) {
             </div>
           )}
           <textarea
-            className="w-full h-48 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 font-mono text-xs"
+            className="w-full h-48 px-3 py-2 rounded-xl bg-gray-800 border border-white/10 font-mono text-xs"
             placeholder={importFormat === 'json' ? '{"name":"My Deck","entries":{...},"total":60}' : '4 Rafiki - Mystical Fighter\n2 The Magic Feather\n4 Sail The Azurite Sea'}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -7531,7 +7531,7 @@ function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
         </div>
         
         {/* Action Buttons - Improved Layout */}
-        <div className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 mt-6 pt-6 pb-4">
+        <div className="bg-gray-900/95 backdrop-blur-sm border-t border-white/10 mt-6 pt-6 pb-4">
           {/* Primary Actions Row */}
           <div className="flex justify-center gap-3 mb-4">
             {/* Download Image Button */}
@@ -9798,7 +9798,7 @@ useEffect(() => {
           />
 
           {/* Essential Quick Filters */}
-          <div className="p-4 bg-gray-900/70 border-b border-gray-800 sticky top-16 z-30 backdrop-blur">
+          <div className="p-4 bg-gray-900/70 border-b border-white/10 sticky top-16 z-30 backdrop-blur">
   <div className="flex flex-wrap items-center gap-4">
     <div className="text-gray-300 font-medium">Quick Filters:</div>
 
@@ -9956,7 +9956,7 @@ useEffect(() => {
 ) && (
   <div
     key={`active-filters-${filters._resetTimestamp ?? "init"}`}
-    className="p-3 bg-gray-900/50 border-b border-gray-800"
+    className="p-3 bg-white/[0.02] border-b border-white/10"
   >
     <div className="text-sm text-gray-300 mb-2">Active Filters:</div>
     <div className="flex flex-wrap gap-2">
@@ -10091,7 +10091,7 @@ useEffect(() => {
 
   {/* Sticky Deck Panel - Fixed width, sticky to bottom of viewport */}
   <div className="hidden lg:block w-96 flex-shrink-0">
-    <div className="sticky bottom-0 border-l border-gray-800 bg-gray-950/95 backdrop-blur-sm">
+    <div className="sticky bottom-0 border-l border-white/10 bg-gray-950/95 backdrop-blur-sm">
       <DeckPanel
         deck={deck}
         onSetCount={handleSetCount}
@@ -10114,7 +10114,7 @@ useEffect(() => {
 </div>
 
 {/* Mobile Deck Panel - Sticky to bottom on small screens */}
-<div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-950/95 backdrop-blur-sm border-t border-gray-800">
+<div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-950/95 backdrop-blur-sm border-t border-white/10">
   <div className="max-h-96 overflow-y-auto">
     <DeckPanel
       deck={deck}
@@ -10229,7 +10229,7 @@ useEffect(() => {
 {showTeamHub && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-      <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
+      <div className="flex justify-between items-center p-4 border-b border-white/10 flex-shrink-0">
         <h2 className="text-xl font-semibold text-white">Team Hub</h2>
         <button
           onClick={() => setShowTeamHub(false)}
