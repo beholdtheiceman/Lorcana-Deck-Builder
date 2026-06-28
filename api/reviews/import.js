@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
+import { postDiscord } from "../_lib/discord.js";
 
 /**
  * Stage A: import a fully-formed review object (produced by an external agent /
@@ -47,7 +48,7 @@ export default withAuth(async (req, res, session) => {
   const userId = session.uid;
   const hub = await prisma.hub.findFirst({
     where: { id: data.hubId, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-    select: { id: true },
+    select: { id: true, name: true, discordWebhookUrl: true },
   });
   if (!hub) return res.status(403).json({ error: "Forbidden" });
 
@@ -68,6 +69,13 @@ export default withAuth(async (req, res, session) => {
       leakTags: data.leakTags,
     },
   });
+
+  // Fire-and-forget Discord notification (never blocks/breaks the response).
+  const matchup = [review.deckArchetype, review.vsArchetype].filter(Boolean).join(" vs ");
+  await postDiscord(
+    hub.discordWebhookUrl,
+    `📝 **New review filed in ${hub.name}**${matchup ? `: ${matchup}` : ""}${review.result ? ` (${review.result})` : ""}`
+  );
 
   return res.status(201).json(review);
 });

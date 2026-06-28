@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
+import { postDiscord } from "../_lib/discord.js";
 
 const keyCard = z.object({
   id: z.union([z.string(), z.number()]).nullish(),
@@ -31,7 +32,9 @@ export default withAuth(async (req, res, session) => {
     include: {
       hub: {
         select: {
+          name: true,
           ownerId: true,
+          discordWebhookUrl: true,
           members: { where: { userId }, select: { id: true } },
         },
       },
@@ -73,6 +76,13 @@ export default withAuth(async (req, res, session) => {
       data: update,
       include: { owner: { select: { id: true, email: true } } },
     });
+
+    // Fire-and-forget Discord notification (never blocks/breaks the response).
+    await postDiscord(
+      primer.hub.discordWebhookUrl,
+      `📖 **Primer updated in ${primer.hub.name}**: ${updated.deckArchetype} vs ${updated.vsArchetype}`
+    );
+
     return res.status(200).json(updated);
   }
 
