@@ -10360,8 +10360,10 @@ function applyFilters(cards, filters) {
         cardTypes = [c._raw.type];
       }
       
-      console.log(`[Filter Debug] Card "${c.name}" has types:`, cardTypes);
-      
+      // Normalize to an array of strings — some cards have non-string/nested type
+      // data, which crashed `type.toLowerCase()` below and white-screened the app.
+      cardTypes = (Array.isArray(cardTypes) ? cardTypes : [cardTypes]).flat().map((t) => String(t ?? ""));
+
       // Special handling for Song type - check if it's an Action - Song
       if (filters.types.has("Song")) {
         // If Song is selected, include cards with type "Action - Song" or "Song"
