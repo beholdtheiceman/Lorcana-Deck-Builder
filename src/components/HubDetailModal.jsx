@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DeckViewModal from './DeckViewModal';
+import ReplayReviewPanel from './ReplayReviewPanel';
+import InsightsWidget from './InsightsWidget';
 
 const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
   const [hubDecks, setHubDecks] = useState([]);
@@ -7,6 +9,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
   const [error, setError] = useState('');
   const [selectedDeck, setSelectedDeck] = useState(null);
   const [deletingDeckId, setDeletingDeckId] = useState(null);
+  const [activeTab, setActiveTab] = useState('decks');
 
   useEffect(() => {
     const fetchHubDecks = async () => {
@@ -141,7 +144,37 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {loading ? (
+          {/* Tab bar */}
+          <div className="mb-4 flex gap-2 border-b border-white/10">
+            {[['decks', 'Decks'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${activeTab === id ? 'border-violet-400 text-violet-300' : 'border-transparent text-gray-400 hover:text-white'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Reviews surface */}
+          {activeTab === 'reviews' && (
+            <div>
+              <InsightsWidget hubId={hub.id} />
+              <div className="mt-4">
+                <ReplayReviewPanel hubId={hub.id} />
+              </div>
+            </div>
+          )}
+
+          {/* Primers surface */}
+          {activeTab === 'primers' && (
+            <ReplayReviewPanel hubId={hub.id} />
+          )}
+
+          {/* Decks surface */}
+          {activeTab === 'decks' && (
+          loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-white">Loading decks...</div>
             </div>
@@ -246,6 +279,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
                 )}
               </div>
             </div>
+          )
           )}
         </div>
       </div>

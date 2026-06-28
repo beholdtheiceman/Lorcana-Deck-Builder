@@ -1,7 +1,7 @@
 import { prisma } from "../_lib/db.js";
 import { readJson } from "../_lib/http.js";
 import { setSession } from "../_lib/auth.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const Register = z.object({ 
