@@ -73,6 +73,9 @@ model Hub {
   llmMonthlyTokenBudget Int?       @default(500000)
   llmUsage              LlmUsage[]
 
+  // Tournament result sync (M5)
+  tournamentResults TournamentResult[]
+
   @@index([inviteCode])
   @@index([ownerId])
 }
@@ -248,4 +251,29 @@ model LlmUsage {
   hub Hub @relation(fields: [hubId], references: [id], onDelete: Cascade)
 
   @@index([hubId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Tournament result sync (M5) — normalized results from PlayHub / Melee /
+// manual / image import. Deduped per hub by (source, externalId).
+// ---------------------------------------------------------------------------
+
+model TournamentResult {
+  id            String    @id @default(uuid())
+  hubId         String
+  addedById     String?
+  source        String                          // "playhub" | "melee" | "manual" | "image"
+  externalId    String?                         // id in the source system, for dedupe
+  eventName     String
+  eventDate     DateTime?
+  playerName    String?
+  deckArchetype String?
+  placement     Int?
+  record        String?                         // e.g. "5-1"
+  createdAt     DateTime  @default(now())
+
+  hub Hub @relation(fields: [hubId], references: [id], onDelete: Cascade)
+
+  @@unique([hubId, source, externalId])
+  @@index([hubId, eventDate])
 }
