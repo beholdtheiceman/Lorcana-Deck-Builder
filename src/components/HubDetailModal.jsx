@@ -5,6 +5,7 @@ import InsightsWidget from './InsightsWidget';
 import PlaytestLog from './PlaytestLog';
 import EventsPanel from './EventsPanel';
 import LlmBudgetBar from './LlmBudgetBar';
+import PaperReviewForm from './PaperReviewForm';
 
 const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
   const [hubDecks, setHubDecks] = useState([]);
@@ -174,6 +175,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
           {activeTab === 'reviews' && (
             <div>
               <LlmBudgetBar hubId={hub.id} />
+              <PaperReviewForm hubId={hub.id} />
               <InsightsWidget hubId={hub.id} />
               <div className="mt-4">
                 <ReplayReviewPanel hubId={hub.id} />
