@@ -3268,7 +3268,7 @@ function hydrateFilterState(raw) {
     classifications: new Set(raw.classifications || []),
     abilities: new Set(raw.abilities || []),
     selectedCosts: new Set(raw.selectedCosts || []),
-    showFilterPanel: raw.showFilterPanel || false,
+    showFilterPanel: false, // always start closed on load
     setNumber: raw.setNumber || "",
     franchise: raw.franchise || "",
     gamemode: raw.gamemode || "",
