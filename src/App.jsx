@@ -1,3 +1,6 @@
+// Local utilities -------------------------------------------------------------
+import { CARD_TYPES, getCardImg } from "./lib/cardUtils.js";
+
 // React & ecosystem -----------------------------------------------------------
 import React, {
   useCallback,
@@ -191,9 +194,7 @@ const INK_COLORS = ["Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"]
 // Rarity options sample
 const RARITIES = ["Common", "Uncommon", "Rare", "Super Rare", "Legendary"];
 
-// Card types (simplified). Adjust to your schema.
-// Note: "Song" represents "Action - Song" cards from the API
-const CARD_TYPES = ["Character", "Action", "Item", "Location", "Song"];
+// CARD_TYPES is imported from ./lib/cardUtils.js
 
 // Card classifications (Lorcana character classifications)
 const CLASSIFICATIONS = [
@@ -4686,11 +4687,7 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
 }
 
 // Enhanced image function that supports multiple image sources
-function getCardImg(card) {
-  // Use multiple image sources for better compatibility
-  const u = card.image_url || card._imageFromAPI || card.image || "";
-  return u; // or: `https://images.weserv.nl/?url=${encodeURIComponent(u)}&output=jpg`;
-}
+// getCardImg is imported from ./lib/cardUtils.js
 
 function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
   if (!card || typeof card !== 'object' || !card.name) {
