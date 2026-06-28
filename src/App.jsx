@@ -302,7 +302,7 @@ const INKABLE_OPTIONS = ["Any", "Inkable", "Non-Inkable"];
 
 // Legacy code mapping for UI compatibility (TFC ↔ "1", ROC ↔ "2", etc.)
 const LEGACY_TO_LORCAST = {
-  TFC: "1", ROC: "2", IAT: "3", URS: "4", SSK: "5", AZS: "6", ARI: "7", ROJ: "8", FAB: "9", D100: "D100"
+  TFC: "1", ROC: "2", IAT: "3", URS: "4", SSK: "5", AZS: "6", ARI: "7", ROJ: "8", FAB: "9", WITW: "10", WSP: "11", WLD: "12", AOV: "13", D100: "D100"
 };
 const LORCAST_TO_LEGACY = Object.fromEntries(
   Object.entries(LEGACY_TO_LORCAST).map(([k, v]) => [v, k])
@@ -319,10 +319,14 @@ const SETS = [
   { code: "ARI", name: "Archazia's Island", shortName: "ARI", setNum: 7 },
   { code: "ROJ", name: "Reign of Jafar", shortName: "ROJ", setNum: 8 },
   { code: "FAB", name: "Fabled", shortName: "FAB", setNum: 9 },
+  { code: "WITW", name: "Whispers in the Well", shortName: "WITW", setNum: 10 },
+  { code: "WSP", name: "Winterspell", shortName: "WSP", setNum: 11 },
+  { code: "WLD", name: "Wilds Unknown", shortName: "WLD", setNum: 12 },
+  { code: "AOV", name: "Attack of the Vine!", shortName: "AOV", setNum: 13 },
 ];
 
 // Set order for consistent sorting (ink → set → set number → card number)
-const SET_ORDER = ["TFC", "ROC", "IAT", "URS", "SSK", "AZS", "ARI", "ROJ", "FAB"];
+const SET_ORDER = ["TFC", "ROC", "IAT", "URS", "SSK", "AZS", "ARI", "ROJ", "FAB", "WITW", "WSP", "WLD", "AOV"];
 
 // Helper function to get set info by set number
 function getSetByNumber(setNum) {
@@ -336,7 +340,7 @@ function getSetByCode(code) {
 
 // Robust card comparison function that doesn't rely on set_num
 const INK_ORDER = ["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
-const SET_CODE_ORDER = ["1","2","3","4","5","6","7","8","9","D100"]; // extend as new sets arrive
+const SET_CODE_ORDER = ["1","2","3","4","5","6","7","8","9","10","11","12","13","D100"]; // extend as new sets arrive
 
 function primaryInk(card){
   const ink = (Array.isArray(card.inks) && card.inks[0]) || card.ink || card._raw?.ink || "";
@@ -352,23 +356,24 @@ function collectorParts(card){
 
 
 function cardComparator(a, b) {
-  // 1) Ink
-  const inkA = primaryInk(a);
-  const inkB = primaryInk(b);
-  const ia = INK_ORDER.indexOf(inkA);
-  const ib = INK_ORDER.indexOf(inkB);
-  if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-
-  // 2) Set: prefer numeric code, else explicit order list
+  // 1) Set — newest first (numeric set code descending; unknown sets last)
   const ac = String(a.setCode || "").toUpperCase();
   const bc = String(b.setCode || "").toUpperCase();
   const an = /^\d+$/.test(ac) ? Number(ac) : null;
   const bn = /^\d+$/.test(bc) ? Number(bc) : null;
-  if (an != null && bn != null && an !== bn) return an - bn;
+  if (an != null && bn != null && an !== bn) return bn - an;
+  if (an != null && bn == null) return -1;
+  if (an == null && bn != null) return 1;
+  if (an == null && bn == null) {
+    const sa = SET_CODE_ORDER.indexOf(ac);
+    const sb = SET_CODE_ORDER.indexOf(bc);
+    if (sa !== sb) return (sb === -1 ? -1 : sb) - (sa === -1 ? -1 : sa);
+  }
 
-  const sa = SET_CODE_ORDER.indexOf(ac);
-  const sb = SET_CODE_ORDER.indexOf(bc);
-  if (sa !== sb) return (sa === -1 ? 999 : sa) - (sb === -1 ? 999 : sb);
+  // 2) Ink (within a set)
+  const ia = INK_ORDER.indexOf(primaryInk(a));
+  const ib = INK_ORDER.indexOf(primaryInk(b));
+  if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
 
   // 3) Collector number (numeric then suffix)
   const ca = collectorParts(a);
@@ -10615,7 +10620,7 @@ function applyFilters(cards, filters) {
     
     if (filters.gamemode === "Core Constructed") {
       // Core Constructed: only allow sets 5+ (exclude sets 1-4)
-      const allowedSetNums = new Set([5, 6, 7, 8, 9]); // SSK, AZS, ARI, ROJ, FAB
+      const allowedSetNums = new Set([5, 6, 7, 8, 9, 10, 11, 12, 13]); // Core Constructed: sets 5+
       
       list = list.filter((c) => {
         // Try multiple sources for set number information (same as sets filter)
