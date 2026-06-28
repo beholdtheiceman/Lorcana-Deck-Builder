@@ -133,9 +133,9 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
   }, [entries, _focus]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Top-line stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
         <StatBox label="Total Cards" value={totals.total} />
         <StatBox label="Inkable" value={`${totals.inkable} (${pct(totals.inkable, totals.total)})`} />
         <StatBox label="Uninkable" value={`${totals.uninkable} (${pct(totals.uninkable, totals.total)})`} />
@@ -144,7 +144,7 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
 
       {/* Cost curve */}
       <Section title="Cost Curve">
-        <div className="grid grid-cols-10 gap-1 items-end">
+        <div className="grid gap-1 items-end" style={{ gridTemplateColumns: "repeat(10, minmax(0, 1fr))" }}>
           {curve.map((v, i) => (
             <Bar key={i} label={i === 9 ? "9+" : i} value={v} max={Math.max(...curve, 1)} />
           ))}
@@ -153,7 +153,7 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
 
       {/* Type counts */}
       <Section title="Card Types">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="flex flex-wrap gap-2">
           {Object.entries(typeCounts).map(([k, v]) => (
             <Pill key={k} label={k} value={v} />
           ))}
@@ -189,7 +189,7 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
 function Section({ title, children }) {
   return (
     <div>
-      <h5 className="text-base font-semibold mb-2 text-violet-300">{title}</h5>
+      <h5 className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-violet-300">{title}</h5>
       {children}
     </div>
   );
@@ -199,7 +199,7 @@ function StatBox({ label, value }) {
   return (
     <div className="rounded-lg bg-white/[0.03] px-3 py-2 border border-white/10">
       <div className="text-xs text-gray-400">{label}</div>
-      <div className="text-lg font-semibold text-gray-100">{value}</div>
+      <div className="text-base font-semibold text-gray-100 tabular-nums">{value}</div>
     </div>
   );
 }

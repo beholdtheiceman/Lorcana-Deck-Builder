@@ -3470,7 +3470,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
       <div className="flex items-center gap-2">
 
         <button
-          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
+          className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
           onClick={onToggleFilters}
           title="Toggle filters (Ctrl+F)"
         >
@@ -3484,14 +3484,14 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
           Decks
         </button>
         <button
-          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
+          className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
           onClick={onNewDeck}
           title="Start fresh deck"
         >
           New
         </button>
         <button
-          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
+          className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
           onClick={onImport}
           title="Import deck JSON"
         >
@@ -4728,9 +4728,9 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
       )}
       
       {/* Add/Remove buttons with count fraction - always visible to prevent layout shifts */}
-      <div className="absolute inset-x-0 bottom-0 px-2 pb-2 pt-7 flex items-center gap-2 bg-gradient-to-t from-black/85 via-black/50 to-transparent">
+      <div className="absolute inset-x-0 bottom-0 px-1.5 pb-1.5 pt-6 flex items-center gap-1.5 bg-gradient-to-t from-black/80 to-transparent">
         <button
-          className="w-7 h-7 rounded-lg text-white text-base leading-none flex items-center justify-center bg-gradient-to-b from-violet-500 to-indigo-500 shadow-[0_3px_12px_-3px_rgba(139,108,255,0.8)] hover:brightness-110 transition"
+          className="w-6 h-6 rounded-md text-white text-sm leading-none flex items-center justify-center bg-gradient-to-b from-violet-500 to-indigo-500 shadow-[0_3px_12px_-3px_rgba(139,108,255,0.8)] hover:brightness-110 transition"
           onClick={(e) => { e.stopPropagation(); onAdd(card, 1); }}
           title="Add to deck"
         >
@@ -4738,7 +4738,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         </button>
         
         <button
-          className={`w-6 h-6 rounded-full border text-xs flex items-center justify-center transition-colors ${
+          className={`w-6 h-6 rounded-md border text-sm flex items-center justify-center transition ${
             deckCount > 0 
               ? 'bg-red-900/90 border-red-700 text-red-100 hover:bg-red-800 cursor-pointer' 
               : 'bg-gray-900/50 border-gray-600 text-gray-500 cursor-not-allowed'
@@ -4754,7 +4754,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         </button>
         
         {/* Card count display as fraction */}
-        <div className="ml-auto bg-black/60 backdrop-blur border border-white/15 text-white text-xs font-semibold px-2.5 py-1 rounded-lg tabular-nums">
+        <div className="ml-auto bg-black/60 backdrop-blur border border-white/15 text-white text-[11px] font-semibold px-2 py-0.5 rounded-md tabular-nums">
           {deckCount}/4
         </div>
       </div>
@@ -5515,7 +5515,7 @@ function Modal({ open, onClose, title, children, footer, size = "md" }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div className="text-lg font-semibold font-display">{title}</div>
           <button
-            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
+            className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
             onClick={onClose}
           >
             Close
@@ -5610,7 +5610,7 @@ return (
       Copy JSON
     </button>
     <a
-      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
+      className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
       href={`data:application/json;charset=utf-8,${encodeURIComponent(json)}`}
       download={`${(deck.name || "deck").replace(/\s+/g, "_")}.json`}
     >
