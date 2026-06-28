@@ -69,6 +69,10 @@ model Hub {
   discordWebhookUrl String?
   events            Event[]
 
+  // Self-serve AI budget guard (M3). null/<=0 = unlimited.
+  llmMonthlyTokenBudget Int?       @default(500000)
+  llmUsage              LlmUsage[]
+
   @@index([inviteCode])
   @@index([ownerId])
 }
@@ -225,4 +229,23 @@ model Event {
 
   @@index([hubId])
   @@index([hubId, startsAt])
+}
+
+// ---------------------------------------------------------------------------
+// LLM usage ledger (M3) — one row per AI review generation, summed per month
+// to enforce a hub's token budget.
+// ---------------------------------------------------------------------------
+
+model LlmUsage {
+  id           String   @id @default(uuid())
+  hubId        String
+  userId       String?
+  kind         String                          // "generate" | "regenerate"
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  hub Hub @relation(fields: [hubId], references: [id], onDelete: Cascade)
+
+  @@index([hubId, createdAt])
 }

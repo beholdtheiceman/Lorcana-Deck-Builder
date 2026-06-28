@@ -4,6 +4,7 @@ import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
 import { buildReviewContext } from "../_lib/reviewContext.js";
+import { getBudgetStatus, recordUsage } from "../_lib/llmBudget.js";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_CONTEXT_CHARS = 60000;
@@ -82,6 +83,17 @@ export default withAuth(async (req, res, session) => {
     context = context.slice(0, MAX_CONTEXT_CHARS) + "\n…[context truncated]";
   }
 
+  // Budget guard: refuse if the hub has hit its monthly token cap.
+  const budget = await getBudgetStatus(review.hubId);
+  if (budget.exceeded) {
+    return res.status(429).json({
+      error:
+        `Monthly AI budget reached for this hub ` +
+        `(${budget.used.toLocaleString()} / ${budget.budget.toLocaleString()} tokens). ` +
+        `The hub owner can raise it in the Reviews tab.`,
+    });
+  }
+
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const userInstruction =
     "Using only the context below, write the review as JSON with exactly this shape:\n" +
@@ -89,14 +101,24 @@ export default withAuth(async (req, res, session) => {
     "Return ONLY the JSON object, no prose, no markdown fences.\n\n=== CONTEXT ===\n" +
     context;
 
-  let out = await callModel(client, userInstruction);
-  if (!out) {
-    out = await callModel(
+  const totalUsage = { input_tokens: 0, output_tokens: 0 };
+  const addUsage = (u) => {
+    totalUsage.input_tokens += u?.input_tokens ?? 0;
+    totalUsage.output_tokens += u?.output_tokens ?? 0;
+  };
+
+  let result = await callModel(client, userInstruction);
+  addUsage(result.usage);
+  if (!result.data) {
+    result = await callModel(
       client,
       userInstruction + "\n\nYour previous reply was not valid JSON. Reply with the raw JSON object only."
     );
+    addUsage(result.usage);
   }
-  if (!out) return res.status(502).json({ error: "Model did not return valid JSON" });
+  await recordUsage(review.hubId, userId, "regenerate", totalUsage);
+  if (!result.data) return res.status(502).json({ error: "Model did not return valid JSON" });
+  const out = result.data;
 
   const updated = await prisma.review.update({
     where: { id },
@@ -124,16 +146,17 @@ async function callModel(client, userInstruction) {
     .map((b) => b.text)
     .join("")
     .trim();
+  const usage = resp.usage;
   const json = extractJson(text);
-  if (!json) return null;
+  if (!json) return { data: null, usage };
   let obj;
   try {
     obj = JSON.parse(json);
   } catch {
-    return null;
+    return { data: null, usage };
   }
   const v = ModelOutSchema.safeParse(obj);
-  return v.success ? v.data : null;
+  return { data: v.success ? v.data : null, usage };
 }
 
 function extractJson(text) {
