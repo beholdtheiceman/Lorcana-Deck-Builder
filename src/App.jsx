@@ -9,6 +9,8 @@ import React, {
   Fragment,
   createContext,
   useContext,
+  lazy,
+  Suspense,
 } from "react";
 
 // Auth context
@@ -45,7 +47,12 @@ import {
 import AuthButton from './components/AuthButton';
 import TeamHub from './components/TeamHub';
 import DeckStatistics from './components/DeckStats';
-import StandingsImageImport from './components/StandingsImageImport';
+
+// OCR (tesseract.js) is heavy; load it on demand only when the image-import tab is opened.
+const StandingsImageImportLazy = lazy(() => import("./components/StandingsImageImport"));
+function StandingsImageImport(props) {
+  return React.createElement(Suspense, { fallback: React.createElement("div", { className: "p-4 text-sm text-gray-300" }, "Loading image importer…") }, React.createElement(StandingsImageImportLazy, props));
+}
 
 // --- Helper components for Tournament Results UI ---
 const Section = ({ title, subtitle, children }) => (
