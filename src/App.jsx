@@ -5537,9 +5537,14 @@ function InspectCardModal({ open, card, onClose, onAdd }) {
   // Locations are landscape cards, but the image source stores them as a
   // portrait (rotated 90°) frame. Rotate back so they present horizontally,
   // and swap the size constraints so the rotated image still fits the viewport.
-  const isLocation = `${card.type || card.type_line || card._raw?.type || ""}`
-    .toLowerCase()
-    .includes("location");
+  // Card mappings are inconsistent (type can be a string, an array like
+  // ["Location"], or dropped entirely), so check every representation plus
+  // Lorcast's canonical `layout: "landscape"` flag.
+  const rawType =
+    card.type ?? card.type_line ?? card._raw?.type ?? card.types ?? card._raw?.types;
+  const typeStr = (Array.isArray(rawType) ? rawType.join(" ") : `${rawType ?? ""}`).toLowerCase();
+  const layoutStr = `${card.layout ?? card._raw?.layout ?? ""}`.toLowerCase();
+  const isLocation = layoutStr === "landscape" || typeStr.includes("location");
   const imgClass = isLocation
     ? "w-auto h-auto max-w-[calc(90vh-100px)] max-h-[90vw] object-contain rounded-xl border border-white/10 rotate-90"
     : "w-auto h-auto max-w-[99.5%] max-h-[calc(90vh-100px)] object-contain rounded-xl border border-white/10";
