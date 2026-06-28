@@ -19,6 +19,11 @@ model User {
   // Team relationships
   ownedHubs    Hub[]    @relation("HubOwner")
   hubMemberships HubMember[]
+
+  // Replay-review feature
+  ownedPrimers    Primer[]
+  uploadedReplays Replay[]
+  authoredReviews Review[]
 }
 
 model Deck {
@@ -44,6 +49,11 @@ model Hub {
 
   owner       User     @relation("HubOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members     HubMember[]
+
+  // Replay-review feature
+  primers     Primer[]
+  replays     Replay[]
+  reviews     Review[]
 
   @@index([inviteCode])
   @@index([ownerId])
@@ -75,4 +85,81 @@ model Comment {
 
   @@index([deckId])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Replay Review + Strategy Primers (coaching feature)
+// Everything is scoped to a Hub so reviews/primers are team-shared.
+// ---------------------------------------------------------------------------
+
+model Primer {
+  id            String   @id @default(uuid())
+  hubId         String
+  deckArchetype String                       // e.g. "Blurple Control"
+  vsArchetype   String                       // e.g. "Go-Wide Dogs"
+  verdict       String?                      // Favored / Even / Behind
+  confidence    String   @default("Draft")   // Draft / Tentative / Solid
+  gameplan      String?  @db.Text
+  mustKill      String?  @db.Text
+  mistakes      String?  @db.Text
+  keyCards      Json     @default("[]")       // [{id,name,note}]
+  ownerId       String?
+  lastReviewedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  hub     Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  owner   User?    @relation(fields: [ownerId], references: [id])
+  reviews Review[]
+
+  @@unique([hubId, deckArchetype, vsArchetype])
+  @@index([hubId])
+}
+
+model Replay {
+  id            String   @id @default(uuid())
+  hubId         String
+  uploaderId    String
+  source        String                        // duels.ink | lorcanito | paper
+  matchId       String?
+  format        String?                       // Core / Infinity
+  playerName    String?
+  opponentName  String?
+  matchResult   String?                       // W / L
+  matchScore    String?                       // "0-2"
+  parsed        Json     @default("{}")        // normalized summary (see Phase 3)
+  createdAt     DateTime @default(now())
+
+  hub      Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  uploader User     @relation(fields: [uploaderId], references: [id])
+  reviews  Review[]
+
+  @@index([hubId])
+}
+
+model Review {
+  id            String   @id @default(uuid())
+  hubId         String
+  replayId      String?                        // null for paper games w/o file
+  primerId      String?
+  authorId      String?                        // user who triggered it
+  generatedBy   String   @default("llm")       // llm | agent | human
+  gameNumber    Int?                           // which game in a BO3
+  player        String?
+  deckArchetype String?
+  vsArchetype   String?
+  result        String?                        // W / L
+  recap         String   @db.Text              // flow recap
+  lines         Json     @default("[]")         // [{turn, whatHappened, betterLine, why}]
+  leakTags      String[]                        // ["over-traded","target selection"]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  hub    Hub     @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  replay Replay? @relation(fields: [replayId], references: [id], onDelete: SetNull)
+  primer Primer? @relation(fields: [primerId], references: [id], onDelete: SetNull)
+  author User?   @relation(fields: [authorId], references: [id])
+
+  @@index([hubId])
+  @@index([replayId])
 }
