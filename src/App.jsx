@@ -3525,7 +3525,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
 
 function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
   return (
-    <div className="p-3 bg-white/[0.02] border-b border-white/10">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0a0d13]/95 backdrop-blur-sm p-5 md:p-8">
       <div className="flex items-center gap-2 mb-2">
         <input
           className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 placeholder:text-gray-500"
@@ -3546,7 +3546,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
           Reset
         </button>
         <button
-          className="px-3 py-2 rounded-xl bg-emerald-900 border border-emerald-700 hover:bg-emerald-800"
+          className="px-3 py-2 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white hover:brightness-110 transition"
           onClick={onDone}
         >
           Done
@@ -3555,8 +3555,8 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
 
       {/* Inkable Checkboxes - Top Priority */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Inkable Status</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Inkable Status</summary>
           <div className="flex flex-col gap-2 mt-2">
             <label className="flex items-center gap-2">
               <input
@@ -3575,13 +3575,13 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               <span>Show only uninkables</span>
             </label>
           </div>
-        </fieldset>
+        </details>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Ink Colors */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Ink Colors</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Ink Colors</summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {INK_COLORS.map((ink) => (
               <TogglePill
@@ -3592,11 +3592,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               />
             ))}
           </div>
-        </fieldset>
+        </details>
 
         {/* 2. Cost Selection */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Cost</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Cost</summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {Array.from({ length: 11 }, (_, i) => (
               <TogglePill
@@ -3607,11 +3607,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               />
             ))}
           </div>
-        </fieldset>
+        </details>
 
         {/* 3. Types */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Types</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Types</summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {CARD_TYPES.map((t) => (
               <TogglePill
@@ -3622,11 +3622,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               />
             ))}
           </div>
-        </fieldset>
+        </details>
 
         {/* 4. Legality */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Legality</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Legality</summary>
           <select
             className="w-full px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
             value={state.gamemode}
@@ -3639,11 +3639,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               </option>
             ))}
           </select>
-        </fieldset>
+        </details>
 
         {/* 5. Classifications */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Classifications</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Classifications</summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {CLASSIFICATIONS.map((classification) => (
               <TogglePill
@@ -3654,11 +3654,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               />
             ))}
           </div>
-        </fieldset>
+        </details>
 
         {/* 6. Abilities */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Abilities</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Abilities</summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {ABILITIES.map((ability) => (
               <TogglePill
@@ -3670,7 +3670,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
             ))}
           </div>
           <button
-            className="mt-2 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+            className="hidden"
             onClick={() => {
               console.log('[Debug] Current abilities state:', state.abilities);
               dispatch({ type: "RESET" });
@@ -3678,11 +3678,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
           >
             Reset Filters (Debug)
           </button>
-        </fieldset>
+        </details>
 
         {/* 4. Lore Range */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Lore Range</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Lore Range</summary>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
@@ -3702,11 +3702,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               onChange={(e) => dispatch({ type: "SET_LORE_RANGE", max: parseInt(e.target.value || 0) })}
             />
           </div>
-        </fieldset>
+        </details>
 
         {/* 5. Strength Range */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Strength Range</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Strength Range</summary>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
@@ -3726,11 +3726,11 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               onChange={(e) => dispatch({ type: "SET_STRENGTH_RANGE", max: parseInt(e.target.value || 0) })}
             />
           </div>
-        </fieldset>
+        </details>
 
         {/* 6. Willpower Range */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Willpower Range</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Willpower Range</summary>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
@@ -3750,10 +3750,10 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               onChange={(e) => dispatch({ type: "SET_WILLPOWER_RANGE", max: parseInt(e.target.value || 0) })}
             />
           </div>
-        </fieldset>
+        </details>
 
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Sets</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Sets</summary>
           <div className="space-y-3">
             {/* Set Selection */}
             <div>
@@ -3785,7 +3785,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
             {/* Quick Set Actions */}
             <div className="flex gap-2">
               <button
-                className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded border border-gray-600"
+                className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded border border-white/10 text-gray-200"
                 onClick={() => {
                   // Select all sets
                   SETS.forEach(s => {
@@ -3798,7 +3798,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
                 Select All
               </button>
               <button
-                className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded border border-gray-600"
+                className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded border border-white/10 text-gray-200"
                 onClick={() => {
                   // Clear all sets
                   state.sets.forEach(setCode => {
@@ -3812,7 +3812,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
             
             {/* Debug Button */}
             <button
-              className="mt-2 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+              className="hidden"
               onClick={() => {
                 console.log('[Debug] Current sets state:', state.sets);
                 console.log('[Debug] SETS constant:', SETS);
@@ -3821,15 +3821,15 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               Debug Sets (Console)
             </button>
           </div>
-        </fieldset>
+        </details>
 
 
 
 
 
         {/* 7. Rarity */}
-        <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Rarity</legend>
+        <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Rarity</summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {RARITIES.map((rar) => (
               <TogglePill
@@ -3840,15 +3840,15 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               />
             ))}
           </div>
-        </fieldset>
+        </details>
 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
 
         {/* Sort section hidden but functionality preserved */}
-        {/* <fieldset className="bg-gray-900 rounded-xl p-3 border border-white/10">
-          <legend className="text-sm text-gray-300">Sort</legend> */}
+        {/* <details open className="bg-white/[0.03] rounded-xl p-3 border border-white/10">
+          <summary className="text-sm font-semibold text-gray-200 cursor-pointer select-none marker:text-violet-400">Sort</summary> */}
           <div className="flex items-center gap-2 mt-2">
             <select
               className="px-2 py-1 rounded-lg bg-gray-800 border border-white/10"
@@ -3870,7 +3870,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
               <option value="desc">Desc</option>
             </select>
           </div>
-        {/* </fieldset> */}
+        {/* </details> */}
       </div>
     </div>
   );
