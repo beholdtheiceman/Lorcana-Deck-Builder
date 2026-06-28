@@ -3,6 +3,7 @@ import DeckViewModal from './DeckViewModal';
 import ReplayReviewPanel from './ReplayReviewPanel';
 import InsightsWidget from './InsightsWidget';
 import PlaytestLog from './PlaytestLog';
+import EventsPanel from './EventsPanel';
 
 const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
   const [hubDecks, setHubDecks] = useState([]);
@@ -147,7 +148,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
         <div className="flex-1 overflow-y-auto p-4">
           {/* Tab bar */}
           <div className="mb-4 flex gap-2 border-b border-white/10">
-            {[['decks', 'Decks'], ['playtest', 'Playtest'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
+            {[['decks', 'Decks'], ['playtest', 'Playtest'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -161,6 +162,11 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
           {/* Playtest surface */}
           {activeTab === 'playtest' && (
             <PlaytestLog hubId={hub.id} decks={hubDecks} currentUser={user} />
+          )}
+
+          {/* Events surface */}
+          {activeTab === 'events' && (
+            <EventsPanel hubId={hub.id} isOwner={hub.owner?.id === user.id} initialWebhook={hub.discordWebhookUrl || ''} />
           )}
 
           {/* Reviews surface */}

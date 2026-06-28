@@ -27,6 +27,9 @@ model User {
 
   // Playtest tracking
   loggedPlaytestGames PlaytestGame[]
+
+  // Events (M4)
+  createdEvents Event[]
 }
 
 model Deck {
@@ -61,6 +64,10 @@ model Hub {
 
   // Playtest tracking
   playtestGames PlaytestGame[]
+
+  // Discord bridge + events (M4)
+  discordWebhookUrl String?
+  events            Event[]
 
   @@index([inviteCode])
   @@index([ownerId])
@@ -196,4 +203,26 @@ model PlaytestGame {
 
   @@index([hubId])
   @@index([hubId, deckArchetype, vsArchetype])
+}
+
+// ---------------------------------------------------------------------------
+// Events (M4) — team calendar (tournaments, playtest sessions, etc.)
+// ---------------------------------------------------------------------------
+
+model Event {
+  id          String   @id @default(uuid())
+  hubId       String
+  createdById String
+  title       String
+  startsAt    DateTime
+  location    String?
+  kind        String?                          // "Tournament" | "Playtest" | "Other"
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  hub       Hub  @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@index([hubId])
+  @@index([hubId, startsAt])
 }
