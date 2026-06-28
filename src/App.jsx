@@ -3451,9 +3451,9 @@ function filterReducer(state, action) {
 
 function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
   return (
-    <div className="flex items-center justify-between gap-4 p-3 bg-gray-900/70 border-b border-gray-800 sticky top-0 z-40 backdrop-blur">
+    <div className="flex items-center justify-between gap-4 p-3 bg-[#0c0f17]/85 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold text-emerald-400">
+        <h1 className="text-xl font-semibold text-white tracking-tight">
           Lorcana Deck Builder
         </h1>
       </div>
@@ -3461,7 +3461,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
       {/* Search bar - always visible */}
       <div className="flex-1 max-w-md mx-4">
         <input
-          className="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 outline-none focus:border-emerald-400"
+          className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 placeholder:text-gray-500"
           placeholder="Search cards by name, text, etc."
           value={searchText}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -3471,28 +3471,28 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
       <div className="flex items-center gap-2">
 
         <button
-          className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
           onClick={onToggleFilters}
           title="Toggle filters (Ctrl+F)"
         >
           Filters
         </button>
         <button
-          className="px-3 py-1.5 rounded-xl bg-blue-900 border border-blue-700 hover:bg-blue-800"
+          className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition"
           onClick={onDeckManager}
           title="Manage decks"
         >
           Decks
         </button>
         <button
-          className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
           onClick={onNewDeck}
           title="Start fresh deck"
         >
           New
         </button>
         <button
-          className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
           onClick={onImport}
           title="Import deck JSON"
         >
@@ -3500,7 +3500,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
         </button>
         
         <button
-          className="px-3 py-1.5 rounded-xl bg-purple-600 border border-purple-700 hover:bg-purple-700"
+          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-violet-200 hover:bg-violet-500/15 hover:border-violet-400/40 transition"
           onClick={onTeamHub}
           title="Team Hub"
         >
@@ -3523,7 +3523,7 @@ function FilterPanel({ state, dispatch, onDone, onSearchChange }) {
     <div className="p-3 bg-gray-900/50 border-b border-gray-800">
       <div className="flex items-center gap-2 mb-2">
         <input
-          className="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 outline-none focus:border-emerald-400"
+          className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 placeholder:text-gray-500"
           placeholder="Search cards by name, text, etc."
           value={state.text}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -5192,10 +5192,10 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
   }, [entries]);
 
   return (
-    <div className="p-3 bg-gray-950 border-l border-gray-800 h-full flex flex-col gap-3">
+    <div className="p-3 bg-[#0b0e15]/80 backdrop-blur border-l border-white/10 h-full flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <div className="text-lg font-semibold">
-          Deck • <span className="text-emerald-400">{deck.total}</span> /{" "}
+        <div className="text-lg font-semibold font-display">
+          Deck • <span className="text-violet-300">{deck.total}</span> /{" "}
           {DECK_RULES.MAX_SIZE}
         </div>
         <div className="flex items-center gap-2">
@@ -5207,7 +5207,7 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
             Present
           </button>
           <button
-            className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
             onClick={onImport}
           >
             Import
@@ -5515,9 +5515,9 @@ function Modal({ open, onClose, title, children, footer, size = "md" }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className={`bg-gray-900 border border-gray-800 rounded-2xl ${sizeClasses[size]} shadow-2xl`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-          <div className="text-lg font-semibold">{title}</div>
+          <div className="text-lg font-semibold font-display">{title}</div>
           <button
-            className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
             onClick={onClose}
           >
             Close
@@ -5612,7 +5612,7 @@ return (
       Copy JSON
     </button>
     <a
-      className="px-3 py-1.5 rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700"
+      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
       href={`data:application/json;charset=utf-8,${encodeURIComponent(json)}`}
       download={`${(deck.name || "deck").replace(/\s+/g, "_")}.json`}
     >
