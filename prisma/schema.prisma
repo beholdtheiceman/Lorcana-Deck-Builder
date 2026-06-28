@@ -24,6 +24,9 @@ model User {
   ownedPrimers    Primer[]
   uploadedReplays Replay[]
   authoredReviews Review[]
+
+  // Playtest tracking
+  loggedPlaytestGames PlaytestGame[]
 }
 
 model Deck {
@@ -35,6 +38,7 @@ model Deck {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   comments  Comment[]
+  playtestGames PlaytestGame[]
 
   @@index([userId])
 }
@@ -54,6 +58,9 @@ model Hub {
   primers     Primer[]
   replays     Replay[]
   reviews     Review[]
+
+  // Playtest tracking
+  playtestGames PlaytestGame[]
 
   @@index([inviteCode])
   @@index([ownerId])
@@ -162,4 +169,31 @@ model Review {
 
   @@index([hubId])
   @@index([replayId])
+}
+
+// ---------------------------------------------------------------------------
+// Playtest & Matchup tracking (M1)
+// A hub-shared log of practice games that rolls up into win-rate by matchup.
+// ---------------------------------------------------------------------------
+
+model PlaytestGame {
+  id            String   @id @default(uuid())
+  hubId         String
+  loggedById    String                          // user who recorded the game
+  deckId        String?                          // link to a saved Deck when chosen
+  deckArchetype String                           // label/fallback, e.g. "Blurple Control"
+  vsArchetype   String                           // opponent archetype
+  result        String                           // "W" | "L"
+  onPlay        Boolean?                          // true = on the play, false = on the draw
+  format        String?                          // "Core" | "Infinity"
+  lesson        String?  @db.Text                // optional takeaway
+  playedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  hub      Hub   @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  loggedBy User  @relation(fields: [loggedById], references: [id])
+  deck     Deck? @relation(fields: [deckId], references: [id], onDelete: SetNull)
+
+  @@index([hubId])
+  @@index([hubId, deckArchetype, vsArchetype])
 }

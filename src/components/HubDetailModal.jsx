@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DeckViewModal from './DeckViewModal';
 import ReplayReviewPanel from './ReplayReviewPanel';
 import InsightsWidget from './InsightsWidget';
+import PlaytestLog from './PlaytestLog';
 
 const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
   const [hubDecks, setHubDecks] = useState([]);
@@ -146,7 +147,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
         <div className="flex-1 overflow-y-auto p-4">
           {/* Tab bar */}
           <div className="mb-4 flex gap-2 border-b border-white/10">
-            {[['decks', 'Decks'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
+            {[['decks', 'Decks'], ['playtest', 'Playtest'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -156,6 +157,11 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
               </button>
             ))}
           </div>
+
+          {/* Playtest surface */}
+          {activeTab === 'playtest' && (
+            <PlaytestLog hubId={hub.id} decks={hubDecks} currentUser={user} />
+          )}
 
           {/* Reviews surface */}
           {activeTab === 'reviews' && (
