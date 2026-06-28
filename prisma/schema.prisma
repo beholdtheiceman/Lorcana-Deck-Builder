@@ -30,6 +30,9 @@ model User {
 
   // Events (M4)
   createdEvents Event[]
+
+  // Tournament submissions (legacy, reconciled)
+  tournaments Tournament[]
 }
 
 model Deck {
@@ -276,4 +279,58 @@ model TournamentResult {
 
   @@unique([hubId, source, externalId])
   @@index([hubId, eventDate])
+}
+
+// ---------------------------------------------------------------------------
+// Tournament submissions (legacy — created outside Prisma via the standings/
+// raw-DDL path). Reconciled into the schema so `prisma db push` no longer
+// proposes dropping them. Field shapes mirror the live DB exactly.
+// ---------------------------------------------------------------------------
+
+model Tournament {
+  id              String    @id @default(uuid())
+  name            String
+  organizerId     String
+  submitCode      String    @unique
+  description     String?
+  startDate       DateTime?
+  endDate         DateTime?
+  location        String?
+  format          String?
+  maxPlayers      Int?
+  status          String    @default("open")
+  requireApproval Boolean   @default(true)
+  allowAnonymous  Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  casterCode      String?   @unique
+
+  organizer   User         @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+
+  @@index([casterCode])
+  @@index([organizerId])
+  @@index([status])
+  @@index([submitCode])
+}
+
+model Submission {
+  id                 String   @id @default(uuid())
+  tournamentId       String
+  playerName         String?
+  playerEmail        String?
+  playerId           String?
+  deckName           String
+  deckData           Json
+  status             String   @default("pending")
+  exportedToInkdecks Boolean  @default(false)
+  inkdecksId         String?
+  submittedAt        DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([submittedAt])
+  @@index([tournamentId])
 }
