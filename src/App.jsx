@@ -3456,15 +3456,9 @@ function filterReducer(state, action) {
 
 function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
   return (
-    <div className="flex items-center justify-between gap-4 p-3 bg-[#0c0f17]/85 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold text-white tracking-tight">
-          Lorcana Deck Builder
-        </h1>
-      </div>
-
+    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-[#0a0d13]/70 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
       {/* Search bar - always visible */}
-      <div className="flex-1 max-w-md mx-4">
+      <div className="flex-1 max-w-xl">
         <input
           className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 placeholder:text-gray-500"
           placeholder="Search cards by name, text, etc."
@@ -3512,10 +3506,6 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
           Team Hub
         </button>
         
-        {/* Authentication Button */}
-        <div className="ml-4 border-l border-white/10 pl-4">
-          <AuthButton />
-        </div>
       </div>
     </div>
   );
