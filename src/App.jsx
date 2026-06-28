@@ -5197,55 +5197,58 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
   }, [entries]);
 
   return (
-    <div className="p-3 bg-[#0b0e15]/80 backdrop-blur border-l border-white/10 h-full flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="text-lg font-semibold font-display">
-          Deck • <span className="text-violet-300">{deck.total}</span> /{" "}
-          {DECK_RULES.MAX_SIZE}
+    <div className="bg-[#0b0e15]/80 backdrop-blur border-l border-white/10 h-full flex flex-col">
+      {/* Identity / count header */}
+      <div className="p-4 border-b border-white/10 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(80%_120%_at_0%_0%,rgba(139,108,255,0.14),transparent_55%)] pointer-events-none" />
+        <div className="relative flex items-center justify-between mb-3">
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-3xl font-bold leading-none">{deck.total}</span>
+            <span className="text-sm text-gray-500">/ {DECK_RULES.MAX_SIZE}</span>
+            <span className={`ml-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${deck.total === DECK_RULES.MAX_SIZE ? "text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 shadow-[0_0_14px_-4px_#34d399]" : "text-gray-400 bg-white/5 border border-white/10"}`}>
+              {deck.total === DECK_RULES.MAX_SIZE ? "● Legal" : `${Math.max(0, DECK_RULES.MAX_SIZE - deck.total)} to go`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 transition text-sm"
+              onClick={onImport}
+            >
+              Import
+            </button>
+            <button
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition text-sm"
+              onClick={onDeckPresentation}
+              title="View deck presentation with stats and charts"
+            >
+              Present
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition"
-            onClick={onDeckPresentation}
-            title="View deck presentation with stats and charts"
-          >
-            Present
-          </button>
-          <button
-            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
-            onClick={onImport}
-          >
-            Import
-          </button>
+        {/* Inkable ratio bar */}
+        <div className="relative flex items-center gap-3 text-xs">
+          <span className="text-emerald-300 font-medium whitespace-nowrap">{inkableCounts.inkable} inkable</span>
+          <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden border border-white/10">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_-2px_#34d399]"
+              style={{ width: `${deck.total ? (inkableCounts.inkable / deck.total) * 100 : 0}%` }}
+            />
+          </div>
+          <span className="text-gray-400 whitespace-nowrap">{inkableCounts.uninkable} not</span>
         </div>
       </div>
 
-      {/* Inkable vs Uninkable Ratio with Icons */}
-      <div className="flex items-center justify-center gap-4 p-3 bg-white/[0.03] rounded-xl border border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-emerald-500"></div>
-          <span className="text-sm text-emerald-400 font-semibold">
-            {inkableCounts.inkable} Inkable
-          </span>
-        </div>
-        <div className="text-gray-500">vs</div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-red-500"></div>
-          <span className="text-sm text-red-400 font-semibold">
-            {inkableCounts.uninkable} Uninkable
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-3 overflow-auto pr-1">
+      {/* Deck list grouped by cost */}
+      <div className="flex-1 overflow-auto p-3 space-y-2">
         {Object.keys(groupedByCost)
           .sort((a, b) => parseInt(a) - parseInt(b))
           .map((cost) => (
-            <div key={cost} className="bg-gray-900 rounded-xl border border-white/10">
-              <div className="px-3 py-2 font-semibold border-b border-white/10">
-                Cost {cost}
+            <div key={cost} className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300 border-b border-white/10 flex items-center justify-between">
+                <span>Cost {cost}</span>
+                <span className="text-gray-500 tabular-nums">{groupedByCost[cost].reduce((s, e) => s + e.count, 0)}</span>
               </div>
-              <div className="divide-y divide-gray-800">
+              <div className="divide-y divide-white/5">
                 {groupedByCost[cost].map((e) => (
                   <DeckRow
                     key={deckKey(e.card)}
