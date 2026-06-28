@@ -5200,7 +5200,7 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
         </div>
         <div className="flex items-center gap-2">
           <button
-            className="px-3 py-1.5 rounded-xl bg-purple-900 border border-purple-700 hover:bg-purple-800"
+            className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition"
             onClick={onDeckPresentation}
             title="View deck presentation with stats and charts"
           >

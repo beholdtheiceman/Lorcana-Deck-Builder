@@ -18,13 +18,13 @@ export default function AuthButton() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setShowLogin(true)}
-          className="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition-colors"
+          className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 transition"
         >
           Login
         </button>
         <button
           onClick={() => setShowRegister(true)}
-          className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+          className="px-3 py-2 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] transition"
         >
           Register
         </button>

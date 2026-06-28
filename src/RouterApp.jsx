@@ -17,7 +17,7 @@ function TopNav() {
     <div className="sticky top-0 z-50 border-b border-gray-800 bg-black/70 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link to="/" className="font-semibold text-emerald-400">
+          <Link to="/" className="font-semibold text-violet-400">
             Lorcana League
           </Link>
           <NavLink to="/builder" className={linkClass}>
