@@ -2,12 +2,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink, Outlet } from 'react-route
 import AuthButton from './components/AuthButton'
 import TeamHub from './components/TeamHub'
 import DeckBuilderApp from './App.jsx'
-import { useAuth } from './contexts/AuthContext'
 
-import { StandingsTab } from './components/playhub/StandingsTab.jsx'
-import { ThisWeekTab } from './components/playhub/ThisWeekTab.jsx'
-import { TeamsTab } from './components/playhub/TeamsTab.jsx'
-import { AdminTab } from './components/playhub/AdminTab.jsx'
 
 function TopNav() {
   const linkClass = ({ isActive }) =>
@@ -172,29 +167,27 @@ function LeagueStandingsPage() {
   return (
     <PageShell title="Standings" subtitle="Team standings + player standings (ledger-backed soon).">
       <div className="card">
-        <StandingsTab />
+        <div className="text-gray-300">Coming soon.</div>
       </div>
     </PageShell>
   )
 }
 
 function LeagueThisWeekPage() {
-  const { user } = useAuth()
   return (
     <PageShell title="This Week" subtitle="Your current week matches and reporting workflow.">
       <div className="card">
-        <ThisWeekTab me={user} />
+        <div className="text-gray-300">Coming soon.</div>
       </div>
     </PageShell>
   )
 }
 
 function LeagueTeamsPage() {
-  const { user } = useAuth()
   return (
     <PageShell title="Teams / Rosters" subtitle="Team list, rosters, captain tools (coming soon).">
       <div className="card">
-        <TeamsTab me={user} />
+        <div className="text-gray-300">Coming soon.</div>
       </div>
     </PageShell>
   )
@@ -211,11 +204,10 @@ function PlaceholderPage({ title, subtitle }) {
 }
 
 function LeagueAdminPage() {
-  const { user } = useAuth()
   return (
     <PageShell title="Admin" subtitle="League/season management tools.">
       <div className="card">
-        <AdminTab me={user} />
+        <div className="text-gray-300">Coming soon.</div>
       </div>
     </PageShell>
   )
