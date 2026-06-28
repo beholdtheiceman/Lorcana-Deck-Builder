@@ -164,9 +164,9 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
       {_focus ? (
         <Section title="Focused Card">
           {focused ? (
-            <div className="rounded-lg border border-emerald-700 p-3 bg-gray-800">
+            <div className="rounded-lg border border-violet-400/30 p-3 bg-white/[0.03]">
               <div className="text-sm text-gray-300">Comparing by name:</div>
-              <div className="text-lg font-semibold text-emerald-300">
+              <div className="text-lg font-semibold text-violet-300">
                 {getDisplayName(focused)} <span className="text-gray-400">×{focused.count || 0}</span>
               </div>
               <div className="text-gray-300 text-sm mt-1">
@@ -174,7 +174,7 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-amber-700 p-3 bg-gray-800 text-amber-300">
+            <div className="rounded-lg border border-amber-700 p-3 bg-white/[0.03] text-amber-300">
               Couldn't find a card matching "{_focus}" in this deck.
             </div>
           )}
@@ -189,7 +189,7 @@ export default function DeckStats({ entries = [], focusCardName = "" }) {
 function Section({ title, children }) {
   return (
     <div>
-      <h5 className="text-base font-semibold mb-2 text-emerald-300">{title}</h5>
+      <h5 className="text-base font-semibold mb-2 text-violet-300">{title}</h5>
       {children}
     </div>
   );
@@ -197,7 +197,7 @@ function Section({ title, children }) {
 
 function StatBox({ label, value }) {
   return (
-    <div className="rounded-lg bg-gray-800 px-3 py-2 border border-gray-700">
+    <div className="rounded-lg bg-white/[0.03] px-3 py-2 border border-white/10">
       <div className="text-xs text-gray-400">{label}</div>
       <div className="text-lg font-semibold text-gray-100">{value}</div>
     </div>
@@ -206,7 +206,7 @@ function StatBox({ label, value }) {
 
 function Pill({ label, value }) {
   return (
-    <div className="inline-flex items-center justify-between rounded-full bg-gray-800 px-3 py-1 border border-gray-700">
+    <div className="inline-flex items-center justify-between rounded-full bg-white/[0.03] px-3 py-1 border border-white/10">
       <span className="text-sm text-gray-200">{label}</span>
       <span className="ml-2 text-sm font-semibold text-gray-100">{value}</span>
     </div>
@@ -217,9 +217,9 @@ function Bar({ label, value, max }) {
   const height = max > 0 ? Math.max(6, Math.round((value / max) * 80)) : 6;
   return (
     <div className="flex flex-col items-center">
-      <div className="w-full bg-gray-800 border border-gray-700 rounded-t h-20 flex items-end">
+      <div className="w-full bg-white/[0.03] border border-white/10 rounded-t h-20 flex items-end">
         <div
-          className="w-full rounded-t bg-emerald-600"
+          className="w-full rounded-t bg-gradient-to-t from-violet-500 to-indigo-400 shadow-[0_0_10px_-2px_rgba(139,108,255,0.6)]"
           style={{ height: `${height}%` }}
           aria-label={`${label}: ${value}`}
           role="img"
