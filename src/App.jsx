@@ -4714,17 +4714,17 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
   const img = card.image_url || card._imageFromAPI || card.image;
   
   return (
-    <div className="group relative overflow-hidden hover:scale-105 transition-all duration-200 cursor-pointer w-full h-64">
+    <div className="group relative rounded-xl overflow-hidden border border-white/10 bg-[#11151f] transition-all duration-200 hover:-translate-y-1.5 hover:border-violet-400/60 hover:shadow-[0_18px_34px_-14px_#000,0_0_28px_-6px_rgba(139,108,255,0.55)] cursor-pointer w-full">
       {img ? (
         <img
           src={img}
           alt={card.name}
-          className="w-full h-full object-contain rounded-lg hover:shadow-lg transition-all duration-200"
+          className="block w-full h-auto aspect-[5/7] object-cover"
           loading="lazy"
           onClick={onInspect}
         />
       ) : (
-        <div className="w-full h-full bg-gray-800 rounded-lg flex items-center justify-center">
+        <div className="w-full aspect-[5/7] bg-gray-800 flex items-center justify-center">
           <div className="text-center text-gray-400">
             <div className="text-xs mb-2">No image</div>
             <div className="text-xs">{card.name}</div>
@@ -4733,9 +4733,9 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
       )}
       
       {/* Add/Remove buttons with count fraction - always visible to prevent layout shifts */}
-      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center gap-2">
+      <div className="absolute inset-x-0 bottom-0 px-2 pb-2 pt-7 flex items-center gap-2 bg-gradient-to-t from-black/85 via-black/50 to-transparent">
         <button
-          className="w-6 h-6 rounded-full bg-emerald-900/90 border border-emerald-700 text-emerald-100 text-xs hover:bg-emerald-800 flex items-center justify-center transition-colors"
+          className="w-7 h-7 rounded-lg text-white text-base leading-none flex items-center justify-center bg-gradient-to-b from-violet-500 to-indigo-500 shadow-[0_3px_12px_-3px_rgba(139,108,255,0.8)] hover:brightness-110 transition"
           onClick={(e) => { e.stopPropagation(); onAdd(card, 1); }}
           title="Add to deck"
         >
@@ -4759,7 +4759,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
         </button>
         
         {/* Card count display as fraction */}
-        <div className="bg-gray-900/90 border border-gray-600 text-white text-xs font-bold px-2 py-1 rounded">
+        <div className="ml-auto bg-black/60 backdrop-blur border border-white/15 text-white text-xs font-semibold px-2.5 py-1 rounded-lg tabular-nums">
           {deckCount}/4
         </div>
       </div>

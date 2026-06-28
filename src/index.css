@@ -1,15 +1,43 @@
 /* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* a tiny bit of global styling is fine */
+/* ---- Lorebound game-client theme ---- */
+:root {
+  --bg: #090c12;
+  --accent: #8b6cff;
+  --accent2: #5f7bff;
+  --amber: #f4b740;
+  --amethyst: #b07cff;
+  --emerald: #36d399;
+  --ruby: #ff5c72;
+  --sapphire: #4d9dff;
+  --steel: #9aa7b8;
+}
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: #0b0f1a; /* your dark background */
-  color: #fff;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  color: #e8ecf4;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(60% 50% at 78% -8%, rgba(139,108,255,.20), transparent 60%),
+    radial-gradient(50% 50% at 8% 0%, rgba(77,157,255,.10), transparent 55%),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: auto, auto, 22px 22px;
+  background-attachment: fixed;
 }
+
+h1, h2, h3, .font-display { font-family: "Space Grotesk", "Inter", sans-serif; }
 button { cursor: pointer; }
+::selection { background: rgba(139,108,255,.35); }
+
+/* slim, on-theme scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(139,108,255,.4); }
+::-webkit-scrollbar-track { background: transparent; }
