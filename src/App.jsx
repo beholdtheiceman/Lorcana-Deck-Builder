@@ -9806,9 +9806,9 @@ useEffect(() => {
           />
 
           {/* Essential Quick Filters */}
-          <div className="p-4 bg-gray-900/70 border-b border-white/10 sticky top-16 z-30 backdrop-blur">
+          <div className="px-4 py-2.5 bg-[#0c0f17]/80 border-b border-white/10 sticky top-16 z-30 backdrop-blur">
   <div className="flex flex-wrap items-center gap-4">
-    <div className="text-gray-300 font-medium">Quick Filters:</div>
+    <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Filter</div>
 
     {/* Safety check */}
     {(!filters || typeof filters !== "object") && (
@@ -9826,7 +9826,7 @@ useEffect(() => {
           onChange={(e) =>
             filterDispatch({ type: "SET_SHOW_INKABLES", value: e.target.checked })
           }
-          className="w-4 h-4 text-emerald-600 bg-gray-700 border-gray-600 rounded focus:ring-emerald-500 focus:ring-2"
+          className="w-4 h-4 accent-violet-500 rounded"
         />
         <span>Inkable Only</span>
       </label>
@@ -9837,7 +9837,7 @@ useEffect(() => {
           onChange={(e) =>
             filterDispatch({ type: "SET_SHOW_UNINKABLES", value: e.target.checked })
           }
-          className="w-4 h-4 text-orange-600 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+          className="w-4 h-4 accent-violet-500 rounded"
         />
         <span>Uninkable Only</span>
       </label>
