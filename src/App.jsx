@@ -356,7 +356,12 @@ function collectorParts(card){
 
 
 function cardComparator(a, b) {
-  // 1) Set — newest first (numeric set code descending; unknown sets last)
+  // 1) Ink color (Amber, Amethyst, Emerald, Ruby, Sapphire, Steel)
+  const ia = INK_ORDER.indexOf(primaryInk(a));
+  const ib = INK_ORDER.indexOf(primaryInk(b));
+  if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+
+  // 2) Set — newest first within a color (numeric set code descending; unknown sets last)
   const ac = String(a.setCode || "").toUpperCase();
   const bc = String(b.setCode || "").toUpperCase();
   const an = /^\d+$/.test(ac) ? Number(ac) : null;
@@ -369,11 +374,6 @@ function cardComparator(a, b) {
     const sb = SET_CODE_ORDER.indexOf(bc);
     if (sa !== sb) return (sb === -1 ? -1 : sb) - (sa === -1 ? -1 : sa);
   }
-
-  // 2) Ink (within a set)
-  const ia = INK_ORDER.indexOf(primaryInk(a));
-  const ib = INK_ORDER.indexOf(primaryInk(b));
-  if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
 
   // 3) Collector number (numeric then suffix)
   const ca = collectorParts(a);
