@@ -4,6 +4,7 @@ import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
 import { buildReviewContext } from "../_lib/reviewContext.js";
+import { getBudgetStatus, recordUsage } from "../_lib/llmBudget.js";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_CONTEXT_CHARS = 60000; // cap grounding context handed to the model
@@ -88,6 +89,17 @@ export default withAuth(async (req, res, session) => {
     context = context.slice(0, MAX_CONTEXT_CHARS) + "\n…[context truncated]";
   }
 
+  // Budget guard: refuse if the hub has hit its monthly token cap.
+  const budget = await getBudgetStatus(replay.hubId);
+  if (budget.exceeded) {
+    return res.status(429).json({
+      error:
+        `Monthly AI budget reached for this hub ` +
+        `(${budget.used.toLocaleString()} / ${budget.budget.toLocaleString()} tokens). ` +
+        `The hub owner can raise it in the Reviews tab.`,
+    });
+  }
+
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const userInstruction =
@@ -98,18 +110,29 @@ export default withAuth(async (req, res, session) => {
     "=== CONTEXT ===\n" +
     context;
 
-  let modelOut = await callModel(client, userInstruction);
-  if (!modelOut) {
+  // Track every token spent (incl. a failed/retried attempt) against the budget.
+  const totalUsage = { input_tokens: 0, output_tokens: 0 };
+  const addUsage = (u) => {
+    totalUsage.input_tokens += u?.input_tokens ?? 0;
+    totalUsage.output_tokens += u?.output_tokens ?? 0;
+  };
+
+  let result = await callModel(client, userInstruction);
+  addUsage(result.usage);
+  if (!result.data) {
     // Retry once with an even stricter reminder on malformed JSON.
-    modelOut = await callModel(
+    result = await callModel(
       client,
       userInstruction +
         "\n\nYour previous reply was not valid JSON. Reply with the raw JSON object only."
     );
+    addUsage(result.usage);
   }
-  if (!modelOut) {
+  await recordUsage(replay.hubId, userId, "generate", totalUsage);
+  if (!result.data) {
     return res.status(502).json({ error: "Model did not return valid JSON" });
   }
+  const modelOut = result.data;
 
   const review = await prisma.review.create({
     data: {
@@ -148,17 +171,18 @@ async function callModel(client, userInstruction) {
     .join("")
     .trim();
 
+  const usage = resp.usage;
   const json = extractJson(text);
-  if (!json) return null;
+  if (!json) return { data: null, usage };
 
   let obj;
   try {
     obj = JSON.parse(json);
   } catch {
-    return null;
+    return { data: null, usage };
   }
   const validated = ModelOutSchema.safeParse(obj);
-  return validated.success ? validated.data : null;
+  return { data: validated.success ? validated.data : null, usage };
 }
 
 /** Pull the first balanced JSON object out of a possibly-fenced model reply. */

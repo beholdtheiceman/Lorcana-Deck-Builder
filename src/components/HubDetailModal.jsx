@@ -4,6 +4,7 @@ import ReplayReviewPanel from './ReplayReviewPanel';
 import InsightsWidget from './InsightsWidget';
 import PlaytestLog from './PlaytestLog';
 import EventsPanel from './EventsPanel';
+import LlmBudgetBar from './LlmBudgetBar';
 
 const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
   const [hubDecks, setHubDecks] = useState([]);
@@ -172,6 +173,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
           {/* Reviews surface */}
           {activeTab === 'reviews' && (
             <div>
+              <LlmBudgetBar hubId={hub.id} />
               <InsightsWidget hubId={hub.id} />
               <div className="mt-4">
                 <ReplayReviewPanel hubId={hub.id} />
