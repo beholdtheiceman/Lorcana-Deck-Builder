@@ -4666,7 +4666,7 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
       
       {/* Show all cards at once - no infinite scroll */}
       {validCards.length > 0 && (
-        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(132px,1fr))]">
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", gap: "12px" }}>
           {validCards.map((c) => (
             <div key={deckKey(c)}>
               <CardTile 
