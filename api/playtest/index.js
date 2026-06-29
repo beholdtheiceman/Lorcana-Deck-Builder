@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
+import { requireHubMember } from "../_lib/hubAuth.js";
 
 const CreateSchema = z.object({
   hubId: z.string().min(1),
@@ -22,12 +23,12 @@ export default withAuth(async (req, res, session) => {
   if (req.method === "GET") {
     const hubId = req.query.hubId;
     if (!hubId) return res.status(400).json({ error: "hubId is required" });
-    await assertHubMember(hubId, userId, res);
-    if (res.writableEnded) return;
+    if (!(await requireHubMember(hubId, userId, res))) return;
 
     const games = await prisma.playtestGame.findMany({
       where: { hubId },
       orderBy: { playedAt: "desc" },
+      include: { loggedBy: { select: { id: true, email: true } } },
     });
     return res.status(200).json(games);
   }
@@ -42,8 +43,7 @@ export default withAuth(async (req, res, session) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
   const data = parsed.data;
 
-  await assertHubMember(data.hubId, userId, res);
-  if (res.writableEnded) return;
+  if (!(await requireHubMember(data.hubId, userId, res))) return;
 
   // If a deck is linked, make sure it exists (the FK is SetNull, so a bad id
   // would otherwise surface as an opaque 500).
@@ -68,12 +68,3 @@ export default withAuth(async (req, res, session) => {
 
   return res.status(201).json(game);
 });
-
-/** Writes a 403 response if the user is not owner/member of the hub. */
-async function assertHubMember(hubId, userId, res) {
-  const hub = await prisma.hub.findFirst({
-    where: { id: hubId, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-    select: { id: true },
-  });
-  if (!hub) res.status(403).json({ error: "Forbidden" });
-}

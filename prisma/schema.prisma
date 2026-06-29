@@ -89,6 +89,13 @@ model HubMember {
   userId   String
   joinedAt DateTime @default(now())
 
+  // Team-hub profile: who this person is and what they play (Team Hub M0).
+  // All optional so existing rows need no backfill.
+  displayName String?
+  petDecks    Json     @default("[]") // archetypes this person plays, e.g. ["Blurple Control"]
+  pilots      Json     @default("[]") // archetypes they're strong with
+  notes       String?  @db.Text
+
   hub       Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -1,4 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+} from 'recharts';
 
 /**
  * Pure rollup helper (exported for testing): groups games by
@@ -24,6 +33,26 @@ export function computeMatchupStats(games) {
     if (win) row.wins++; else row.losses++;
     if (g.onPlay === true) { row.onPlayGames++; if (win) row.onPlayWins++; }
     else if (g.onPlay === false) { row.onDrawGames++; if (win) row.onDrawWins++; }
+  }
+  const rows = [...map.values()].map((r) => {
+    const total = r.wins + r.losses;
+    return { ...r, total, winPct: total ? Math.round((r.wins / total) * 100) : 0 };
+  });
+  rows.sort((a, b) => b.total - a.total || b.winPct - a.winPct);
+  return rows;
+}
+
+/**
+ * Pure rollup helper (exported for testing): win/loss totals and win % per
+ * player, keyed by the logger's email (falling back to their id).
+ */
+export function computePlayerStats(games) {
+  const map = new Map();
+  for (const g of games) {
+    const key = g.loggedBy?.email || g.loggedById || 'Unknown';
+    let row = map.get(key);
+    if (!row) { row = { player: key, wins: 0, losses: 0 }; map.set(key, row); }
+    if (g.result === 'W') row.wins++; else row.losses++;
   }
   const rows = [...map.values()].map((r) => {
     const total = r.wins + r.losses;
@@ -65,6 +94,16 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
   }, [hubId]);
 
   const stats = useMemo(() => computeMatchupStats(games), [games]);
+  const playerStats = useMemo(() => computePlayerStats(games), [games]);
+  // Top matchups by sample size for the win-rate bar chart.
+  const chartData = useMemo(
+    () => stats.slice(0, 10).map((r) => ({
+      name: `${r.deckArchetype} vs ${r.vsArchetype}`,
+      winPct: r.winPct,
+      record: `${r.wins}–${r.losses}`,
+    })),
+    [stats]
+  );
   const overall = useMemo(() => {
     const wins = games.filter((g) => g.result === 'W').length;
     return { wins, losses: games.length - wins, total: games.length };
@@ -257,6 +296,62 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
           </div>
         )}
       </div>
+
+      {/* Win-rate bar chart by matchup */}
+      {chartData.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-violet-300 mb-2">Matchup win % (top {chartData.length})</h4>
+          <div className="bg-gray-800/60 rounded-lg p-3" style={{ width: '100%', height: Math.max(120, chartData.length * 34) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#9ca3af', fontSize: 11 }} unit="%" />
+                <YAxis type="category" dataKey="name" width={150} tick={{ fill: '#d1d5db', fontSize: 11 }} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                  contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 6, fontSize: 12 }}
+                  formatter={(value, _n, p) => [`${value}% (${p.payload.record})`, 'Win rate']}
+                />
+                <Bar dataKey="winPct" radius={[0, 4, 4, 0]}>
+                  {chartData.map((d) => (
+                    <Cell key={d.name} fill={d.winPct >= 50 ? '#34d399' : '#f87171'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Win-rate by player */}
+      {playerStats.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-violet-300 mb-2">Win rate by player</h4>
+          <div className="overflow-x-auto rounded-lg border border-gray-700">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-800 text-gray-400">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">Player</th>
+                  <th className="text-right px-3 py-2 font-medium">Games</th>
+                  <th className="text-right px-3 py-2 font-medium">W–L</th>
+                  <th className="text-right px-3 py-2 font-medium">Win %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {playerStats.map((p) => (
+                  <tr key={p.player} className="border-t border-gray-700/60">
+                    <td className="px-3 py-2 text-gray-200">{p.player}</td>
+                    <td className="px-3 py-2 text-right text-gray-400">{p.total}</td>
+                    <td className="px-3 py-2 text-right text-gray-200">{p.wins}–{p.losses}</td>
+                    <td className={`px-3 py-2 text-right font-medium ${p.winPct >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {p.winPct}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Recent games */}
       {games.length > 0 && (

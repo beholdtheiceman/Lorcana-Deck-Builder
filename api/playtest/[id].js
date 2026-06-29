@@ -1,5 +1,6 @@
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
+import { requireHubMember } from "../_lib/hubAuth.js";
 
 // DELETE /api/playtest/:id -> the logger or the hub owner can remove a game.
 export default withAuth(async (req, res, session) => {
@@ -10,11 +11,8 @@ export default withAuth(async (req, res, session) => {
   const game = await prisma.playtestGame.findUnique({ where: { id } });
   if (!game) return res.status(404).json({ error: "Game not found" });
 
-  const hub = await prisma.hub.findFirst({
-    where: { id: game.hubId, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-    select: { ownerId: true },
-  });
-  if (!hub) return res.status(403).json({ error: "Forbidden" });
+  const hub = await requireHubMember(game.hubId, userId, res);
+  if (!hub) return;
 
   if (req.method !== "DELETE") {
     res.setHeader("Allow", "DELETE");
