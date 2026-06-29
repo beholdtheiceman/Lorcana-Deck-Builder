@@ -45,6 +45,43 @@ export default async function handler(req, res) {
 
     const isOwner = hub.ownerId === user.id;
 
+    if (req.method === 'GET') {
+      // Roster + per-member profile (Team Hub M0). Any member can read.
+      // The owner is not a HubMember row, so it has no editable profile here.
+      const members = await prisma.hubMember.findMany({
+        where: { hubId },
+        orderBy: { joinedAt: 'asc' },
+        select: {
+          id: true,
+          userId: true,
+          joinedAt: true,
+          displayName: true,
+          petDecks: true,
+          pilots: true,
+          notes: true,
+          user: { select: { id: true, email: true } },
+        },
+      });
+
+      const roster = members.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        email: m.user?.email ?? null,
+        displayName: m.displayName,
+        petDecks: m.petDecks ?? [],
+        pilots: m.pilots ?? [],
+        notes: m.notes,
+        joinedAt: m.joinedAt,
+        isOwner: false,
+      }));
+
+      return res.status(200).json({
+        ownerId: hub.ownerId,
+        owner: { id: hub.owner.id, email: hub.owner.email, isOwner: true },
+        members: roster,
+      });
+    }
+
     if (req.method === 'DELETE') {
       // Remove member from hub (owner only)
       const { memberId } = req.body;

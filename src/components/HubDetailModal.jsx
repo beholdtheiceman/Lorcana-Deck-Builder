@@ -4,6 +4,7 @@ import ReplayReviewPanel from './ReplayReviewPanel';
 import InsightsWidget from './InsightsWidget';
 import PlaytestLog from './PlaytestLog';
 import EventsPanel from './EventsPanel';
+import RosterTab from './team/RosterTab';
 import LlmBudgetBar from './LlmBudgetBar';
 import PaperReviewForm from './PaperReviewForm';
 
@@ -150,7 +151,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
         <div className="flex-1 overflow-y-auto p-4">
           {/* Tab bar */}
           <div className="mb-4 flex gap-2 border-b border-white/10">
-            {[['decks', 'Decks'], ['playtest', 'Playtest'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
+            {[['decks', 'Decks'], ['roster', 'Roster'], ['playtest', 'Playtest'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -160,6 +161,11 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
               </button>
             ))}
           </div>
+
+          {/* Roster surface */}
+          {activeTab === 'roster' && (
+            <RosterTab hubId={hub.id} currentUser={user} />
+          )}
 
           {/* Playtest surface */}
           {activeTab === 'playtest' && (
