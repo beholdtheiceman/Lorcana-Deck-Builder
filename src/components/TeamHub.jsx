@@ -316,7 +316,7 @@ const TeamHub = () => {
                     }}
                     className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                   >
-                    View Decks
+                    View Hub
                   </button>
                 </div>
               </div>
