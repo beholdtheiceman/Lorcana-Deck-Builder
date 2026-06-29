@@ -7,6 +7,7 @@ import EventsPanel from './EventsPanel';
 import RosterTab from './team/RosterTab';
 import MetaReportsTab from './team/MetaReportsTab';
 import PracticesTab from './team/PracticesTab';
+import PodsTab from './team/PodsTab';
 import LlmBudgetBar from './LlmBudgetBar';
 import PaperReviewForm from './PaperReviewForm';
 
@@ -153,7 +154,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
         <div className="flex-1 overflow-y-auto p-4">
           {/* Tab bar */}
           <div className="mb-4 flex gap-2 border-b border-white/10">
-            {[['decks', 'Decks'], ['roster', 'Roster'], ['playtest', 'Playtest'], ['reports', 'Reports'], ['practices', 'Practices'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
+            {[['decks', 'Decks'], ['roster', 'Roster'], ['playtest', 'Playtest'], ['reports', 'Reports'], ['practices', 'Practices'], ['pods', 'Pods'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -182,6 +183,11 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
           {/* Practices surface */}
           {activeTab === 'practices' && (
             <PracticesTab hubId={hub.id} currentUser={user} isOwner={hub.ownerId === user.id} />
+          )}
+
+          {/* Pods surface */}
+          {activeTab === 'pods' && (
+            <PodsTab hubId={hub.id} currentUser={user} />
           )}
 
           {/* Events surface */}
