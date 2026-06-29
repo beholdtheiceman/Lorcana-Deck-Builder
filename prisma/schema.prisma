@@ -34,6 +34,11 @@ model User {
   // Team Hub shared write-ups (M1)
   authoredReports MetaReport[]
 
+  // Team Hub practices + event attendance (M1)
+  createdPractices Practice[]
+  practiceRsvps    PracticeRsvp[]
+  eventAttendance  EventAttendance[]
+
   // Tournament submissions (legacy, reconciled)
   tournaments Tournament[]
 }
@@ -77,6 +82,9 @@ model Hub {
 
   // Team Hub shared write-ups (M1)
   metaReports       MetaReport[]
+
+  // Team Hub practices (M1)
+  practices         Practice[]
 
   // Self-serve AI budget guard (M3). null/<=0 = unlimited.
   llmMonthlyTokenBudget Int?       @default(500000)
@@ -243,11 +251,64 @@ model Event {
   notes       String?  @db.Text
   createdAt   DateTime @default(now())
 
-  hub       Hub  @relation(fields: [hubId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id])
+  hub        Hub               @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  createdBy  User              @relation(fields: [createdById], references: [id])
+  attendance EventAttendance[]
 
   @@index([hubId])
   @@index([hubId, startsAt])
+}
+
+// ---------------------------------------------------------------------------
+// Team Hub practices (M1) — scrim/testing sessions anyone can post & RSVP to.
+// ---------------------------------------------------------------------------
+
+model Practice {
+  id          String   @id @default(uuid())
+  hubId       String
+  createdById String
+  title       String
+  startsAt    DateTime?
+  focus       String?  @db.Text             // what we're testing this session
+  createdAt   DateTime @default(now())
+
+  hub       Hub            @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  createdBy User           @relation(fields: [createdById], references: [id])
+  rsvps     PracticeRsvp[]
+
+  @@index([hubId])
+  @@index([hubId, startsAt])
+}
+
+model PracticeRsvp {
+  id         String @id @default(uuid())
+  practiceId String
+  memberId   String                          // userId of the responder
+  status     String @default("yes")          // yes | no | maybe
+
+  practice Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  member   User     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([practiceId, memberId])
+  @@index([practiceId])
+}
+
+// ---------------------------------------------------------------------------
+// Team Hub event attendance (M1) — who's going and what they're bringing.
+// ---------------------------------------------------------------------------
+
+model EventAttendance {
+  id       String  @id @default(uuid())
+  eventId  String
+  memberId String                            // userId of the attendee
+  going    Boolean @default(true)
+  bringing String?                           // deck they'll play
+
+  event  Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member User  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+  @@index([eventId])
 }
 
 // ---------------------------------------------------------------------------

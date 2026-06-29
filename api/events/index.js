@@ -27,8 +27,19 @@ export default withAuth(async (req, res, session) => {
     const events = await prisma.event.findMany({
       where: { hubId },
       orderBy: { startsAt: "asc" },
+      include: { attendance: { include: { member: { select: { id: true, email: true } } } } },
     });
-    return res.status(200).json(events);
+    return res.status(200).json(
+      events.map((e) => ({
+        ...e,
+        attendance: e.attendance.map((a) => ({
+          memberId: a.memberId,
+          email: a.member?.email ?? null,
+          going: a.going,
+          bringing: a.bringing,
+        })),
+      }))
+    );
   }
 
   if (req.method !== "POST") {

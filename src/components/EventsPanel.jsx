@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 
 const EMPTY = { title: '', startsAt: '', location: '', kind: '', notes: '' };
 
-export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '' }) {
+export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '', currentUser = null }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -91,6 +91,27 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
     }
   };
 
+  const setAttendance = async (eventId, going, bringing) => {
+    try {
+      const r = await fetch(`/api/events/${eventId}/attendance`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ going, bringing: bringing?.trim() || null }),
+      });
+      if (!r.ok) throw new Error('attendance');
+      const mine = await r.json();
+      setEvents((prev) =>
+        prev.map((e) => {
+          if (e.id !== eventId) return e;
+          const others = (e.attendance || []).filter((a) => a.memberId !== mine.memberId);
+          return { ...e, attendance: [...others, mine] };
+        })
+      );
+    } catch {
+      setError('Failed to save your attendance.');
+    }
+  };
+
   const saveWebhook = async () => {
     setSavingWebhook(true);
     setWebhookMsg('');
@@ -116,20 +137,53 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
   const fmt = (iso) =>
     new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
-  const Row = ({ e, dim }) => (
-    <li className={`flex items-start gap-3 bg-gray-800/60 rounded px-3 py-2 text-sm ${dim ? 'opacity-60' : ''}`}>
-      <div className="flex-1 min-w-0">
-        <div className="text-gray-100 font-medium">
-          {e.title}
-          {e.kind && <span className="ml-2 text-xs text-violet-300">{e.kind}</span>}
+  const AttendanceControls = ({ e }) => {
+    const mine = (e.attendance || []).find((a) => a.memberId === currentUser?.id) || null;
+    const [bringing, setBringing] = useState(mine?.bringing || '');
+    const going = (e.attendance || []).filter((a) => a.going);
+    return (
+      <div className="mt-2 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button onClick={() => setAttendance(e.id, true, bringing)}
+            className={`px-2.5 py-1 rounded text-xs font-medium ${mine?.going ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Going
+          </button>
+          <button onClick={() => setAttendance(e.id, false, bringing)}
+            className={`px-2.5 py-1 rounded text-xs font-medium ${mine && !mine.going ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Not going
+          </button>
+          <input value={bringing} onChange={(ev) => setBringing(ev.target.value)}
+            onBlur={() => { if (mine && (bringing.trim() || '') !== (mine.bringing || '')) setAttendance(e.id, mine.going, bringing); }}
+            placeholder="Bringing… (deck)"
+            className="flex-1 min-w-[8rem] p-1 bg-gray-800 border border-gray-700 rounded text-white text-xs" />
+          <span className="text-xs text-gray-500">{going.length} going</span>
         </div>
-        <div className="text-gray-400 text-xs mt-0.5">
-          {fmt(e.startsAt)}{e.location ? ` · ${e.location}` : ''}
-        </div>
-        {e.notes && <div className="text-gray-400 text-xs mt-0.5">{e.notes}</div>}
+        {going.length > 0 && (
+          <div className="text-xs text-gray-400">
+            {going.map((a) => `${a.email || 'Unknown'}${a.bringing ? ` (${a.bringing})` : ''}`).join(', ')}
+          </div>
+        )}
       </div>
-      <button onClick={() => remove(e.id)}
-        className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete event">✕</button>
+    );
+  };
+
+  const Row = ({ e, dim }) => (
+    <li className={`bg-gray-800/60 rounded px-3 py-2 text-sm ${dim ? 'opacity-60' : ''}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-gray-100 font-medium">
+            {e.title}
+            {e.kind && <span className="ml-2 text-xs text-violet-300">{e.kind}</span>}
+          </div>
+          <div className="text-gray-400 text-xs mt-0.5">
+            {fmt(e.startsAt)}{e.location ? ` · ${e.location}` : ''}
+          </div>
+          {e.notes && <div className="text-gray-400 text-xs mt-0.5">{e.notes}</div>}
+        </div>
+        <button onClick={() => remove(e.id)}
+          className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete event">✕</button>
+      </div>
+      <AttendanceControls e={e} />
     </li>
   );
 
