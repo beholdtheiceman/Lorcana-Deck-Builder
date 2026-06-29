@@ -39,6 +39,9 @@ model User {
   practiceRsvps    PracticeRsvp[]
   eventAttendance  EventAttendance[]
 
+  // Team Hub practice pods (M1)
+  podMemberships   PodMember[]
+
   // Tournament submissions (legacy, reconciled)
   tournaments Tournament[]
 }
@@ -85,6 +88,9 @@ model Hub {
 
   // Team Hub practices (M1)
   practices         Practice[]
+
+  // Team Hub practice pods (M1)
+  pods              Pod[]
 
   // Self-serve AI budget guard (M3). null/<=0 = unlimited.
   llmMonthlyTokenBudget Int?       @default(500000)
@@ -309,6 +315,34 @@ model EventAttendance {
 
   @@unique([eventId, memberId])
   @@index([eventId])
+}
+
+// ---------------------------------------------------------------------------
+// Team Hub practice pods (M1) — fixed/persistent practice groups within a hub.
+// ---------------------------------------------------------------------------
+
+model Pod {
+  id        String   @id @default(uuid())
+  hubId     String
+  name      String
+  createdAt DateTime @default(now())
+
+  hub     Hub         @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  members PodMember[]
+
+  @@index([hubId])
+}
+
+model PodMember {
+  id       String @id @default(uuid())
+  podId    String
+  memberId String                            // userId of the pod member
+
+  pod    Pod  @relation(fields: [podId], references: [id], onDelete: Cascade)
+  member User @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([podId, memberId])
+  @@index([podId])
 }
 
 // ---------------------------------------------------------------------------
