@@ -6,6 +6,7 @@ import PlaytestLog from './PlaytestLog';
 import EventsPanel from './EventsPanel';
 import RosterTab from './team/RosterTab';
 import MetaReportsTab from './team/MetaReportsTab';
+import PracticesTab from './team/PracticesTab';
 import LlmBudgetBar from './LlmBudgetBar';
 import PaperReviewForm from './PaperReviewForm';
 
@@ -152,7 +153,7 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
         <div className="flex-1 overflow-y-auto p-4">
           {/* Tab bar */}
           <div className="mb-4 flex gap-2 border-b border-white/10">
-            {[['decks', 'Decks'], ['roster', 'Roster'], ['playtest', 'Playtest'], ['reports', 'Reports'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
+            {[['decks', 'Decks'], ['roster', 'Roster'], ['playtest', 'Playtest'], ['reports', 'Reports'], ['practices', 'Practices'], ['events', 'Events'], ['reviews', 'Reviews'], ['primers', 'Primers']].map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -178,9 +179,14 @@ const HubDetailModal = ({ hub, onClose, onDeckClick, user }) => {
             <MetaReportsTab hubId={hub.id} currentUser={user} isOwner={hub.ownerId === user.id} />
           )}
 
+          {/* Practices surface */}
+          {activeTab === 'practices' && (
+            <PracticesTab hubId={hub.id} currentUser={user} isOwner={hub.ownerId === user.id} />
+          )}
+
           {/* Events surface */}
           {activeTab === 'events' && (
-            <EventsPanel hubId={hub.id} isOwner={hub.owner?.id === user.id} initialWebhook={hub.discordWebhookUrl || ''} />
+            <EventsPanel hubId={hub.id} currentUser={user} isOwner={hub.owner?.id === user.id} initialWebhook={hub.discordWebhookUrl || ''} />
           )}
 
           {/* Reviews surface */}
