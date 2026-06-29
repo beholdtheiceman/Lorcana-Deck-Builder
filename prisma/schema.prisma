@@ -31,6 +31,9 @@ model User {
   // Events (M4)
   createdEvents Event[]
 
+  // Team Hub shared write-ups (M1)
+  authoredReports MetaReport[]
+
   // Tournament submissions (legacy, reconciled)
   tournaments Tournament[]
 }
@@ -71,6 +74,9 @@ model Hub {
   // Discord bridge + events (M4)
   discordWebhookUrl String?
   events            Event[]
+
+  // Team Hub shared write-ups (M1)
+  metaReports       MetaReport[]
 
   // Self-serve AI budget guard (M3). null/<=0 = unlimited.
   llmMonthlyTokenBudget Int?       @default(500000)
@@ -242,6 +248,28 @@ model Event {
 
   @@index([hubId])
   @@index([hubId, startsAt])
+}
+
+// ---------------------------------------------------------------------------
+// Meta reports (Team Hub M1) — shareable write-ups: meta reads, tech choices,
+// tournament reports. Body is markdown. Any member can post/edit/read.
+// ---------------------------------------------------------------------------
+
+model MetaReport {
+  id        String   @id @default(uuid())
+  hubId     String
+  authorId  String
+  title     String
+  body      String   @db.Text                 // markdown
+  tags      String[]                           // e.g. ["meta", "matchup", "event-report"]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hub    Hub  @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([hubId])
+  @@index([hubId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
