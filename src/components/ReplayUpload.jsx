@@ -65,10 +65,12 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
       }
       try {
         setUploading(true);
-        const form = new FormData();
-        form.append('file', file);
-        form.append('hubId', hubId);
-        const res = await fetch('/api/replays', { method: 'POST', body: form });
+        // The endpoint expects the raw .zip bytes as the body (bodyParser is
+        // disabled) and the hubId in the query string — not multipart FormData.
+        const res = await fetch(`/api/replays?hubId=${encodeURIComponent(hubId)}`, {
+          method: 'POST',
+          body: file,
+        });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `Upload failed (${res.status})`);
