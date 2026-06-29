@@ -35,7 +35,10 @@ function normalizeGames(parsed) {
 
 function loreSeries(game) {
   // Accept loreCurve / lore / turns, each row may use you/opp, player/opponent, etc.
-  const rows = game?.loreCurve || game?.lore || game?.turns || [];
+  // Guard against a truthy non-array (the parser may emit an object) so .map
+  // never throws and takes the whole panel down.
+  const raw = game?.loreCurve || game?.lore || game?.turns || [];
+  const rows = Array.isArray(raw) ? raw : [];
   return rows.map((r, i) => ({
     turn: r.turn ?? r.t ?? i + 1,
     you: r.you ?? r.player ?? r.self ?? r.me ?? 0,
