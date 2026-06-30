@@ -34,3 +34,8 @@ test('error shows error paragraph', () => {
   expect(errorPara).toBeInTheDocument()
   expect(errorPara).toHaveClass('text-bad')
 })
+
+test('spreads rest props to select element', () => {
+  render(<Select label="Color" disabled><option value="red">Red</option></Select>)
+  expect(screen.getByRole('combobox')).toBeDisabled()
+})

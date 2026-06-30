@@ -17,7 +17,7 @@ test('error string shows error paragraph with text-bad class', () => {
 
 test('no error → no error paragraph', () => {
   render(<Input label="Email" />)
-  expect(screen.queryByText(/./)).not.toHaveClass('text-bad')
+  expect(screen.queryByRole('paragraph')).not.toBeInTheDocument()
 })
 
 test('rest props spread to input', async () => {

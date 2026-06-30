@@ -16,5 +16,10 @@ test('error shows error paragraph', () => {
 
 test('no error → no error paragraph', () => {
   render(<Textarea label="Description" />)
-  expect(screen.queryByText(/./)).not.toHaveClass('text-bad')
+  expect(screen.queryByRole('paragraph')).not.toBeInTheDocument()
+})
+
+test('spreads rest props to textarea', () => {
+  render(<Textarea label="Notes" placeholder="Enter notes" />)
+  expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Enter notes')
 })
