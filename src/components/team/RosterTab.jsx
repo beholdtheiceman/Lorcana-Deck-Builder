@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Skeleton, EmptyState } from '../ui';
 
 /** Parse a comma/newline separated list into a trimmed, de-duped string array. */
 function parseList(text) {
@@ -104,21 +105,20 @@ export default function RosterTab({ hubId, currentUser }) {
     }
   };
 
-  if (loading) return <p className="text-gray-400 text-sm">Loading roster…</p>;
+  if (loading) return <Skeleton variant="block" className="h-24" />;
 
   return (
     <div className="space-y-4">
-      {error && <div className="p-3 bg-red-600/90 text-white rounded text-sm">{error}</div>}
+      {error && <p className="text-bad text-sm">{error}</p>}
 
       <div className="flex items-baseline justify-between">
         <h4 className="text-sm font-semibold text-violet-300">
           Roster ({members.length + (owner ? 1 : 0)})
         </h4>
         {me && !editing && (
-          <button onClick={startEdit}
-            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded text-xs font-medium">
+          <Button onClick={startEdit} size="sm">
             Edit my profile
-          </button>
+          </Button>
         )}
       </div>
 
@@ -153,14 +153,12 @@ export default function RosterTab({ hubId, currentUser }) {
               placeholder="Anything teammates should know" />
           </div>
           <div className="flex gap-2">
-            <button type="submit" disabled={saving}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded text-sm font-medium">
+            <Button type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save profile'}
-            </button>
-            <button type="button" onClick={() => setEditing(false)}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm">
+            </Button>
+            <Button type="button" onClick={() => setEditing(false)} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -178,7 +176,7 @@ export default function RosterTab({ hubId, currentUser }) {
 
       {/* Member cards */}
       {members.length === 0 ? (
-        <p className="text-gray-500 text-sm">No other members yet.</p>
+        <EmptyState title="No members yet" description="Invite someone with the hub invite code." />
       ) : (
         <ul className="space-y-3">
           {members.map((m) => {
