@@ -1,7 +1,16 @@
-import { BrowserRouter, Routes, Route, Link, NavLink, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, Navigate } from 'react-router-dom'
 import AuthButton from './components/AuthButton'
-import TeamHub from './components/TeamHub'
 import DeckBuilderApp from './App.jsx'
+import HubListPage from './pages/HubListPage'
+import HubDetailLayout from './pages/HubDetailLayout'
+import RosterPage from './pages/hub/RosterPage'
+import PodsPage from './pages/hub/PodsPage'
+import PracticesPage from './pages/hub/PracticesPage'
+import EventsPage from './pages/hub/EventsPage'
+import ReportsPage from './pages/hub/ReportsPage'
+import ReviewsPage from './pages/hub/ReviewsPage'
+import PrimersPage from './pages/hub/PrimersPage'
+import PlaytestPage from './pages/hub/PlaytestPage'
 
 function TopNav() {
   const linkClass = ({ isActive }) =>
@@ -49,14 +58,6 @@ function BuilderPage() {
   return <DeckBuilderApp />
 }
 
-function TeamHubPage() {
-  return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900/40 p-2">
-      <TeamHub />
-    </div>
-  )
-}
-
 export default function RouterApp() {
   return (
     <BrowserRouter>
@@ -64,7 +65,18 @@ export default function RouterApp() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<BuilderPage />} />
           <Route path="/builder" element={<BuilderPage />} />
-          <Route path="/team-hub" element={<TeamHubPage />} />
+          <Route path="/team-hub" element={<HubListPage />} />
+          <Route path="/team-hub/:id" element={<HubDetailLayout />}>
+            <Route index element={<Navigate to="roster" replace />} />
+            <Route path="roster" element={<RosterPage />} />
+            <Route path="pods" element={<PodsPage />} />
+            <Route path="practices" element={<PracticesPage />} />
+            <Route path="events" element={<EventsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="reviews" element={<ReviewsPage />} />
+            <Route path="primers" element={<PrimersPage />} />
+            <Route path="playtest" element={<PlaytestPage />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

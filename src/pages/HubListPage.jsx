@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Skeleton, EmptyState } from '../components/ui';
 
 const HubListPage = () => {
   const { user } = useAuth();
@@ -264,18 +265,13 @@ const HubListPage = () => {
 
       {/* Hubs List */}
       {loading ? (
-        <div className="h-24 bg-gray-700 rounded-lg animate-pulse" />
+        <Skeleton variant="block" className="h-24" />
       ) : hubs.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-300 font-medium text-lg mb-1">No hubs yet</p>
-          <p className="text-gray-500 text-sm mb-4">Create a hub or join one with an invite code.</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-          >
-            Create Hub
-          </button>
-        </div>
+        <EmptyState
+          title="No hubs yet"
+          description="Create a hub or join one with an invite code."
+          action={{ label: 'Create Hub', onClick: () => setShowCreateModal(true) }}
+        />
       ) : (
         <div className="space-y-4">
           {hubs.map(hub => (
