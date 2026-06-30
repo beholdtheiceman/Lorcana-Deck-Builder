@@ -1,0 +1,40 @@
+<h2>How far do we take the app structure refactor?</h2>
+<p class="subtitle">The UX audit calls for "real routes, not modals." Before we write a line of code, let's agree on scope. All three approaches keep the current violet-on-dark look and build the primitive component library.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Primitives + polish only</h3>
+      <p>Build the design token system and core UI components (<code>Button</code>, <code>Card</code>, <code>Badge</code>, <code>Skeleton</code>, <code>Toast</code>, <code>EmptyState</code>). Apply them everywhere — Team Hub tabs, deck builder, playtest log. Keep the current modal/tab navigation as-is. <strong>No routing changes.</strong></p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Lowest risk, no URL changes</li><li>Fastest to ship, immediate visible polish</li><li>No breaking changes to existing flows</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Modal-in-modal stays; tabs not deep-linkable</li><li>Audit's "polished" definition requires real URLs</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Primitives + route the Team Hub <span style="color:#8b5cf6">(Recommended)</span></h3>
+      <p>Same primitive library as A, <strong>plus</strong> convert the Team Hub from modal-in-modal to real sub-routes: <code>/team-hub/:id/roster</code>, <code>/team-hub/:id/playtest</code>, etc. Hub tabs become a routed sub-nav. The deck builder stays as a single-page experience (it's already a route).</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Kills the biggest UX pain point (nested modals)</li><li>Deep-linkable hub tabs — share a direct link to Roster, Pods, etc.</li><li>Back button works in the hub</li><li>Achieves the audit's "polished" definition</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Moderate routing work (~1–2 days)</li><li>HubDetailModal needs to be restructured into a layout</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Full redesign — persistent sidebar + all routes</h3>
+      <p>Everything in B, <strong>plus</strong> replace the top nav with a persistent left sidebar (like naurcana), add a home command-center screen, route the deck builder with sub-pages, and split the 11K-line <code>App.jsx</code> into feature modules with route-level code-splitting.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Fully matches the benchmark; most "finished" feel</li><li>Code health dramatically improved</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Largest scope — weeks of work</li><li>Sidebar is a layout change users will notice immediately</li><li>High risk of regressions in a 11K-line file</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
