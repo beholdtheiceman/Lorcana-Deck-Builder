@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Skeleton, EmptyState, Button } from '../ui';
 
 const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
 
@@ -141,24 +142,23 @@ export default function PodsTab({ hubId, currentUser }) {
     }
   };
 
-  if (loading) return <p className="text-gray-400 text-sm">Loading pods…</p>;
+  if (loading) return <Skeleton variant="block" className="h-24" />;
 
   return (
     <div className="space-y-4">
-      {error && <div className="p-3 bg-red-600/90 text-white rounded text-sm">{error}</div>}
+      {error && <p className="text-bad text-sm">{error}</p>}
 
       {/* Create pod */}
       <form onSubmit={createPod} className="flex gap-2">
         <input className={input} value={newName} onChange={(e) => setNewName(e.target.value)}
           placeholder="New pod name (e.g. Test-Group-A)" />
-        <button type="submit" disabled={creating}
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded text-sm font-medium shrink-0">
+        <Button variant="primary" type="submit" disabled={creating} className="shrink-0">
           {creating ? 'Adding…' : 'Add pod'}
-        </button>
+        </Button>
       </form>
 
       {pods.length === 0 ? (
-        <p className="text-gray-500 text-sm">No pods yet.</p>
+        <EmptyState title="No pods yet" description="Create a pod to organize team members." />
       ) : (
         <ul className="space-y-3">
           {pods.map((pod) => {
