@@ -8,6 +8,7 @@ import {
   Tooltip,
   Cell,
 } from 'recharts';
+import { Button, Skeleton, EmptyState } from './ui';
 
 /**
  * Pure rollup helper (exported for testing): groups games by
@@ -180,7 +181,7 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
 
   return (
     <div className="space-y-6">
-      {error && <div className="p-3 bg-red-600/90 text-white rounded text-sm">{error}</div>}
+      {error && <p className="text-bad text-sm">{error}</p>}
 
       {/* Log a game */}
       <form onSubmit={submit} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
@@ -242,10 +243,9 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
             onChange={(e) => setField('lesson', e.target.value)}
             placeholder="What did you learn? e.g. mulligan more aggressively for early board" />
         </div>
-        <button type="submit" disabled={saving}
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded text-sm font-medium">
+        <Button variant="primary" type="submit" disabled={saving}>
           {saving ? 'Logging…' : 'Log game'}
-        </button>
+        </Button>
       </form>
 
       {/* Win-rate by matchup */}
@@ -258,9 +258,12 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
           </span>
         </div>
         {loading ? (
-          <p className="text-gray-400 text-sm">Loading…</p>
+          <Skeleton variant="block" className="h-24" />
         ) : stats.length === 0 ? (
-          <p className="text-gray-500 text-sm">No games logged yet.</p>
+          <EmptyState
+            title="No games logged yet"
+            description="Log a practice game to see matchup statistics"
+          />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-700">
             <table className="w-full text-sm">
