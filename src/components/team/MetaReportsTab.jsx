@@ -177,10 +177,10 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
 
       {/* Reports list */}
       {loading ? (
-        <Skeleton variant=”block” className=”h-24” />
+        <Skeleton variant="block" className="h-24" />
       ) : visible.length === 0 ? (
         <EmptyState
-          title={activeTag ? `No reports tagged “${activeTag}”` : 'No reports yet'}
+          title={activeTag ? `No reports tagged "${activeTag}"` : 'No reports yet'}
           description={activeTag ? 'Try a different tag filter' : 'Create a meta report to get started'}
         />
       ) : (
