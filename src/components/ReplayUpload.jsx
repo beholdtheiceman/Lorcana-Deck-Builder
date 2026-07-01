@@ -47,13 +47,14 @@ function loreSeries(game) {
   }));
 }
 
-const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
+const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }) => {
   const { user } = useAuth();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [replay, setReplay] = useState(null);
   const [generatingFor, setGeneratingFor] = useState(null); // gameNumber
+  const [selectedPrimerId, setSelectedPrimerId] = useState('');
   const inputRef = useRef(null);
 
   const games = normalizeGames(replay?.parsed);
@@ -100,6 +101,10 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
 
   const generateReview = async (game) => {
     setError('');
+    if (!selectedPrimerId) {
+      setError('Please select a primer before generating a review.');
+      return;
+    }
     const gameNumber = game.gameNumber ?? game.game ?? game.number ?? null;
     try {
       setGeneratingFor(gameNumber ?? game);
@@ -107,9 +112,9 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          hubId,
           replayId: replay?.id,
           gameNumber,
+          primerId: selectedPrimerId,
         }),
       });
       if (!res.ok) {
@@ -170,6 +175,33 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
       </div>
 
       {error && <p className="text-bad text-sm">{error}</p>}
+
+      {/* Primer selector */}
+      {primers.length > 0 && (
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Primer (matchup context)
+          </label>
+          <select
+            value={selectedPrimerId}
+            onChange={(e) => setSelectedPrimerId(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none"
+          >
+            <option value="">— select a primer —</option>
+            {primers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.deckArchetype} vs {p.vsArchetype}
+                {p.verdict ? ` (${p.verdict})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {primers.length === 0 && (
+        <p className="text-xs text-amber-400">
+          No primers yet — create one in the Primers tab so the AI has matchup context.
+        </p>
+      )}
 
       {/* Parsed games */}
       {replay && (

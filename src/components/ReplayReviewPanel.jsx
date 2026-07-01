@@ -94,6 +94,7 @@ const ReplayReviewPanel = ({ hubId }) => {
       {tab === 'upload' && (
         <ReplayUpload
           hubId={hubId}
+          primers={primers}
           onReviewCreated={() => {
             bumpReviews();
             setTab('reviews');
