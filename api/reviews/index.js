@@ -96,6 +96,18 @@ export default withAuth(async (req, res, session) => {
   await assertHubMember(replay.hubId, userId, res);
   if (res.writableEnded) return;
 
+  // DEBUG — remove after confirming parser fix
+  const _parsed = replay.parsed || {};
+  const _games = Array.isArray(_parsed.games) ? _parsed.games : [];
+  console.log("[review-debug] replay.parsed keys:", Object.keys(_parsed));
+  console.log("[review-debug] game count:", _games.length);
+  if (_games[0]) {
+    console.log("[review-debug] game[0] keys:", Object.keys(_games[0]));
+    console.log("[review-debug] game[0].events length:", (_games[0].events || []).length);
+    console.log("[review-debug] game[0].gameNumber:", _games[0].gameNumber);
+    console.log("[review-debug] game[0] first event:", JSON.stringify((_games[0].events || [])[0]));
+  }
+
   // Budget guard before any LLM calls.
   const budget = await getBudgetStatus(replay.hubId);
   if (budget.exceeded) {
