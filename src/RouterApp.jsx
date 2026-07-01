@@ -15,6 +15,7 @@ import AskPage from './pages/hub/AskPage'
 import HubOverviewPage from './pages/hub/HubOverviewPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import JoinPage from './pages/JoinPage'
 import { useAuth } from './contexts/AuthContext'
 
 function TopNav() {
@@ -27,15 +28,15 @@ function TopNav() {
     <div className="sticky top-0 z-50 border-b border-gray-800 bg-black/70 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 font-semibold text-violet-400">
+          <Link to="/team-hub" className="flex items-center gap-2 font-semibold text-violet-400">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 shadow-[0_0_14px_-2px_rgba(139,108,255,0.7)] inline-block" aria-hidden="true"></span>
-            Lorcana Deck Builder
+            Team Lorcana
           </Link>
-          <NavLink to="/builder" className={linkClass}>
-            Deck Builder
-          </NavLink>
           <NavLink to="/team-hub" className={linkClass}>
             Team Hub
+          </NavLink>
+          <NavLink to="/builder" className={linkClass}>
+            Deck Lab
           </NavLink>
         </div>
 
@@ -91,10 +92,11 @@ export default function RouterApp() {
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<BuilderPage />} />
+          <Route path="/" element={<Navigate to="/team-hub" replace />} />
           <Route path="/builder" element={<BuilderPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/join" element={<JoinPage />} />
           <Route path="/team-hub" element={<RequireAuth><HubListPage /></RequireAuth>} />
           <Route path="/team-hub/:id" element={<RequireAuth><HubDetailLayout /></RequireAuth>}>
             <Route index element={<Navigate to="home" replace />} />

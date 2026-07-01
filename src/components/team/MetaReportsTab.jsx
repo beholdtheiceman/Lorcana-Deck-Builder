@@ -24,6 +24,7 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
   const [form, setForm] = useState(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
   const [activeTag, setActiveTag] = useState('');
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   // AI draft state
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -128,7 +129,7 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
   };
 
   const remove = async (id) => {
-    if (!window.confirm('Delete this report?')) return;
+    setPendingDelete(null);
     const prev = reports;
     setReports((rs) => rs.filter((x) => x.id !== id)); // optimistic
     try {
@@ -268,8 +269,14 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
                   <div className="flex gap-2 shrink-0">
                     <button onClick={() => openEdit(r)}
                       className="text-gray-500 hover:text-violet-300 text-xs">Edit</button>
-                    <button onClick={() => remove(r.id)}
-                      className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                    {pendingDelete === r.id ? (
+                      <>
+                        <button onClick={() => remove(r.id)} className="text-red-400 hover:text-red-300 text-xs">Sure?</button>
+                        <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setPendingDelete(r.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                    )}
                   </div>
                 )}
               </div>

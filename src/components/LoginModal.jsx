@@ -40,7 +40,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
        <div className="w-full max-w-md">
         <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 border border-gray-800" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Login</h2>
+            <h2 className="text-2xl font-bold text-white">Sign in</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors"
@@ -66,7 +66,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
                 placeholder="Enter your email"
                 autoComplete="email"
                 required
@@ -83,7 +83,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
                 placeholder="Enter your password"
                 autoComplete="current-password"
                 required
@@ -103,9 +103,9 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
+              className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-violet-800 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
@@ -114,9 +114,9 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
               Don't have an account?{' '}
               <button
                 onClick={onSwitchToRegister}
-                className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                className="text-violet-400 hover:text-violet-300 transition-colors"
               >
-                Register here
+                Create account
               </button>
             </p>
           </div>

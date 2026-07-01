@@ -74,6 +74,7 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,7 +165,7 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
   };
 
   const remove = async (id) => {
-    if (!window.confirm('Delete this logged game?')) return;
+    setPendingDelete(null);
     const prev = games;
     setGames((g) => g.filter((x) => x.id !== id)); // optimistic
     try {
@@ -211,7 +212,7 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
               {knownOpponents.map((o) => <option key={o} value={o} />)}
             </datalist>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label className={label}>Result *</label>
               <select className={input} value={form.result} onChange={(e) => setField('result', e.target.value)}>
@@ -273,8 +274,8 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
                   <th className="text-left px-3 py-2 font-medium">vs</th>
                   <th className="text-right px-3 py-2 font-medium">W–L</th>
                   <th className="text-right px-3 py-2 font-medium">Win %</th>
-                  <th className="text-right px-3 py-2 font-medium">On play</th>
-                  <th className="text-right px-3 py-2 font-medium">On draw</th>
+                  <th className="text-right px-3 py-2 font-medium hidden md:table-cell">On play</th>
+                  <th className="text-right px-3 py-2 font-medium hidden md:table-cell">On draw</th>
                 </tr>
               </thead>
               <tbody>
@@ -286,10 +287,10 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
                     <td className={`px-3 py-2 text-right font-medium ${r.winPct >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
                       {r.winPct}%
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-400">
+                    <td className="px-3 py-2 text-right text-gray-400 hidden md:table-cell">
                       {r.onPlayGames ? `${r.onPlayWins}/${r.onPlayGames}` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-400">
+                    <td className="px-3 py-2 text-right text-gray-400 hidden md:table-cell">
                       {r.onDrawGames ? `${r.onDrawWins}/${r.onDrawGames}` : '—'}
                     </td>
                   </tr>
@@ -377,10 +378,14 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
                     {new Date(g.playedAt).toLocaleDateString()}
                   </div>
                 </div>
-                <button onClick={() => remove(g.id)}
-                  className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete game">
-                  ✕
-                </button>
+                {pendingDelete === g.id ? (
+                  <>
+                    <button onClick={() => remove(g.id)} className="text-red-400 hover:text-red-300 text-xs shrink-0">Sure?</button>
+                    <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs shrink-0">✕</button>
+                  </>
+                ) : (
+                  <button onClick={() => setPendingDelete(g.id)} className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete game">✕</button>
+                )}
               </li>
             ))}
           </ul>

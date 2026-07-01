@@ -35,6 +35,7 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +116,7 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
   };
 
   const remove = async (id) => {
-    if (!window.confirm('Delete this practice?')) return;
+    setPendingDelete(null);
     const prev = practices;
     setPractices((list) => list.filter((x) => x.id !== id));
     try {
@@ -166,16 +167,23 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
           {canModify(p) && (
             <div className="flex gap-2 shrink-0">
               <button onClick={() => openEdit(p)} className="text-gray-500 hover:text-violet-300 text-xs">Edit</button>
-              <button onClick={() => remove(p.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+              {pendingDelete === p.id ? (
+                <>
+                  <button onClick={() => remove(p.id)} className="text-red-400 hover:text-red-300 text-xs">Sure?</button>
+                  <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+                </>
+              ) : (
+                <button onClick={() => setPendingDelete(p.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+              )}
             </div>
           )}
         </div>
 
         {/* RSVP controls */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {STATUSES.map(([val, lbl]) => (
             <button key={val} onClick={() => setRsvp(p.id, val)}
-              className={`px-2.5 py-1 rounded text-xs font-medium ${myStatus === val ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+              className={`px-2.5 py-1.5 rounded text-xs font-medium ${myStatus === val ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
               {lbl}
             </button>
           ))}

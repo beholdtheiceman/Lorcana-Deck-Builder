@@ -1,5 +1,6 @@
 // Local utilities -------------------------------------------------------------
 import { CARD_TYPES, getCardImg } from "./lib/cardUtils.js";
+import { exportDeck, generateTextExport, generateSimpleTextExport, generateCSVExport } from "./utils/deckExport.js";
 
 // React & ecosystem -----------------------------------------------------------
 import React, {
@@ -2410,82 +2411,6 @@ function duplicateDeck(decks, deckId, newName = null) {
   return updatedDecks;
 }
 
-// Export deck to various formats
-function exportDeck(deck, format = 'json') {
-  switch (format) {
-    case 'json':
-      return JSON.stringify(deck, null, 2);
-    case 'txt':
-      return generateTextExport(deck);
-    case 'simple-txt':
-      return generateSimpleTextExport(deck);
-    case 'csv':
-      return generateCSVExport(deck);
-    default:
-      return JSON.stringify(deck, null, 2);
-  }
-}
-
-// Generate text export
-function generateTextExport(deck) {
-  const lines = [
-    `${deck.name}`,
-    `Format: ${deck.format}`,
-    `Created: ${new Date(deck.createdAt).toLocaleDateString()}`,
-    `Updated: ${new Date(deck.updatedAt).toLocaleDateString()}`,
-    `Total Cards: ${deck.total}`,
-    '',
-    'Cards:',
-    ''
-  ];
-  
-  // Group by cost
-  const entries = Object.values(deck.entries).filter(e => e.count > 0);
-  const groupedByCost = groupBy(entries, (e) => getCost(e.card));
-  
-  Object.keys(groupedByCost)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .forEach(cost => {
-      lines.push(`Cost ${cost}:`);
-      groupedByCost[cost].forEach(entry => {
-        const card = entry.card;
-        lines.push(`  ${entry.count}x ${card.name} (${card.set} #${card.number})`);
-      });
-      lines.push('');
-    });
-  
-  return lines.join('\n');
-}
-
-// Generate simple text export (matches import format)
-function generateSimpleTextExport(deck) {
-  const lines = [];
-  
-  // Get all entries with count > 0, sorted by card name
-  const entries = Object.values(deck.entries)
-    .filter(e => e.count > 0)
-    .sort((a, b) => a.card.name.localeCompare(b.card.name));
-  
-  entries.forEach(entry => {
-    lines.push(`${entry.count} ${entry.card.name}`);
-  });
-  
-  return lines.join('\n');
-}
-
-// Generate CSV export
-function generateCSVExport(deck) {
-  const lines = ['Name,Set,Number,Cost,Type,Rarity,Count'];
-  
-  const entries = Object.values(deck.entries).filter(e => e.count > 0);
-  entries.forEach(entry => {
-    const card = entry.card;
-    lines.push(`"${card.name}","${card.set}","${card.number}","${getCost(card)}","${card.type}","${card.rarity}","${entry.count}"`);
-  });
-  
-  return lines.join('\n');
-}
-
 // Import deck from various formats
 function importDeck(data, format = 'json') {
   try {
@@ -3501,14 +3426,6 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
           title="Import deck JSON"
         >
           Import
-        </button>
-        
-        <button
-          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-violet-200 hover:bg-violet-500/15 hover:border-violet-400/40 transition"
-          onClick={onTeamHub}
-          title="Team Hub"
-        >
-          Team Hub
         </button>
         
       </div>
@@ -4911,7 +4828,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                       console.error('[DeckManager] Manual refresh failed:', error);
                     }
                   }}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+                  className="px-3 py-1 bg-violet-600 hover:bg-violet-700 rounded text-sm"
                   title="Refresh decks from cloud"
                 >
                   ↻ Refresh
@@ -5031,7 +4948,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
                       console.log('[DeckManager] Calling onSwitchDeck with:', selectedDeck);
                       onSwitchDeck(selectedDeck);
                     }}
-                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+                    className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-700 rounded"
                   >
                     Switch to This Deck
                   </button>
@@ -7563,7 +7480,7 @@ function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
                 window.print();
                 onClose();
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Print deck presentation"
             >
               🖨️ Print
@@ -7617,7 +7534,7 @@ Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)
 Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
                 navigator.clipboard.writeText(stats);
               }}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Copy deck statistics to clipboard"
             >
               📊 Copy Stats
@@ -7646,7 +7563,7 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
               <button
                 onClick={handleSaveToHub}
                 disabled={!selectedHubId || !deckName.trim() || savingToHub}
-                className="px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
+                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
                 title="Save deck to selected team hub"
               >
                 {savingToHub ? '🔄' : '👥'} {savingToHub ? 'Saving...' : 'Save'}
@@ -8119,7 +8036,7 @@ function TournamentResultsSection({ deckId, deckName }) {
                             <div className="flex gap-1">
                               <button
                                 onClick={saveEdit}
-                                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                                className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded"
                               >
                                 ✓
                               </button>
@@ -8134,7 +8051,7 @@ function TournamentResultsSection({ deckId, deckName }) {
                             <div className="flex gap-1">
                               <button
                                 onClick={() => startEdit(record)}
-                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                                className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded"
                               >
                                 ✏️
                               </button>
@@ -8329,6 +8246,8 @@ function AppInner() {
       const yOffset = headerH + margin;
       
       // Draw all cards in one continuous grid
+      let cardsDone = 0;
+      const totalCards = allEntries.length;
       for (const entry of allEntries) {
         const x = margin + currentCol * (cardWidth + gap);
         const y = yOffset + currentRow * (cardHeight + gap);
@@ -8595,6 +8514,8 @@ function AppInner() {
         }
         
         // Move to next position
+        cardsDone++;
+        if (button) button.textContent = `Loading card images… ${cardsDone}/${totalCards}`;
         currentCol++;
         if (currentCol >= cardsPerRow) {
           currentCol = 0;
@@ -8624,7 +8545,7 @@ function AppInner() {
       
     } catch (error) {
       console.error('Failed to generate deck image:', error);
-      alert('Failed to generate deck image. Please try again.');
+      addToast('Failed to generate deck image. Please try again.', 'error');
       
       // Restore button state on error
       if (button) {
@@ -10212,7 +10133,7 @@ useEffect(() => {
       <div className="pt-4">
         <button
           onClick={() => setSaveConfirmationOpen(false)}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
+          className="px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-lg font-semibold transition-colors"
         >
           Continue
         </button>

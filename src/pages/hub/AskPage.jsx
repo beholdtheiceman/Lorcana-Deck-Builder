@@ -75,12 +75,12 @@ export default function AskPage() {
           className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm resize-none focus:border-violet-500 focus:outline-none disabled:opacity-50"
         />
         {error && <p className="text-sm text-red-400">{error}</p>}
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-gray-500">Press Enter to send · Shift+Enter for new line</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="text-xs text-gray-500 order-2 sm:order-1">Press Enter to send · Shift+Enter for new line</p>
           <button
             type="submit"
             disabled={loading || !question.trim()}
-            className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            className="order-1 sm:order-2 w-full sm:w-auto px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Thinking…' : 'Ask'}
           </button>

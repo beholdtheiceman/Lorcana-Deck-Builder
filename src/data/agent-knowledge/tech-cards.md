@@ -1,5 +1,5 @@
 # Lorcana Tech Cards Reference
-_Last updated: July 2026 (Sets 1–6 / Azurite Sea era)_
+_Updated: Set 12 (Wilds Unknown). Sourced from Metafy competitive guides._
 
 "Tech cards" are situational includes added to a deck specifically to address meta threats. When a user asks "what should I run against X" or "what's good tech for Y meta," reference this file.
 
@@ -125,6 +125,78 @@ _Use when specific threats need to be answered_
 ### vs. Amber/Sapphire Ramp
 - **Run:** Aggressive pressure to race before their big threats land; removal for their ramp pieces; Rush characters
 - **Avoid:** Control strategies that let them reach 7+ ink; you need to end the game fast
+
+---
+
+---
+
+## Set 12 (Wilds Unknown) Tech Cards — Current Meta
+
+### Tech Cards for Amber/Ruby Toys (sourced from Metafy guide)
+
+These are the cards the competitive community considers for the Toys shell — with reasoning for inclusion or exclusion:
+
+| Card | Verdict | Why |
+|------|---------|-----|
+| The Horseman Strikes | Conditional | Strong vs. Evasive-heavy decks (Dumbo); weak vs. most of the field. Only worth it if your local meta is 40%+ Evasive-focused. |
+| Mowgli | Situational | Silver bullet vs. board-wipe decks. Low early-game value. Consider 1-of if facing heavy control locally. |
+| Lumiere | Near-cut | +1 strength to all toys helps in combat. Would include if a toy in the current list underperformed. |
+| Jingle Joe | Situational | Good stat line; useful for protecting against non-Evasive threats. Not currently needed vs. meta. |
+| Bo Peep | Excluded | 3-cost with no free-play discount is awkward. Bodyguard on Woody characters is counter-productive (Shift Woody is what you don't want challenged). |
+| Roller Bob | Near-cut | Rush was actually problematic — lowering toy count in discard makes Hand and Ducky cost more. Include if character/location decks become more prevalent. |
+| Firefly Swarm | Situational | Early removal option; condition to hit Dragon Fire trigger is harder in Toys. Useful in aggressive-heavy local metas. |
+| Worlds Greatest Criminal Mind | Situational | Same category as Horseman Strikes. Works with Babyhead for flexibility but rarely applies to common meta decks. |
+| Grab Your Bow | Excluded | Strong (singable on turn 3; reach potential with Sid). Cut due to uninkable count management — couldn't find a replacement. |
+| Andy's Room | Excluded | Location found off Woody (4); 1-toy-only restriction is too narrow. |
+
+### Key Threats to Tech Against in Set 12
+
+**Enigmatic Inkcaster / Snowfort (Burn Lore Items):**
+- Amber/Ruby has NO item removal — these go unchecked
+- Tech option: Mowgli (can answer some board-wipe threats; doesn't directly answer items)
+- Best answer: Race lore faster; don't try to stop them, out-race them
+
+**Demona (Blurple board swing):**
+- Tech option: Dump your hand before her turn; Babyhead for card flow post-swing
+- Best answer: Bodies — keep flooding the board; force her to have no challengers
+
+**Under the Sea (Dogs disruption):**
+- Tech option: Headless Horseman to remove their singers before they can sing
+- Best answer: Either remove singers OR go so big that the disruption doesn't matter
+
+**Chromicon (Emerald — hurts "when played"):**
+- Tech option: Sequence correctly — toys' "when played" triggers fire normally; Chromicon mainly hurts opponent if they're also playing triggered abilities
+- Best answer: Don't be afraid of it; proper sequencing neutralizes its effect
+
+**Prince Phillip + MMS (ES Control combo):**
+- Tech option: Race to 16+ lore; hold Sid + Hand/Ptera for explosive follow-up AFTER their board wipe
+- Best answer: End the game before they set up; they're the slowest deck in the format
+
+**Goliath (Sapphire Steel draw engine):**
+- Tech option: Kill Goliath immediately; do NOT use your own draw effects while it's active
+- Best answer: Pressure path; remove Goliath and their deck crumbles
+
+**Yzma (Amethyst Steel card advantage):**
+- Tech option: Candy Drift (removes large characters); Horseman as direct removal
+- Best answer: Kill Yzma ASAP; the rest of the matchup becomes manageable
+
+**Dale (YP Dale combo enabler):**
+- Tech option: Headless Horseman × 4 — specifically included for this matchup
+- Best answer: Kill Dale first; their deck's power collapses without him
+
+---
+
+## Matchup-Specific Tech Recommendations (Set 12)
+
+| Matchup | Key Tech | Reasoning |
+|---------|----------|-----------|
+| vs. Dogs | Headless Horseman × 4 | Remove singers before Under the Sea; banish Evasive threats |
+| vs. Blurple | Candy Drift | Answers Merryweather (4/5 Ward); small toys can't challenge Ward |
+| vs. Amber Steel | 2-willpower characters | Dodge Angel's recurring damage; maintain board presence |
+| vs. YP Dale | Headless Horseman × 4 | Dale is the primary removal target; Horseman hits him cleanly |
+| vs. ES Control | Speed | Can't tech for this — must race; no card answers their board wipe |
+| vs. Sapphire Steel | Sid Phillips | Primary removal tool; Horseman is harder to use vs. beefy targets |
+| vs. Amethyst Steel | Candy Drift | Removes Yzma and other large characters |
 
 ---
 

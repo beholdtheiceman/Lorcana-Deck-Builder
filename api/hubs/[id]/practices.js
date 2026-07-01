@@ -3,6 +3,7 @@ import { prisma } from "../../_lib/db.js";
 import { withAuth } from "../../_lib/withAuth.js";
 import { readJson } from "../../_lib/http.js";
 import { requireHubMember } from "../../_lib/hubAuth.js";
+import { postDiscord } from "../../_lib/discord.js";
 
 const CreateSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -48,6 +49,16 @@ export default withAuth(async (req, res, session) => {
     },
     include: { rsvps: { include: { member: { select: { id: true, email: true } } } } },
   });
+
+  // Fire-and-forget Discord notification
+  prisma.hub.findUnique({ where: { id: hubId }, select: { name: true, discordWebhookUrl: true } })
+    .then(hub => {
+      const dateStr = practice.startsAt
+        ? new Date(practice.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        : 'TBD';
+      return postDiscord(hub?.discordWebhookUrl, `📅 **New practice in ${hub?.name}**: ${practice.title} · ${dateStr}`);
+    })
+    .catch(() => {});
 
   return res.status(201).json(serialize(practice));
 });

@@ -14,6 +14,7 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
   const [webhook, setWebhook] = useState(initialWebhook);
   const [webhookMsg, setWebhookMsg] = useState('');
   const [savingWebhook, setSavingWebhook] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +81,7 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
   };
 
   const remove = async (id) => {
-    if (!window.confirm('Delete this event?')) return;
+    setPendingDelete(null);
     const prev = events;
     setEvents((list) => list.filter((x) => x.id !== id));
     try {
@@ -181,8 +182,14 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
           </div>
           {e.notes && <div className="text-gray-400 text-xs mt-0.5">{e.notes}</div>}
         </div>
-        <button onClick={() => remove(e.id)}
-          className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete event">✕</button>
+        {pendingDelete === e.id ? (
+          <>
+            <button onClick={() => remove(e.id)} className="text-red-400 hover:text-red-300 text-xs shrink-0">Sure?</button>
+            <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs shrink-0">✕</button>
+          </>
+        ) : (
+          <button onClick={() => setPendingDelete(e.id)} className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete event">✕</button>
+        )}
       </div>
       <AttendanceControls e={e} />
     </li>

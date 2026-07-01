@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
