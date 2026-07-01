@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Skeleton, EmptyState } from '../ui';
 
 const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
 const label = 'block text-xs font-medium text-gray-400 mb-1';
@@ -111,15 +112,14 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
 
   return (
     <div className="space-y-4">
-      {error && <div className="p-3 bg-red-600/90 text-white rounded text-sm">{error}</div>}
+      {error && <p className="text-bad text-sm">{error}</p>}
 
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-violet-300">Meta reports ({reports.length})</h4>
         {!showForm && (
-          <button onClick={openNew}
-            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded text-xs font-medium">
+          <Button variant="primary" onClick={openNew}>
             New report
-          </button>
+          </Button>
         )}
       </div>
 
@@ -165,25 +165,24 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
             </datalist>
           </div>
           <div className="flex gap-2">
-            <button type="submit" disabled={saving}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded text-sm font-medium">
+            <Button variant="primary" type="submit" disabled={saving}>
               {saving ? 'Saving…' : form.id ? 'Save changes' : 'Post report'}
-            </button>
-            <button type="button" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm">
+            </Button>
+            <Button variant="ghost" type="button" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}>
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
 
       {/* Reports list */}
       {loading ? (
-        <p className="text-gray-400 text-sm">Loading…</p>
+        <Skeleton variant=”block” className=”h-24” />
       ) : visible.length === 0 ? (
-        <p className="text-gray-500 text-sm">
-          {activeTag ? `No reports tagged “${activeTag}”.` : 'No reports yet.'}
-        </p>
+        <EmptyState
+          title={activeTag ? `No reports tagged “${activeTag}”` : 'No reports yet'}
+          description={activeTag ? 'Try a different tag filter' : 'Create a meta report to get started'}
+        />
       ) : (
         <ul className="space-y-3">
           {visible.map((r) => (
