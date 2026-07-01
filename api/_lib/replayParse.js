@@ -2,125 +2,39 @@ import JSZip from "jszip";
 import { gunzipSync } from "node:zlib";
 
 /**
- * Lorcana ".match-replay.zip" parser.
+ * Lorcana ".match-replay.zip" parser — validated against real replay files.
  *
- * !!! IMPORTANT — UNVERIFIED FORMAT !!!
- * This parser is written against the *documented* duels match-replay layout.
- * No real sample replay was available at implementation time, so every field
- * path, enum value, and event shape below is a best-effort guess and MUST be
- * validated against a real exported replay before being trusted in production.
- * Where the real format diverges, adjust the field accessors in
- * `normalizeGameV1` / `summarizeV1` rather than the public contract.
- *
- * Expected archive layout (documented):
- *   match.json                      -> match-level metadata
- *   game-01_<slug>.replay.gz        -> gzip-compressed per-game event log (JSON)
+ * Archive layout:
+ *   match.json                      -> match-level metadata (duels-match-replay-v1)
+ *   game-01_<slug>.replay.gz        -> gzip-compressed per-game replay (duels-replay-v1)
  *   game-02_<slug>.replay.gz
- *   ...
  *
- * match.json (documented "duels-match-replay-v1"):
- *   {
- *     "format": "duels-match-replay-v1",
- *     "matchId": "abc123",
- *     "gameFormat": "Core",                 // Core | Infinity
- *     "source": "duels.ink",
- *     "perspectivePlayer": "Larry",         // whose POV "me" refers to
- *     "players": [{ "name": "Larry", "seat": 0 }, { "name": "Opp", "seat": 1 }],
- *     "result": { "winner": "Larry", "score": "2-1" },
- *     "cardRefs": { "0": "10-60", "1": "6-200", ... }  // ref index -> setNum-cardNum
- *   }
+ * match.json shape:
+ *   { format, matchId, perspective (1|2), playerNames: {"1":"..","2":".."},
+ *     matchWinner, matchFormat, games: [{gameNumber, winner, victoryReason, matchScoreAfter}] }
  *
- * Each decompressed game .replay (documented):
- *   {
- *     "gameNumber": 1,
- *     "winner": "Larry",
- *     "victoryReason": "lore",            // lore | deckout | concede
- *     "turns": 14,
- *     "cardRefs": { ... },                // optional per-game override of match cardRefs
- *     "loreCurve": { "Larry": [0,1,3,..], "Opp": [0,0,2,..] },
- *     "decklists": { "Larry": [{card:0}, {card:1}, ...], "Opp": [...] },
- *     "events": [
- *       { "turn": 1, "player": "Larry", "type": "play",  "card": {card:0} },
- *       { "turn": 1, "player": "Larry", "type": "quest", "card": {card:3} },
- *       ...
- *     ]
- *   }
+ * Per-game replay shape (decompressed):
+ *   { format:"duels-replay-v1", gameId, perspective (1|2), playerNames, winner,
+ *     victoryReason, turnCount, decklist: ["11-38","12-46",...], baseSnapshot, frames, logs }
+ *
+ *   frames[]: { seq, actionType, player (1|2), turnNumber, takenAction, patch }
+ *   takenAction shapes by actionType:
+ *     PLAY_CARD:   { type, player, cardId, cardName, cardType, source }
+ *     QUEST:       { type, player, cardId, cardName, loreGained, newLoreTotal }
+ *     ATTACK:      { type:"CHALLENGE", player, attackerName, defenderName,
+ *                    defenderBanished, attackerBanished }
+ *     ADD_TO_INK:  { type, player, cardId, cardName }
+ *     BOOST:       { type, player, cardId, cardName }
+ *     ACTIVATE_ABILITY: { type, player, cardId, cardName }
+ *
+ *   logs[]: { id, timestamp, turnNumber, player, type, message, cardRefs?, data? }
  */
 
 const SUPPORTED_FORMATS = new Set(["duels-match-replay-v1"]);
 
 /**
- * Resolve a `{card:N}` reference (or a bare index / already-resolved string)
- * to a "setNum-cardNum" id using the provided cardRefs map. Returns null when
- * it cannot be resolved so callers can decide how to handle gaps.
- */
-function resolveCardRef(ref, cardRefs) {
-  if (ref == null) return null;
-  // Already a resolved id like "10-60".
-  if (typeof ref === "string") {
-    return cardRefs[ref] ?? ref;
-  }
-  // Bare numeric index.
-  if (typeof ref === "number") {
-    return cardRefs[String(ref)] ?? null;
-  }
-  // Documented `{card:N}` shape.
-  if (typeof ref === "object" && "card" in ref) {
-    return cardRefs[String(ref.card)] ?? null;
-  }
-  return null;
-}
-
-/** Determine "me"/"opp" mapping from the perspective player name. */
-function sidesFor(players, perspectivePlayer) {
-  const names = (players || []).map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean);
-  const me = perspectivePlayer && names.includes(perspectivePlayer) ? perspectivePlayer : names[0] ?? null;
-  const opp = names.find((n) => n !== me) ?? null;
-  return { me, opp };
-}
-
-/** Build the loreCurve {me,opp} arrays from a game's per-player curves. */
-function loreCurveFor(game, me, opp) {
-  const curves = game.loreCurve || {};
-  return {
-    me: Array.isArray(curves[me]) ? curves[me] : [],
-    opp: Array.isArray(curves[opp]) ? curves[opp] : [],
-  };
-}
-
-/** Normalize one decompressed game object into the summary game shape. */
-function normalizeGameV1(game, matchCardRefs, sides) {
-  // Per-game cardRefs (if present) override/extend the match-level map.
-  const cardRefs = { ...matchCardRefs, ...(game.cardRefs || {}) };
-  const { me, opp } = sides;
-
-  const decklistRaw = (game.decklists && game.decklists[me]) || [];
-  const decklistMe = decklistRaw
-    .map((ref) => resolveCardRef(ref, cardRefs))
-    .filter((id) => id != null);
-
-  const events = (game.events || []).map((ev) => ({
-    turn: ev.turn ?? null,
-    player: ev.player ?? null,
-    type: ev.type ?? null,
-    card: resolveCardRef(ev.card, cardRefs),
-  }));
-
-  return {
-    gameNumber: game.gameNumber ?? null,
-    winner: game.winner ?? null,
-    victoryReason: game.victoryReason ?? null,
-    turns: game.turns ?? null,
-    loreCurve: loreCurveFor(game, me, opp),
-    decklistMe,
-    events,
-  };
-}
-
-/**
  * Parse a .match-replay.zip buffer into a normalized summary.
- *
- * @param {Buffer|Uint8Array|ArrayBuffer} buffer raw zip bytes
+ * @param {Buffer|Uint8Array|ArrayBuffer} buffer
  * @returns {Promise<{ games: Array, perspectivePlayer: string|null }>}
  */
 export async function parseReplayZip(buffer) {
@@ -134,11 +48,10 @@ export async function parseReplayZip(buffer) {
   let match;
   try {
     match = JSON.parse(await matchFile.async("string"));
-  } catch (err) {
+  } catch {
     throw new Error("parseReplayZip: match.json is not valid JSON");
   }
 
-  // Version branch. Only v1 is documented/handled today.
   if (!SUPPORTED_FORMATS.has(match.format)) {
     throw new Error(`parseReplayZip: unsupported replay format "${match.format ?? "unknown"}"`);
   }
@@ -147,11 +60,13 @@ export async function parseReplayZip(buffer) {
 }
 
 async function summarizeV1(zip, match) {
-  const matchCardRefs = match.cardRefs || {};
-  const perspectivePlayer = match.perspectivePlayer ?? null;
-  const sides = sidesFor(match.players, perspectivePlayer);
+  const myPlayerNum = match.perspective ?? 1;
+  const oppPlayerNum = myPlayerNum === 1 ? 2 : 1;
+  const playerNames = match.playerNames || {};
+  const myName = playerNames[String(myPlayerNum)] ?? `Player ${myPlayerNum}`;
+  const oppName = playerNames[String(oppPlayerNum)] ?? `Player ${oppPlayerNum}`;
 
-  // Collect game-NN_*.replay.gz entries, sorted by game number.
+  // Collect game-NN_*.replay.gz entries sorted by game number.
   const gameEntries = [];
   zip.forEach((relativePath, entry) => {
     if (/(^|\/)game-\d+.*\.replay\.gz$/i.test(relativePath)) {
@@ -161,18 +76,172 @@ async function summarizeV1(zip, match) {
   });
   gameEntries.sort((a, b) => a.num - b.num);
 
+  const matchGamesMeta = match.games || [];
   const games = [];
-  for (const { entry } of gameEntries) {
+  for (let i = 0; i < gameEntries.length; i++) {
+    const { entry } = gameEntries[i];
     const gz = await entry.async("nodebuffer");
-    let game;
+    let gameData;
     try {
-      game = JSON.parse(gunzipSync(gz).toString("utf8"));
-    } catch (err) {
-      // Skip a corrupt/unparseable game rather than failing the whole match.
+      gameData = JSON.parse(gunzipSync(gz).toString("utf8"));
+    } catch {
       continue;
     }
-    games.push(normalizeGameV1(game, matchCardRefs, sides));
+    const gameMeta = matchGamesMeta[i] ?? {};
+    games.push(normalizeGame(gameData, gameMeta, myPlayerNum, myName, oppName));
   }
 
-  return { games, perspectivePlayer };
+  const lastGame = matchGamesMeta[matchGamesMeta.length - 1];
+  const score = lastGame?.matchScoreAfter
+    ? `${lastGame.matchScoreAfter.player1}-${lastGame.matchScoreAfter.player2}`
+    : null;
+  const mw = match.matchWinner;
+  const matchWinner = mw === myPlayerNum ? myName : mw === oppPlayerNum ? oppName : null;
+
+  return {
+    games,
+    perspectivePlayer: myName,
+    playerNames: { me: myName, opp: oppName },
+    matchWinner,
+    matchScore: score,
+    source: "duels.ink",
+  };
+}
+
+function normalizeGame(game, gameMeta, myPlayerNum, myName, oppName) {
+  const frames = game.frames || [];
+  const meNum = game.perspective ?? myPlayerNum;
+  const oppNum = meNum === 1 ? 2 : 1;
+
+  // Decklist — only my deck is visible in POV replay.
+  const decklistMe = Array.isArray(game.decklist) ? [...game.decklist] : [];
+
+  // Build events from takenAction on each frame.
+  const INCLUDE_TYPES = new Set(["PLAY_CARD", "QUEST", "ATTACK", "ADD_TO_INK", "BOOST", "ACTIVATE_ABILITY"]);
+  const events = [];
+
+  for (const frame of frames) {
+    const ta = frame.takenAction;
+    if (!ta) continue;
+    const actionType = frame.actionType || ta.type || "";
+    if (!INCLUDE_TYPES.has(actionType)) continue;
+
+    const playerLabel = frame.player === meNum ? "me" : "opp";
+
+    if (actionType === "ATTACK") {
+      const aName = ta.attackerName ?? ta.attackerCardId ?? "?";
+      const dName = ta.defenderName ?? ta.defenderCardId ?? "?";
+      const outcome = ta.defenderBanished && ta.attackerBanished
+        ? "both banished"
+        : ta.defenderBanished
+        ? "defender banished"
+        : ta.attackerBanished
+        ? "attacker banished"
+        : "no banishment";
+      events.push({
+        turn: frame.turnNumber,
+        player: playerLabel,
+        type: "challenge",
+        action: `challenged ${dName} with ${aName} (${outcome})`,
+        card: aName,
+        target: dName,
+        attackerBanished: ta.attackerBanished ?? false,
+        defenderBanished: ta.defenderBanished ?? false,
+      });
+    } else if (actionType === "QUEST") {
+      const cardName = ta.cardName ?? ta.cardId ?? "?";
+      events.push({
+        turn: frame.turnNumber,
+        player: playerLabel,
+        type: "quest",
+        action: `quested with ${cardName} (+${ta.loreGained ?? "?"} lore, total: ${ta.newLoreTotal ?? "?"})`,
+        card: cardName,
+        loreGained: ta.loreGained,
+        newLoreTotal: ta.newLoreTotal,
+      });
+    } else {
+      const cardName = ta.cardName ?? ta.cardId ?? "?";
+      const verb =
+        actionType === "PLAY_CARD" ? "played" :
+        actionType === "ADD_TO_INK" ? "inked" :
+        actionType === "BOOST" ? "boosted" :
+        actionType === "ACTIVATE_ABILITY" ? "activated ability of" :
+        actionType.toLowerCase();
+      events.push({
+        turn: frame.turnNumber,
+        player: playerLabel,
+        type: actionType.toLowerCase(),
+        action: `${verb} ${cardName}`,
+        card: cardName,
+      });
+    }
+  }
+
+  // Lore curve: track per-turn lore totals from QUEST frames.
+  const loreTotals = { me: {}, opp: {} };
+  for (const frame of frames) {
+    const ta = frame.takenAction;
+    if (!ta || frame.actionType !== "QUEST" || ta.newLoreTotal == null) continue;
+    const side = frame.player === meNum ? "me" : "opp";
+    loreTotals[side][frame.turnNumber] = ta.newLoreTotal;
+  }
+
+  const turnCount =
+    game.turnCount ??
+    frames.reduce((max, f) => Math.max(max, f.turnNumber || 0), 0);
+
+  const loreCurve = [];
+  let lastMe = 0;
+  let lastOpp = 0;
+  for (let t = 1; t <= turnCount; t++) {
+    if (loreTotals.me[t] != null) lastMe = loreTotals.me[t];
+    if (loreTotals.opp[t] != null) lastOpp = loreTotals.opp[t];
+    loreCurve.push({ turn: t, you: lastMe, opp: lastOpp });
+  }
+
+  // Detect ink colors from PLAY_CARD patch additions.
+  const myColors = new Set();
+  const oppColors = new Set();
+  for (const frame of frames) {
+    if (frame.actionType !== "PLAY_CARD") continue;
+    for (const op of frame.patch || []) {
+      if (op.op === "add" && Array.isArray(op.value?.colors)) {
+        const target = frame.player === meNum ? myColors : oppColors;
+        for (const c of op.value.colors) target.add(c);
+      }
+    }
+  }
+  const colorsToArchetype = (colors) => {
+    if (!colors.size) return null;
+    return [...colors]
+      .map((c) => c.charAt(0).toUpperCase() + c.slice(1))
+      .sort()
+      .join("/");
+  };
+
+  // Human-readable log lines from the logs array.
+  const logs = (game.logs || []).map((l) => ({
+    turn: l.turnNumber,
+    player: l.player === meNum ? "me" : "opp",
+    type: l.type,
+    message: l.message,
+  }));
+
+  const winnerNum = game.winner ?? gameMeta.winner ?? null;
+  const result = winnerNum === meNum ? "W" : winnerNum === oppNum ? "L" : null;
+
+  return {
+    gameNumber: gameMeta.gameNumber ?? null, // from match.json games[] array
+    winner: winnerNum === meNum ? myName : winnerNum === oppNum ? oppName : null,
+    victoryReason: game.victoryReason ?? gameMeta.victoryReason ?? null,
+    result,
+    turnCount,
+    loreCurve,
+    decklistMe,
+    events,
+    logs,
+    deckArchetype: colorsToArchetype(myColors),
+    vsArchetype: colorsToArchetype(oppColors),
+    playerNames: { me: myName, opp: oppName },
+  };
 }

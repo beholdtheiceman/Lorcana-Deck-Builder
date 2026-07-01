@@ -52,28 +52,26 @@ async function assertHubAccess(userId, hubId) {
 
 /** Derive Replay column values from match.json + parsed summary. */
 function deriveMatchMeta(match, parsed) {
-  const perspective = parsed.perspectivePlayer ?? null;
+  // Prefer values already resolved by the parser (perspectivePlayer, matchScore, matchWinner).
+  const playerName = parsed.perspectivePlayer ?? null;
+  const opponentName = parsed.playerNames?.opp ?? null;
 
-  const players = (match.players || [])
-    .map((p) => (typeof p === "string" ? p : p?.name))
-    .filter(Boolean);
-  const playerName = perspective && players.includes(perspective) ? perspective : players[0] ?? null;
-  const opponentName = players.find((n) => n !== playerName) ?? null;
+  // parsed.matchWinner is the winner's name string (resolved from player number by the parser).
+  const matchWinnerName = parsed.matchWinner ?? null;
+  const matchResult =
+    matchWinnerName == null ? null : matchWinnerName === playerName ? "W" : "L";
 
-  const winner = match.result?.winner ?? null;
-  const matchResult = winner == null ? null : winner === playerName ? "W" : "L";
-
-  const rawFormat = match.gameFormat ?? match.format ?? null;
+  const rawFormat = match.matchFormat ?? match.gameFormat ?? match.format ?? null;
   const format = GAME_FORMATS.has(rawFormat) ? rawFormat : null;
 
   return {
-    source: match.source ?? "unknown",
+    source: parsed.source ?? match.source ?? "unknown",
     matchId: match.matchId ?? null,
     format,
     playerName,
     opponentName,
     matchResult,
-    matchScore: match.result?.score ?? null,
+    matchScore: parsed.matchScore ?? match.result?.score ?? null,
   };
 }
 
