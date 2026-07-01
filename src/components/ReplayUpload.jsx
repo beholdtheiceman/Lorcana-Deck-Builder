@@ -65,8 +65,9 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
       setError('');
       if (!file) return;
       const name = (file.name || '').toLowerCase();
-      if (!name.endsWith('.zip') && !name.endsWith('.match-replay.zip')) {
-        setError('Please drop a .match-replay.zip file.');
+      const allowed = ['.zip', '.gz', '.json'];
+      if (!allowed.some((ext) => name.endsWith(ext))) {
+        setError('Please drop a .zip, .gz, or .json replay file.');
         return;
       }
       try {
@@ -149,7 +150,7 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
         <input
           ref={inputRef}
           type="file"
-          accept=".zip,.match-replay.zip,application/zip"
+          accept=".zip,.gz,.json,application/zip,application/gzip,application/json"
           className="hidden"
           onChange={(e) => upload(e.target.files?.[0])}
         />
@@ -163,7 +164,7 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
         ) : (
           <>
             <p className="text-sm font-medium text-white">
-              Drag a <span className="text-violet-300">.match-replay.zip</span> here
+              Drag a <span className="text-violet-300">.zip · .gz · .json</span> replay here
             </p>
             <p className="mt-1 text-xs text-gray-400">or click to browse</p>
           </>

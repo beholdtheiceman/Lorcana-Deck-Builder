@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
-import { parseReplayZip } from "../_lib/replayParse.js";
+import { parseReplayBuffer } from "../_lib/replayParse.js";
 
 /**
  * Replay ingestion endpoint.
@@ -108,7 +108,7 @@ export default withAuth(async (req, res, session) => {
     // match-level fields for the Replay columns, so read it once here too.
     let parsed;
     try {
-      parsed = await parseReplayZip(raw);
+      parsed = await parseReplayBuffer(raw);
     } catch (err) {
       // Bad/unsupported archive -> client error, not a 500.
       return res.status(422).json({ error: "Could not parse replay archive" });
