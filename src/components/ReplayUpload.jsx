@@ -101,21 +101,15 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
 
   const generateReview = async (game) => {
     setError('');
-    if (!selectedPrimerId) {
-      setError('Please select a primer before generating a review.');
-      return;
-    }
     const gameNumber = game.gameNumber ?? game.game ?? game.number ?? null;
     try {
       setGeneratingFor(gameNumber ?? game);
+      const payload = { replayId: replay?.id, gameNumber };
+      if (selectedPrimerId) payload.primerId = selectedPrimerId;
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          replayId: replay?.id,
-          gameNumber,
-          primerId: selectedPrimerId,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -176,18 +170,21 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
 
       {error && <p className="text-bad text-sm">{error}</p>}
 
-      {/* Primer selector */}
+      {/* Optional primer selector — if skipped the agent auto-generates matchup context */}
       {primers.length > 0 && (
         <div>
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Primer (matchup context)
+            Primer{' '}
+            <span className="font-normal normal-case text-gray-500">
+              — optional, auto-generated if skipped
+            </span>
           </label>
           <select
             value={selectedPrimerId}
             onChange={(e) => setSelectedPrimerId(e.target.value)}
             className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none"
           >
-            <option value="">— select a primer —</option>
+            <option value="">— auto-generate from matchup —</option>
             {primers.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.deckArchetype} vs {p.vsArchetype}
@@ -196,11 +193,6 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
             ))}
           </select>
         </div>
-      )}
-      {primers.length === 0 && (
-        <p className="text-xs text-amber-400">
-          No primers yet — create one in the Primers tab so the AI has matchup context.
-        </p>
       )}
 
       {/* Parsed games */}
