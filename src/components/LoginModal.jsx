@@ -10,13 +10,8 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Handle click outside to close
   const handleBackdropClick = (e) => {
-    console.log('[LoginModal] Backdrop clicked, target:', e.target, 'currentTarget:', e.currentTarget);
-    if (e.target === e.currentTarget) {
-      console.log('[LoginModal] Closing modal');
-      onClose();
-    }
+    if (e.target === e.currentTarget) onClose();
   };
 
   const handleSubmit = async (e) => {
@@ -41,18 +36,9 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
 
   return (
          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 grid place-items-center p-4" 
-          onClick={handleBackdropClick}
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              console.log('[LoginModal] Mouse down on backdrop, closing');
-              onClose();
-            }
-          }}>
+          onClick={handleBackdropClick}>
        <div className="w-full max-w-md">
-        <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 border border-gray-800" onClick={(e) => {
-          console.log('[LoginModal] Modal content clicked, stopping propagation');
-          e.stopPropagation();
-        }}>
+        <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 border border-gray-800" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Login</h2>
             <button

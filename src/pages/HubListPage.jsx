@@ -22,6 +22,9 @@ const HubListPage = () => {
   // Form states
   const [hubName, setHubName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [displayNameError, setDisplayNameError] = useState('');
 
   // Post-join display name prompt
   const [showDisplayNameModal, setShowDisplayNameModal] = useState(false);
@@ -59,11 +62,10 @@ const HubListPage = () => {
 
     try {
       setLoading(true);
+      setCreateError('');
       const response = await fetch('/api/hubs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: hubName })
       });
 
@@ -72,13 +74,12 @@ const HubListPage = () => {
         setHubs(prev => [...prev, newHub]);
         setHubName('');
         setShowCreateModal(false);
-        setError('');
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Failed to create hub');
+        setCreateError(errorData.error || 'Failed to create hub');
       }
-    } catch (error) {
-      setError('Error creating hub');
+    } catch {
+      setCreateError('Network error — please try again');
     } finally {
       setLoading(false);
     }
@@ -90,11 +91,10 @@ const HubListPage = () => {
 
     try {
       setLoading(true);
+      setJoinError('');
       const response = await fetch('/api/hubs/join', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteCode: inviteCode.toUpperCase() })
       });
 
@@ -106,16 +106,15 @@ const HubListPage = () => {
         });
         setInviteCode('');
         setShowJoinModal(false);
-        setError('');
         setJoinedHubId(updatedHub.id);
         setDisplayName('');
         setShowDisplayNameModal(true);
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Failed to join hub');
+        setJoinError(errorData.error || 'Failed to join hub');
       }
-    } catch (error) {
-      setError('Error joining hub');
+    } catch {
+      setJoinError('Network error — please try again');
     } finally {
       setLoading(false);
     }
@@ -144,17 +143,23 @@ const HubListPage = () => {
     if (!displayName.trim() || !joinedHubId) return;
     try {
       setSavingDisplayName(true);
-      await fetch(`/api/hubs/${joinedHubId}/profile`, {
+      setDisplayNameError('');
+      const res = await fetch(`/api/hubs/${joinedHubId}/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: displayName.trim() }),
       });
-    } catch {
-      // non-blocking — they can set it later from the Roster tab
-    } finally {
-      setSavingDisplayName(false);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDisplayNameError(data.error || 'Failed to save display name');
+        return;
+      }
       setShowDisplayNameModal(false);
       navigate(`/team-hub/${joinedHubId}/roster`);
+    } catch {
+      setDisplayNameError('Network error — please try again');
+    } finally {
+      setSavingDisplayName(false);
     }
   };
 
@@ -409,19 +414,24 @@ const HubListPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-semibold text-white mb-4">Create New Hub</h2>
-            <form onSubmit={createHub}>
+            <form onSubmit={createHub} className="space-y-3">
+              {createError && (
+                <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">
+                  {createError}
+                </div>
+              )}
               <input
                 type="text"
                 placeholder="Hub Name"
                 value={hubName}
                 onChange={(e) => setHubName(e.target.value)}
-                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white mb-4"
+                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
                 required
               />
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => { setShowCreateModal(false); setCreateError(''); }}
                   className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
                 >
                   Cancel
@@ -444,20 +454,25 @@ const HubListPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-semibold text-white mb-4">Join Hub</h2>
-            <form onSubmit={joinHub}>
+            <form onSubmit={joinHub} className="space-y-3">
+              {joinError && (
+                <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">
+                  {joinError}
+                </div>
+              )}
               <input
                 type="text"
                 placeholder="Invite Code (8 characters)"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white mb-4"
+                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white font-mono uppercase tracking-widest"
                 maxLength={8}
                 required
               />
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowJoinModal(false)}
+                  onClick={() => { setShowJoinModal(false); setJoinError(''); }}
                   className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
                 >
                   Cancel
@@ -515,14 +530,19 @@ const HubListPage = () => {
             <p className="text-gray-400 text-sm mb-5">
               Set a display name so your teammates know who you are. You can always update this later from the Roster tab.
             </p>
-            <form onSubmit={saveDisplayName}>
+            <form onSubmit={saveDisplayName} className="space-y-3">
+              {displayNameError && (
+                <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">
+                  {displayNameError}
+                </div>
+              )}
               <input
                 type="text"
                 placeholder="Your display name (e.g. Larry)"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 maxLength={80}
-                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white mb-4"
+                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
                 autoFocus
               />
               <div className="flex justify-end space-x-3">

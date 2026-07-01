@@ -9,13 +9,8 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
-  // Handle click outside to close
   const handleBackdropClick = (e) => {
-    console.log('[RegisterModal] Backdrop clicked, target:', e.target, 'currentTarget:', e.currentTarget);
-    if (e.target === e.currentTarget) {
-      console.log('[RegisterModal] Closing modal');
-      onClose();
-    }
+    if (e.target === e.currentTarget) onClose();
   };
 
   const handleSubmit = async (e) => {
@@ -50,22 +45,11 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
 
   if (!isOpen) return null;
 
-  console.log('[RegisterModal] Rendering with email:', email);
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 grid place-items-center p-4" 
-         onClick={handleBackdropClick}
-         onMouseDown={(e) => {
-           if (e.target === e.currentTarget) {
-             console.log('[RegisterModal] Mouse down on backdrop, closing');
-             onClose();
-           }
-         }}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 grid place-items-center p-4"
+         onClick={handleBackdropClick}>
        <div className="w-full max-w-md">
-        <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 border border-gray-800" onClick={(e) => {
-          console.log('[RegisterModal] Modal content clicked, stopping propagation');
-          e.stopPropagation();
-        }}>
+        <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 border border-gray-800" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Create Account</h2>
             <button
@@ -83,10 +67,9 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
               </div>
             )}
 
-            {/* Email Field - First and Most Important */}
-            <div className="bg-yellow-900/30 p-4 rounded-lg border-2 border-yellow-500">
-              <label htmlFor="register-email" className="block text-lg font-bold text-yellow-300 mb-3">
-                🚨 EMAIL ADDRESS REQUIRED 🚨
+            <div>
+              <label htmlFor="register-email" className="block text-sm font-medium text-gray-300 mb-2">
+                Email
               </label>
               <input
                 id="register-email"
@@ -94,12 +77,11 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-white text-black placeholder-gray-600 border-2 border-yellow-400 focus:border-yellow-300 focus:outline-none text-lg font-medium"
-                placeholder="Enter your email address here"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
+                placeholder="Enter your email"
                 autoComplete="email"
                 required
               />
-              <p className="text-sm text-yellow-200 mt-2 font-medium">This will be your login username</p>
             </div>
 
             <div>
@@ -113,10 +95,11 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
-                placeholder="Create a password (min 8 characters)"
+                placeholder="Create a password"
                 autoComplete="new-password"
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
             </div>
 
             <div>
