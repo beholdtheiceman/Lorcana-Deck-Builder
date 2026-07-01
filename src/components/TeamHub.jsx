@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import HubDetailModal from './HubDetailModal';
 
 const TeamHub = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [hubs, setHubs] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [selectedHub, setSelectedHub] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showHubDetail, setShowHubDetail] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hubToDelete, setHubToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -310,10 +309,7 @@ const TeamHub = () => {
                     </>
                   )}
                   <button
-                    onClick={() => {
-                      setSelectedHub(hub);
-                      setShowHubDetail(true);
-                    }}
+                    onClick={() => navigate(`/hub/${hub.id}`)}
                     className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                   >
                     View Hub
@@ -449,21 +445,6 @@ const TeamHub = () => {
         </div>
       )}
 
-      {/* Hub Detail Modal */}
-      {showHubDetail && selectedHub && (
-        <HubDetailModal
-          hub={selectedHub}
-          user={user}
-          onClose={() => {
-            setShowHubDetail(false);
-            setSelectedHub(null);
-          }}
-          onDeckClick={(deck) => {
-            // The new approach handles deck detail directly in HubDetailModal
-            // No additional state management needed here
-          }}
-        />
-      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && hubToDelete && (
@@ -546,8 +527,6 @@ const TeamHub = () => {
           </div>
         </div>
       )}
-
-      {/* The new approach handles deck viewing directly in HubDetailModal */}
     </div>
   );
 };
