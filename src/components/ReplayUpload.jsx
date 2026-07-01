@@ -10,6 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
+import { Button, EmptyState } from './ui';
 
 /**
  * ReplayUpload
@@ -168,11 +169,7 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
         )}
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
-          {error}
-        </div>
-      )}
+      {error && <p className="text-bad text-sm">{error}</p>}
 
       {/* Parsed games */}
       {replay && (
@@ -188,9 +185,10 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
           </div>
 
           {games.length === 0 ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-gray-400">
-              No individual games were parsed from this replay.
-            </div>
+            <EmptyState
+              title="No games parsed"
+              description="No individual games were parsed from this replay"
+            />
           ) : (
             games.map((game, idx) => {
               const gameNumber = game.gameNumber ?? game.game ?? game.number ?? idx + 1;
@@ -224,13 +222,13 @@ const ReplayUpload = ({ hubId, onReviewCreated, onReplayUploaded }) => {
                         {game.vsArchetype || game.opponentDeck || 'Opponent'}
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() => generateReview({ ...game, gameNumber })}
                       disabled={busy}
-                      className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 px-3 py-1.5 text-sm font-medium text-white shadow hover:opacity-90 disabled:opacity-50"
                     >
                       {busy ? 'Generating…' : 'Generate review'}
-                    </button>
+                    </Button>
                   </div>
 
                   {series.length > 0 ? (
