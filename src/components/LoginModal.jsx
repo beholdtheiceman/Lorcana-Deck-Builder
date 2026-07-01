@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
@@ -7,6 +8,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   // Handle click outside to close
   const handleBackdropClick = (e) => {
@@ -100,6 +102,16 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
                 autoComplete="current-password"
                 required
               />
+            </div>
+
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => { onClose(); navigate('/forgot-password'); }}
+                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                Forgot password?
+              </button>
             </div>
 
             <button

@@ -44,6 +44,8 @@ model User {
 
   // Tournament submissions (legacy, reconciled)
   tournaments Tournament[]
+
+  resetTokens PasswordResetToken[]
 }
 
 model Deck {
@@ -442,6 +444,15 @@ model Tournament {
   @@index([organizerId])
   @@index([status])
   @@index([submitCode])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Submission {

@@ -13,6 +13,8 @@ import PrimersPage from './pages/hub/PrimersPage'
 import PlaytestPage from './pages/hub/PlaytestPage'
 import AskPage from './pages/hub/AskPage'
 import HubOverviewPage from './pages/hub/HubOverviewPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import { useAuth } from './contexts/AuthContext'
 
 function TopNav() {
@@ -91,6 +93,8 @@ export default function RouterApp() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<BuilderPage />} />
           <Route path="/builder" element={<BuilderPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/team-hub" element={<RequireAuth><HubListPage /></RequireAuth>} />
           <Route path="/team-hub/:id" element={<RequireAuth><HubDetailLayout /></RequireAuth>}>
             <Route index element={<Navigate to="home" replace />} />
