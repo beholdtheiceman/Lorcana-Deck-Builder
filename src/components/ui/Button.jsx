@@ -24,6 +24,7 @@ export default function Button({
 }) {
   return (
     <button
+      type="button"
       {...props}
       disabled={disabled || loading}
       className={`

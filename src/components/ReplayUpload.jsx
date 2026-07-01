@@ -54,6 +54,7 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
   const [error, setError] = useState('');
   const [replay, setReplay] = useState(null);
   const [generatingFor, setGeneratingFor] = useState(null); // gameNumber
+  const [doneFor, setDoneFor] = useState(new Set()); // gameNumbers with completed reviews
   const [selectedPrimerId, setSelectedPrimerId] = useState('');
   const inputRef = useRef(null);
 
@@ -116,6 +117,7 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
         throw new Error(body.error || `Could not generate review (${res.status})`);
       }
       const review = await res.json();
+      setDoneFor((prev) => new Set([...prev, gameNumber]));
       onReviewCreated?.(review);
     } catch (e) {
       setError(e.message || 'Could not generate review.');
@@ -219,6 +221,7 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
               const series = loreSeries(game);
               const key = gameNumber ?? idx;
               const busy = generatingFor === gameNumber || generatingFor === game;
+              const done = doneFor.has(gameNumber);
               return (
                 <div
                   key={key}
@@ -246,13 +249,19 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
                         {game.vsArchetype || game.opponentDeck || 'Opponent'}
                       </p>
                     </div>
-                    <Button
-                      variant="primary"
-                      onClick={() => generateReview({ ...game, gameNumber })}
-                      disabled={busy}
-                    >
-                      {busy ? 'Generating…' : 'Generate review'}
-                    </Button>
+                    {done ? (
+                      <span className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-sm font-medium text-emerald-300">
+                        Review created ✓
+                      </span>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        onClick={() => generateReview({ ...game, gameNumber })}
+                        disabled={busy}
+                      >
+                        {busy ? 'Generating…' : 'Generate review'}
+                      </Button>
+                    )}
                   </div>
 
                   {series.length > 0 ? (

@@ -95,10 +95,7 @@ const ReplayReviewPanel = ({ hubId }) => {
         <ReplayUpload
           hubId={hubId}
           primers={primers}
-          onReviewCreated={() => {
-            bumpReviews();
-            setTab('reviews');
-          }}
+          onReviewCreated={bumpReviews}
         />
       )}
 
