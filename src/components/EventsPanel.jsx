@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Skeleton, EmptyState } from './ui';
 
 const EMPTY = { title: '', startsAt: '', location: '', kind: '', notes: '' };
 
@@ -189,7 +190,7 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
 
   return (
     <div className="space-y-6">
-      {error && <div className="p-3 bg-red-600/90 text-white rounded text-sm">{error}</div>}
+      {error && <p className="text-bad text-sm">{error}</p>}
 
       {/* Add event */}
       <form onSubmit={submit} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
@@ -225,19 +226,18 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
           <textarea className={input} rows={2} value={form.notes}
             onChange={(e) => setField('notes', e.target.value)} placeholder="Format, who's going, etc." />
         </div>
-        <button type="submit" disabled={saving}
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded text-sm font-medium">
+        <Button type="submit" variant="primary" disabled={saving}>
           {saving ? 'Adding…' : 'Add event'}
-        </button>
+        </Button>
       </form>
 
       {/* Lists */}
       <div>
         <h4 className="text-sm font-semibold text-violet-300 mb-2">Upcoming</h4>
         {loading ? (
-          <p className="text-gray-400 text-sm">Loading…</p>
+          <Skeleton variant="block" className="h-24" />
         ) : upcoming.length === 0 ? (
-          <p className="text-gray-500 text-sm">No upcoming events.</p>
+          <EmptyState title="No events yet" description="Schedule an event for your team." />
         ) : (
           <ul className="space-y-2">{upcoming.map((e) => <Row key={e.id} e={e} />)}</ul>
         )}
@@ -261,10 +261,9 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
             <input className={input} type="url" value={webhook}
               onChange={(e) => setWebhook(e.target.value)}
               placeholder="https://discord.com/api/webhooks/…" />
-            <button onClick={saveWebhook} disabled={savingWebhook}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded text-sm shrink-0">
+            <Button onClick={saveWebhook} variant="ghost" disabled={savingWebhook}>
               {savingWebhook ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           </div>
           {webhookMsg && <p className="text-xs text-gray-400">{webhookMsg}</p>}
         </div>
