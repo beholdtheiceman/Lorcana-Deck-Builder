@@ -198,16 +198,18 @@ const RARITIES = ["Common", "Uncommon", "Rare", "Super Rare", "Legendary"];
 
 // Card classifications (Lorcana character classifications)
 const CLASSIFICATIONS = [
-  "Ally", "Captain", "Detective", "Dreamborn", "Floodborn", "Hyena", "Inventor", 
-  "King", "Mentor", "Pirate", "Princess", "Queen", "Robot", "Storyborn", "Titan",
-  "Alien", "Broom", "Deity", "Dragon", "Fairy", "Hero", "Illusion", "Knight", "Madrigal", 
-  "Musketeer", "Prince", "Puppy", "Racer", "Seven Dwarfs", "Sorcerer", "Tigger", "Villain"
+  "Alien", "Ally", "Broom", "Captain", "Colossus", "Deity", "Detective", "Dinosaur",
+  "Dragon", "Dreamborn", "Entangled", "Fairy", "Floodborn", "Gargoyle", "Ghost",
+  "Giant", "Hero", "Hunny", "Hyena", "Illusion", "Inventor", "King", "Knight",
+  "Madrigal", "Mentor", "Monster", "Musketeer", "Obstacle", "Pirate", "Prince",
+  "Princess", "Puppy", "Queen", "Racer", "Robot", "Seven Dwarfs", "Sorcerer",
+  "Storyborn", "Super", "Tigger", "Titan", "Toy", "Villain", "Whisper"
 ];
 
 // Canonical ability names you expose in the UI
 const ABILITIES_CANON = [
-  "Bodyguard", "Challenger", "Evasive", "Reckless", "Resist", "Rush",
-  "Shift", "Singer", "Support", "Ward", "Vanish"
+  "Alert", "Bodyguard", "Boost", "Challenger", "Evasive", "Reckless", "Resist", "Rush",
+  "Shift", "Sing Together", "Singer", "Support", "Vanish", "Ward"
 ];
 
 // Legacy ABILITIES constant for backward compatibility
@@ -10626,8 +10628,8 @@ function applyFilters(cards, filters) {
     console.log(`[Legality Filter] Applying ${filters.gamemode} filter`);
     
     if (filters.gamemode === "Core Constructed") {
-      // Core Constructed: only allow sets 5+ (exclude sets 1-4)
-      const allowedSetNums = new Set([5, 6, 7, 8, 9, 10, 11, 12, 13]); // Core Constructed: sets 5+
+      // Core Constructed: only allow sets 9+ (exclude sets 1-8)
+      const allowedSetNums = new Set([9, 10, 11, 12, 13]); // Core Constructed: sets 9+
       
       list = list.filter((c) => {
         // Try multiple sources for set number information (same as sets filter)
