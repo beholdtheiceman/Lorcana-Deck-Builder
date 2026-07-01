@@ -1695,6 +1695,7 @@ async function apiSearchCards({
           cost: card.cost,
           inks: Array.isArray(card.inks) ? card.inks : [card.inks].filter(Boolean),
           type: Array.isArray(card.types) ? card.types.join("/") : card.types,
+          classifications: card.classifications,
           rarity: card.rarity,
           image_url: card.image,
           text: card.text,
@@ -1918,6 +1919,7 @@ function normalizeLorcast(c) {
       setNum: setNum,            // numeric if possible, else null (1, 2, 3...)
       number: c.collector_number,
       types: typeList,
+      classifications: Array.isArray(c.classifications) ? c.classifications : [],
       rarity: c.rarity,
       cost: c.cost ?? c.ink_cost,
       inks: inks,
