@@ -57,8 +57,26 @@ export default withAuth(async (req, res, session) => {
     return res.status(200).json({ ok: true });
   }
 
+  if (req.method === "PATCH") {
+    if (review.authorId !== userId && hub.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the review author or hub owner can edit this review" });
+    }
+    const body = req.body ?? (await readJson(req));
+    const PatchSchema = z.object({
+      recap: z.string().max(10000).optional(),
+      leakTags: z.array(z.string().trim().max(80)).max(20).optional(),
+    });
+    const parsed = PatchSchema.safeParse(body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    const data = {};
+    if (parsed.data.recap !== undefined) data.recap = parsed.data.recap;
+    if (parsed.data.leakTags !== undefined) data.leakTags = parsed.data.leakTags;
+    const updated = await prisma.review.update({ where: { id }, data });
+    return res.status(200).json(updated);
+  }
+
   if (req.method !== "POST") {
-    res.setHeader("Allow", "GET, POST, DELETE");
+    res.setHeader("Allow", "GET, POST, PATCH, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   }
 

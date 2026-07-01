@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReviewCard from './ReviewCard';
+import Skeleton from './ui/Skeleton';
 
 /**
  * ReviewArchive
@@ -98,6 +99,10 @@ const ReviewArchive = ({ hubId, refreshKey, onEditReview, onOpenPrimer }) => {
     setReviews((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   };
 
+  const handleDeleted = (id) => {
+    setReviews((prev) => prev.filter((r) => r.id !== id));
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -121,8 +126,9 @@ const ReviewArchive = ({ hubId, refreshKey, onEditReview, onOpenPrimer }) => {
 
       {/* List */}
       {loading ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-gray-400">
-          Loading reviews…
+        <div className="space-y-3">
+          <Skeleton variant="block" className="h-28" />
+          <Skeleton variant="block" className="h-28" />
         </div>
       ) : error ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -141,6 +147,7 @@ const ReviewArchive = ({ hubId, refreshKey, onEditReview, onOpenPrimer }) => {
               key={r.id}
               review={r}
               onUpdated={handleUpdated}
+              onDeleted={handleDeleted}
               onEdit={onEditReview}
               onOpenPrimer={onOpenPrimer}
             />

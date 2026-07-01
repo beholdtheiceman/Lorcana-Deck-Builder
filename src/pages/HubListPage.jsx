@@ -23,6 +23,12 @@ const HubListPage = () => {
   const [hubName, setHubName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
 
+  // Post-join display name prompt
+  const [showDisplayNameModal, setShowDisplayNameModal] = useState(false);
+  const [joinedHubId, setJoinedHubId] = useState(null);
+  const [displayName, setDisplayName] = useState('');
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+
   useEffect(() => {
     if (user) {
       fetchHubs();
@@ -94,12 +100,16 @@ const HubListPage = () => {
 
       if (response.ok) {
         const updatedHub = await response.json();
-        setHubs(prev => prev.map(hub =>
-          hub.id === updatedHub.id ? updatedHub : hub
-        ));
+        setHubs(prev => {
+          const exists = prev.some(h => h.id === updatedHub.id);
+          return exists ? prev.map(h => h.id === updatedHub.id ? updatedHub : h) : [...prev, updatedHub];
+        });
         setInviteCode('');
         setShowJoinModal(false);
         setError('');
+        setJoinedHubId(updatedHub.id);
+        setDisplayName('');
+        setShowDisplayNameModal(true);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Failed to join hub');
@@ -112,7 +122,40 @@ const HubListPage = () => {
   };
 
   const regenerateInviteCode = async (hubId) => {
-    setError('Regenerate invite code not implemented yet');
+    try {
+      const response = await fetch(`/api/hubs/${hubId}/regenerate-invite`, { method: 'POST' });
+      if (response.ok) {
+        const { inviteCode: newCode } = await response.json();
+        setHubs(prev => prev.map(hub =>
+          hub.id === hubId ? { ...hub, inviteCode: newCode } : hub
+        ));
+        setError('');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to regenerate invite code');
+      }
+    } catch {
+      setError('Error regenerating invite code');
+    }
+  };
+
+  const saveDisplayName = async (e) => {
+    e.preventDefault();
+    if (!displayName.trim() || !joinedHubId) return;
+    try {
+      setSavingDisplayName(true);
+      await fetch(`/api/hubs/${joinedHubId}/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: displayName.trim() }),
+      });
+    } catch {
+      // non-blocking — they can set it later from the Roster tab
+    } finally {
+      setSavingDisplayName(false);
+      setShowDisplayNameModal(false);
+      navigate(`/team-hub/${joinedHubId}/roster`);
+    }
   };
 
   const handleDeleteHub = async () => {
@@ -226,14 +269,6 @@ const HubListPage = () => {
     setHubToTransfer(hub);
     setShowTransferModal(true);
   };
-
-  if (!user) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-400">Please log in to access Team Hub</p>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -468,6 +503,48 @@ const HubListPage = () => {
                 {deleting ? 'Deleting...' : 'Delete Hub'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Join Display Name Modal */}
+      {showDisplayNameModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold text-white mb-1">Welcome to the hub!</h2>
+            <p className="text-gray-400 text-sm mb-5">
+              Set a display name so your teammates know who you are. You can always update this later from the Roster tab.
+            </p>
+            <form onSubmit={saveDisplayName}>
+              <input
+                type="text"
+                placeholder="Your display name (e.g. Larry)"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={80}
+                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white mb-4"
+                autoFocus
+              />
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDisplayNameModal(false);
+                    navigate(`/team-hub/${joinedHubId}/roster`);
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                >
+                  Skip for now
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDisplayName || !displayName.trim()}
+                  className="px-4 py-2 bg-violet-600 text-white rounded hover:bg-violet-700 disabled:opacity-50 text-sm"
+                >
+                  {savingDisplayName ? 'Saving...' : 'Save & Enter Hub'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

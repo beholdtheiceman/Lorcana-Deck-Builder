@@ -25,6 +25,12 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
   const [showForm, setShowForm] = useState(false);
   const [activeTag, setActiveTag] = useState('');
 
+  // AI draft state
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [draftPrompt, setDraftPrompt] = useState('');
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState('');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -59,6 +65,30 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
   const canModify = (r) => r.authorId === currentUser?.id || isOwner;
 
   const openNew = () => { setForm(EMPTY_FORM); setShowForm(true); };
+
+  const draftReport = async (e) => {
+    e.preventDefault();
+    if (!draftPrompt.trim()) return;
+    setDrafting(true);
+    setDraftError('');
+    try {
+      const r = await fetch('/api/reports/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hubId, prompt: draftPrompt.trim() }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Draft failed');
+      setForm({ id: null, title: data.title, body: data.body, tags: 'meta' });
+      setShowDraftModal(false);
+      setDraftPrompt('');
+      setShowForm(true);
+    } catch (e) {
+      setDraftError(e.message || 'Draft failed. Try again.');
+    } finally {
+      setDrafting(false);
+    }
+  };
   const openEdit = (r) => {
     setForm({ id: r.id, title: r.title, body: r.body, tags: (r.tags || []).join(', ') });
     setShowForm(true);
@@ -117,11 +147,50 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-violet-300">Meta reports ({reports.length})</h4>
         {!showForm && (
-          <Button variant="primary" onClick={openNew}>
-            New report
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => { setShowDraftModal(true); setDraftError(''); }}>
+              Draft with AI
+            </Button>
+            <Button variant="primary" onClick={openNew}>
+              New report
+            </Button>
+          </div>
         )}
       </div>
+
+      {/* AI Draft Modal */}
+      {showDraftModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-xl border border-white/10 p-6 w-full max-w-lg">
+            <h2 className="text-lg font-semibold text-white mb-1">Draft with AI</h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Describe the report you want. The AI will use your team's match data and recent reports as context.
+            </p>
+            <form onSubmit={draftReport} className="space-y-3">
+              <textarea
+                value={draftPrompt}
+                onChange={(e) => setDraftPrompt(e.target.value)}
+                rows={3}
+                placeholder='e.g. "Write a meta report on Steel Song after rotation" or "Summarize our win rates this week"'
+                className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm resize-none focus:border-violet-500 focus:outline-none"
+                autoFocus
+                required
+              />
+              {draftError && (
+                <p className="text-sm text-red-400">{draftError}</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" type="button" onClick={() => setShowDraftModal(false)} disabled={drafting}>
+                  Cancel
+                </Button>
+                <Button variant="primary" type="submit" disabled={drafting || !draftPrompt.trim()}>
+                  {drafting ? 'Drafting…' : 'Generate draft'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Tag filter */}
       {allTags.length > 0 && (

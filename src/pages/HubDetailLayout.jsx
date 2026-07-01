@@ -1,8 +1,10 @@
 import { useParams, NavLink, Outlet, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import Skeleton from '../components/ui/Skeleton'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const NAV_TABS = [
+  { label: 'Home',      path: 'home' },
   { label: 'Roster',    path: 'roster' },
   { label: 'Pods',      path: 'pods' },
   { label: 'Practices', path: 'practices' },
@@ -11,6 +13,7 @@ const NAV_TABS = [
   { label: 'Reviews',   path: 'reviews' },
   { label: 'Primers',   path: 'primers' },
   { label: 'Playtest',  path: 'playtest' },
+  { label: 'Ask',       path: 'ask' },
 ]
 
 export default function HubDetailLayout() {
@@ -80,7 +83,9 @@ export default function HubDetailLayout() {
       </div>
 
       {/* Child route content */}
-      <Outlet context={{ hub, user }} />
+      <ErrorBoundary>
+        <Outlet context={{ hub, user }} />
+      </ErrorBoundary>
     </div>
   )
 }

@@ -11,6 +11,9 @@ import ReportsPage from './pages/hub/ReportsPage'
 import ReviewsPage from './pages/hub/ReviewsPage'
 import PrimersPage from './pages/hub/PrimersPage'
 import PlaytestPage from './pages/hub/PlaytestPage'
+import AskPage from './pages/hub/AskPage'
+import HubOverviewPage from './pages/hub/HubOverviewPage'
+import { useAuth } from './contexts/AuthContext'
 
 function TopNav() {
   const linkClass = ({ isActive }) =>
@@ -58,6 +61,29 @@ function BuilderPage() {
   return <DeckBuilderApp />
 }
 
+function RequireAuth({ children }) {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-gray-400">
+        Loading...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-gray-300 text-lg mb-2">You need to be logged in to access Team Hub.</p>
+        <p className="text-gray-500 text-sm">Use the Login button in the top right to sign in or create an account.</p>
+      </div>
+    )
+  }
+
+  return children
+}
+
 export default function RouterApp() {
   return (
     <BrowserRouter>
@@ -65,9 +91,10 @@ export default function RouterApp() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<BuilderPage />} />
           <Route path="/builder" element={<BuilderPage />} />
-          <Route path="/team-hub" element={<HubListPage />} />
-          <Route path="/team-hub/:id" element={<HubDetailLayout />}>
-            <Route index element={<Navigate to="roster" replace />} />
+          <Route path="/team-hub" element={<RequireAuth><HubListPage /></RequireAuth>} />
+          <Route path="/team-hub/:id" element={<RequireAuth><HubDetailLayout /></RequireAuth>}>
+            <Route index element={<Navigate to="home" replace />} />
+            <Route path="home" element={<HubOverviewPage />} />
             <Route path="roster" element={<RosterPage />} />
             <Route path="pods" element={<PodsPage />} />
             <Route path="practices" element={<PracticesPage />} />
@@ -76,6 +103,7 @@ export default function RouterApp() {
             <Route path="reviews" element={<ReviewsPage />} />
             <Route path="primers" element={<PrimersPage />} />
             <Route path="playtest" element={<PlaytestPage />} />
+            <Route path="ask" element={<AskPage />} />
           </Route>
         </Route>
       </Routes>

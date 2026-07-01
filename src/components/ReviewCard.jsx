@@ -33,10 +33,16 @@ function resultBadge(result) {
   );
 }
 
-const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
+const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
   const { user } = useAuth();
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editRecap, setEditRecap] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!review) return null;
 
@@ -66,6 +72,56 @@ const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
     }
   };
 
+  const startEdit = () => {
+    setEditRecap(review.recap || '');
+    setEditTags((Array.isArray(review.leakTags) ? review.leakTags : []).join(', '));
+    setEditing(true);
+    setError('');
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/reviews/${review.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recap: editRecap,
+          leakTags: editTags.split(',').map(t => t.trim()).filter(Boolean),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Save failed');
+      }
+      const updated = await res.json();
+      onUpdated?.(updated);
+      setEditing(false);
+    } catch (e) {
+      setError(e.message || 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteReview = async () => {
+    setDeleting(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/reviews/${review.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Delete failed');
+      }
+      onDeleted?.(review.id);
+    } catch (e) {
+      setError(e.message || 'Delete failed.');
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   return (
     <div className="rounded-xl border border-white/10 bg-[#11151f] p-5">
       {/* Header */}
@@ -86,19 +142,47 @@ const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={regenerate}
-            disabled={regenerating}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06] disabled:opacity-50"
-          >
-            {regenerating ? 'Regenerating…' : 'Regenerate'}
-          </button>
-          <button
-            onClick={() => onEdit?.(review)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            Edit
-          </button>
+          {!editing && (
+            <>
+              <button
+                onClick={regenerate}
+                disabled={regenerating}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06] disabled:opacity-50"
+              >
+                {regenerating ? 'Regenerating…' : 'Regenerate'}
+              </button>
+              <button
+                onClick={startEdit}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm text-red-300 hover:bg-red-500/20"
+              >
+                Delete
+              </button>
+            </>
+          )}
+          {editing && (
+            <>
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-emerald-500 to-green-600 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06]"
+              >
+                Cancel
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -109,7 +193,17 @@ const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
       )}
 
       {/* Recap */}
-      {review.recap && (
+      {editing ? (
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Recap</p>
+          <textarea
+            value={editRecap}
+            onChange={e => setEditRecap(e.target.value)}
+            rows={5}
+            className="w-full rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none resize-y"
+          />
+        </div>
+      ) : review.recap ? (
         <div className="mb-4">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
             Recap
@@ -118,7 +212,7 @@ const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
             {review.recap}
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* Decision points */}
       {lines.length > 0 && (
@@ -162,7 +256,20 @@ const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
       )}
 
       {/* Leak tags */}
-      {leakTags.length > 0 && (
+      {editing ? (
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Leaks <span className="font-normal text-gray-500">(comma-separated)</span>
+          </p>
+          <input
+            type="text"
+            value={editTags}
+            onChange={e => setEditTags(e.target.value)}
+            placeholder="over-traded, target selection, …"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none"
+          />
+        </div>
+      ) : leakTags.length > 0 ? (
         <div className="mb-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
             Leaks
@@ -179,6 +286,29 @@ const ReviewCard = ({ review, onUpdated, onEdit, onOpenPrimer }) => {
                 {tag}
               </span>
             ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/[0.08] p-4">
+          <p className="mb-3 text-sm text-red-200">Delete this review? This cannot be undone.</p>
+          <div className="flex gap-2">
+            <button
+              onClick={deleteReview}
+              disabled={deleting}
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : 'Yes, delete'}
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+              className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06]"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
