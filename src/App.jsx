@@ -4558,37 +4558,59 @@ function DrawSimulator({ deck }) {
 
 // Card grid ------------------------------------------------------------------
 
+const PAGE_SIZE = 60;
+
 function CardGrid({ cards, onAdd, onInspect, deck }) {
-  // Filter out only completely invalid cards, be more lenient
   const validCards = cards.filter(card => card && typeof card === 'object');
-  if (validCards.length !== cards.length) {
-    console.warn(`[CardGrid] Filtered out ${cards.length - validCards.length} completely invalid cards`);
-  }
-  
-  // Get deck count for each card
+
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef(null);
+
+  // Reset to first page when the card list changes (filter / search)
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [cards]);
+
+  // Load next page when the sentinel scrolls into view
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setDisplayCount((n) => Math.min(n + PAGE_SIZE, validCards.length));
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [validCards.length]);
+
   const getDeckCount = (card) => {
     const key = deckKey(card);
     return deck?.entries?.[key]?.count || 0;
   };
-  
+
+  const visible = validCards.slice(0, displayCount);
+  const hasMore = displayCount < validCards.length;
+
   return (
     <div className="space-y-3 p-3">
-      {/* Show message if no valid cards */}
       {validCards.length === 0 && (
         <div className="text-center py-8 text-gray-400">
           <div className="text-lg mb-2">No valid cards found</div>
           <div className="text-sm">Please check your data source or try refreshing the page</div>
         </div>
       )}
-      
-      {/* Show all cards at once - no infinite scroll */}
+
       {validCards.length > 0 && (
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", gap: "12px" }}>
-          {validCards.map((c) => (
+          {visible.map((c) => (
             <div key={deckKey(c)}>
-              <CardTile 
-                card={c} 
-                onAdd={(card, count = 1) => onAdd(card, count)} 
+              <CardTile
+                card={c}
+                onAdd={(card, count = 1) => onAdd(card, count)}
                 onInspect={() => onInspect(c)}
                 deckCount={getDeckCount(c)}
               />
@@ -4596,13 +4618,15 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
           ))}
         </div>
       )}
-      
-      {/* Card count indicator */}
-      {validCards.length > 0 && (
-        <div className="text-center py-4 text-gray-500">
-          Showing {validCards.length} cards
-        </div>
-      )}
+
+      {/* Sentinel — triggers next page when scrolled into view */}
+      <div ref={sentinelRef} className="py-2 text-center text-xs text-gray-600">
+        {hasMore
+          ? `Showing ${visible.length} of ${validCards.length} cards — scroll for more`
+          : validCards.length > 0
+            ? `All ${validCards.length} cards shown`
+            : null}
+      </div>
     </div>
   );
 }
