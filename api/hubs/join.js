@@ -27,7 +27,13 @@ export default withAuth(async (req, res, session) => {
   });
   if (existingMember) return res.status(400).json({ error: 'Already a member of this hub' });
 
-  await prisma.hubMember.create({ data: { hubId: hub.id, userId } });
+  try {
+    await prisma.hubMember.create({ data: { hubId: hub.id, userId } });
+  } catch (e) {
+    // A concurrent join raced past the existence check above; the unique
+    // constraint caught it. Treat as success (idempotent join).
+    if (e?.code !== "P2002") throw e;
+  }
 
   const updatedHub = await prisma.hub.findUnique({ where: { id: hub.id }, include: HUB_INCLUDE });
   return res.status(200).json(updatedHub);

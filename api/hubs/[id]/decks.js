@@ -30,6 +30,7 @@ export default withAuth(async (req, res, session) => {
       where: { userId: { in: memberIds } },
       include: { user: { select: { id: true, email: true } } },
       orderBy: { updatedAt: "desc" },
+      take: 1000, // cap payload across all hub members' decks
     });
 
     return res.status(200).json(decks.map((d) => ({ ...d, cardCount: cardCountOf(d) })));

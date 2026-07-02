@@ -1,7 +1,8 @@
 import { prisma } from "../_lib/db.js";
 import { postDiscord } from "../_lib/discord.js";
 
-const DIGEST_SECRET = process.env.DIGEST_SECRET;
+// Accept an explicit DIGEST_SECRET or Vercel's auto-injected CRON_SECRET.
+const DIGEST_SECRET = process.env.DIGEST_SECRET || process.env.CRON_SECRET;
 
 function fmt(iso) {
   return new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -92,7 +93,8 @@ export default async function handler(req, res) {
   // a manual POST with the same token for ad-hoc testing.
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (DIGEST_SECRET && token !== DIGEST_SECRET) {
+  // Fail closed: if no secret is configured, reject rather than run publicly.
+  if (!DIGEST_SECRET || token !== DIGEST_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 

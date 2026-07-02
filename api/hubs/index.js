@@ -23,20 +23,21 @@ export default withAuth(async (req, res, session) => {
   if (req.method === "POST") {
     const { name } = createHubSchema.parse(req.body);
 
-    let inviteCode;
-    let attempts = 0;
-    do {
-      inviteCode = generateInviteCode();
-      if (++attempts > 10) {
-        return res.status(500).json({ error: "Failed to generate unique invite code" });
+    // Rely on the DB unique constraint (source of truth) and retry on a rare
+    // collision, rather than a racy check-then-insert.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        const hub = await prisma.hub.create({
+          data: { name, inviteCode: generateInviteCode(), ownerId: userId },
+          include: HUB_INCLUDE,
+        });
+        return res.status(201).json(hub);
+      } catch (e) {
+        if (e?.code === "P2002" && attempt < 9) continue; // invite code collision → retry
+        throw e;
       }
-    } while (await prisma.hub.findUnique({ where: { inviteCode } }));
-
-    const hub = await prisma.hub.create({
-      data: { name, inviteCode, ownerId: userId },
-      include: HUB_INCLUDE,
-    });
-    return res.status(201).json(hub);
+    }
+    return res.status(500).json({ error: "Failed to generate unique invite code" });
   }
 
   if (req.method === "GET") {

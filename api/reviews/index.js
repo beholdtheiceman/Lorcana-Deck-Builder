@@ -69,6 +69,7 @@ export default withAuth(async (req, res, session) => {
     const reviews = await prisma.review.findMany({
       where: { hubId },
       orderBy: { createdAt: "desc" },
+      take: 200, // cap payload; UI shows recent reviews
     });
     return res.status(200).json(reviews);
   }

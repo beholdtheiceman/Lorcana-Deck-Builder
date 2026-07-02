@@ -36,7 +36,14 @@ export async function getSession(req) {
   const token = cookies[COOKIE];
 
   if (!token) {
-    if (process.env.NODE_ENV === "development" && process.env.DEV_USER_EMAIL) {
+    // Dev-only auto-login. Requires an explicit opt-in flag in addition to
+    // NODE_ENV so a misconfigured preview/prod env can never silently
+    // authenticate every visitor as DEV_USER_EMAIL.
+    if (
+      process.env.NODE_ENV === "development" &&
+      process.env.ALLOW_DEV_AUTH_BYPASS === "true" &&
+      process.env.DEV_USER_EMAIL
+    ) {
       const user = await prisma.user.findUnique({
         where: { email: process.env.DEV_USER_EMAIL },
         select: { id: true, email: true },
@@ -47,7 +54,8 @@ export async function getSession(req) {
   }
 
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    // Pin the algorithm so a token can't be verified under an unexpected alg.
+    return jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
   } catch {
     return null;
   }
