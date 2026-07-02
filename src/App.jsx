@@ -10696,15 +10696,11 @@ function applyFilters(cards, filters) {
 
   list.sort((a, b) => {
     const dir = filters.sortDir === "desc" ? -1 : 1;
-    console.log('[Sort Debug] Sorting with:', filters.sortBy, 'direction:', filters.sortDir);
-    
+
     switch (filters.sortBy) {
               case "set-ink-number": {
-          console.log('[Sort Debug] set-ink-number sort for cards:', a.name, 'vs', b.name);
-          
           // Use the consistent comparison function (set → ink → card number)
           const result = cardComparator(a, b);
-          console.log('[Sort Debug] Consistent comparison result:', result);
           return result * dir;
         }
       case "cost":
@@ -10715,11 +10711,8 @@ function applyFilters(cards, filters) {
         return sa.localeCompare(sb) * dir;
       }
       case "ink-set-number": {
-        console.log('[Sort Debug] ink-set-number sort for cards:', a.name, 'vs', b.name);
-        
         // Use the consistent comparison function (ink → set → card number)
         const result = cardComparator(a, b);
-        console.log('[Sort Debug] Consistent comparison result:', result);
         return result * dir;
       }
       case "rarity":
