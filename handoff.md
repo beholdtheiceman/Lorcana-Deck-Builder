@@ -34,6 +34,25 @@ newer code. Recommend deleting local + remote `feature/replay-review` to prevent
 accidental merge. **Confirm and Claude will delete it** (kept until you say so, in case
 you want anything from its history).
 
+## 0. URGENT-ish: deploy to fix the My Decks Edit bug (2026-07-02)
+
+The "Edit in Deck Lab makes the deck disappear" bug is FIXED (`9cffb2f`, regression-tested,
+verified in the browser) — but prod still runs the old code until a deploy happens, which
+the session's permission classifier blocks. Say "deploy" and it ships together with
+everything below.
+
+## 0b. "0 copies / weird data" decks — need one piece of evidence
+
+Locally-saved decks render perfectly (verified end-to-end), so the corrupted decks are
+almost certainly ones that round-tripped through cloud sync — possibly rows saved by an
+older app version in a different JSON shape (which would ALSO explain bad generated deck
+images: slimmed card objects lose their image URLs, so the canvas fallback kicks in).
+To confirm, either:
+- approve a **read-only, shape-only** query of your `Deck` rows in the prod DB (no card
+  contents printed), or
+- open My Decks on prod, click a weird deck, and paste a screenshot + the output of
+  `JSON.parse(localStorage.getItem('lorcana.decks.v2'))` for that deck from DevTools.
+
 ## 4. Approve prod deploy of Wave 1 (quick)
 
 `members.js`→`withAuth` (`5726c53`), `.tsx`→`.jsx` (`16d1b7c`), and the plan docs
