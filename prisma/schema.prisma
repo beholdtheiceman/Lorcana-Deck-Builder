@@ -172,7 +172,7 @@ model Primer {
 model Replay {
   id            String   @id @default(uuid())
   hubId         String
-  uploaderId    String
+  uploaderId    String?                       // null = uploader's account was deleted
   source        String                        // duels.ink | lorcanito | paper
   matchId       String?
   format        String?                       // Core / Infinity
@@ -184,7 +184,7 @@ model Replay {
   createdAt     DateTime @default(now())
 
   hub      Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
-  uploader User     @relation(fields: [uploaderId], references: [id])
+  uploader User?    @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   reviews  Review[]
 
   @@index([hubId])
@@ -211,7 +211,7 @@ model Review {
   hub    Hub     @relation(fields: [hubId], references: [id], onDelete: Cascade)
   replay Replay? @relation(fields: [replayId], references: [id], onDelete: SetNull)
   primer Primer? @relation(fields: [primerId], references: [id], onDelete: SetNull)
-  author User?   @relation(fields: [authorId], references: [id])
+  author User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   @@index([hubId])
   @@index([replayId])
@@ -225,7 +225,7 @@ model Review {
 model PlaytestGame {
   id            String   @id @default(uuid())
   hubId         String
-  loggedById    String                          // user who recorded the game
+  loggedById    String?                         // user who recorded the game; null = account deleted
   deckId        String?                          // link to a saved Deck when chosen
   deckArchetype String                           // label/fallback, e.g. "Blurple Control"
   vsArchetype   String                           // opponent archetype
@@ -237,7 +237,7 @@ model PlaytestGame {
   createdAt     DateTime @default(now())
 
   hub      Hub   @relation(fields: [hubId], references: [id], onDelete: Cascade)
-  loggedBy User  @relation(fields: [loggedById], references: [id])
+  loggedBy User? @relation(fields: [loggedById], references: [id], onDelete: SetNull)
   deck     Deck? @relation(fields: [deckId], references: [id], onDelete: SetNull)
 
   @@index([hubId])
@@ -251,7 +251,7 @@ model PlaytestGame {
 model Event {
   id          String   @id @default(uuid())
   hubId       String
-  createdById String
+  createdById String?                          // null = creator's account was deleted
   title       String
   startsAt    DateTime
   location    String?
@@ -260,7 +260,7 @@ model Event {
   createdAt   DateTime @default(now())
 
   hub        Hub               @relation(fields: [hubId], references: [id], onDelete: Cascade)
-  createdBy  User              @relation(fields: [createdById], references: [id])
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
   attendance EventAttendance[]
 
   @@index([hubId])
@@ -274,14 +274,14 @@ model Event {
 model Practice {
   id          String   @id @default(uuid())
   hubId       String
-  createdById String
+  createdById String?                          // null = creator's account was deleted
   title       String
   startsAt    DateTime?
   focus       String?  @db.Text             // what we're testing this session
   createdAt   DateTime @default(now())
 
   hub       Hub            @relation(fields: [hubId], references: [id], onDelete: Cascade)
-  createdBy User           @relation(fields: [createdById], references: [id])
+  createdBy User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
   rsvps     PracticeRsvp[]
 
   @@index([hubId])
@@ -355,7 +355,7 @@ model PodMember {
 model MetaReport {
   id        String   @id @default(uuid())
   hubId     String
-  authorId  String
+  authorId  String?                            // null = author's account was deleted
   title     String
   body      String   @db.Text                 // markdown
   tags      String[]                           // e.g. ["meta", "matchup", "event-report"]
@@ -363,7 +363,7 @@ model MetaReport {
   updatedAt DateTime @updatedAt
 
   hub    Hub  @relation(fields: [hubId], references: [id], onDelete: Cascade)
-  author User @relation(fields: [authorId], references: [id])
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   @@index([hubId])
   @@index([hubId, createdAt])

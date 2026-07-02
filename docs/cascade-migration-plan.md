@@ -1,8 +1,9 @@
-# Prisma cascade / onDelete migration plan (DRAFT — not applied)
+# Prisma cascade / onDelete migration plan (APPLIED 2026-07-02)
 
-**Status:** review-only. Nothing in this doc has been run. It touches the **production
-Neon DB**, so apply it deliberately (ideally *after* rotating the leaked
-`DATABASE_URL` / `JWT_SECRET`), not as a drive-by change.
+**Status:** applied to the production Neon DB on 2026-07-02, after rotating the leaked
+`DATABASE_URL` / `JWT_SECRET`. The executed SQL is saved at
+`prisma/user_ondelete_setnull.sql`; a post-apply `prisma migrate diff` returned empty
+(DB matches schema). `Review.authorId` needed no change — its FK already matched.
 
 ## Problem
 
