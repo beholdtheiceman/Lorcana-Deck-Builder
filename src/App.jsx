@@ -137,33 +137,40 @@ function saveLS(key, value) {
 // Card image cache context
 // -----------------------------------------------------------------------------
 
-console.log('[Context] Creating ImageCacheContext...');
 const ImageCacheContext = createContext();
-console.log('[Context] ImageCacheContext created:', ImageCacheContext);
+
+const IMG_CACHE_CAP = 4000; // bound localStorage growth; each entry is a URL string
 
 function ImageCacheProvider({ children }) {
-  console.log('[ImageCacheProvider] Initializing...');
   const [cache, setCache] = useState(() => loadLS(LS_KEYS.CACHE_IMG, {}));
   const [cacheVersion, setCacheVersion] = useState(0);
-  
+
+  // Debounced persist: rapid image loads no longer serialize the entire cache
+  // synchronously on every put. We write at most once ~800ms after the last change.
   useEffect(() => {
-    console.log('[ImageCacheProvider] Cache updated, saving to localStorage');
-    saveLS(LS_KEYS.CACHE_IMG, cache);
+    const t = setTimeout(() => saveLS(LS_KEYS.CACHE_IMG, cache), 800);
+    return () => clearTimeout(t);
   }, [cache]);
 
+  const setEntry = useCallback((key, value) => {
+    setCache((c) => {
+      const next = { ...c, [key]: value };
+      const overflow = Object.keys(next).length - IMG_CACHE_CAP;
+      if (overflow > 0) {
+        // Drop the oldest entries (objects preserve string-key insertion order).
+        const keys = Object.keys(next);
+        for (let i = 0; i < overflow; i++) delete next[keys[i]];
+      }
+      return next;
+    });
+    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
+  }, []);
+
   const get = useCallback((key) => cache[key], [cache]);
-  const put = useCallback((key, value) => {
-    setCache((c) => ({ ...c, [key]: value }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
-  const putFailed = useCallback((key) => {
-    setCache((c) => ({ ...c, [key]: 'FAILED' }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
+  const put = useCallback((key, value) => setEntry(key, value), [setEntry]);
+  const putFailed = useCallback((key) => setEntry(key, 'FAILED'), [setEntry]);
 
   const value = useMemo(() => ({ get, put, putFailed, cache, cacheVersion }), [get, put, putFailed, cache, cacheVersion]);
-
-  console.log('[ImageCacheProvider] About to render with value:', value);
 
   return (
     <ImageCacheContext.Provider value={value}>
@@ -174,17 +181,13 @@ function ImageCacheProvider({ children }) {
 
 // Debug component to trace context
 function ContextDebugger() {
-  const context = useContext(ImageCacheContext);
-  console.log('[ContextDebugger] Context value:', context);
+  useContext(ImageCacheContext);
   return null; // This component doesn't render anything
 }
 
 function useImageCache() {
-  console.log('[useImageCache] Hook called');
   const context = useContext(ImageCacheContext);
-  console.log('[useImageCache] Context value:', context);
   if (!context) {
-    console.error('[useImageCache] Context is null/undefined - this will cause the error');
     throw new Error('useImageCache must be used within ImageCacheProvider');
   }
   return context;
@@ -2054,69 +2057,6 @@ async function fetchAllCards({ signal } = {}) {
     return mapped;
   } catch (e) {
     console.error("[API] Unified fetch failed:", e);
-    return [];
-  }
-}
-
-async function fetchAllCardsFallback({ signal } = {}) {
-  try {
-    console.log('[API] Fallback using unified fetch...');
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
-    const normalized = normalizeCards(list, source);
-    console.log(`[API] Fallback loaded ${normalized.length}/${total} cards from ${source}`);
-    
-    const mapped = normalized.map(card => ({
-      id: card.id,
-      name: card.name,
-      // CRITICAL: Preserve baseName and subname for subtitle matching
-      baseName: card.baseName,
-      subname: card.subname,
-      // NORMALIZED set fields you can rely on everywhere:
-      set: card.set,           // e.g. "TFC"
-      setNum: card.setNum,     // numeric series index if present
-      setName: card.setName,   // e.g. "The First Chapter"
-      setCode: card.setCode,   // e.g. "TFC"
-      number: card.number,
-      cost: card.cost,
-      inks: Array.isArray(card.inks) ? card.inks : [card.inks].filter(Boolean),
-      type: Array.isArray(card.types) ? card.types.join("/") : card.types,
-      rarity: card.rarity,
-      image_url: card.image,
-      _source: card._source,
-      _raw: card._raw,
-      // Preserve additional fields that might be needed for filtering
-      text: card.text,
-      classifications: card.classifications,
-      keywords: card.keywords,
-      abilities: card.keywords, // Now contains comprehensive abilities from all sources
-      _abilitiesIndex: card._abilitiesIndex, // Preserve the normalized abilities index
-      franchise: card.franchise,
-      gamemode: card.gamemode,
-      inkable: card.inkable,
-      lore: card.lore,
-      willpower: card.willpower,
-      strength: card.strength
-    }));
-    
-    // Debug: Check if abilities are being extracted correctly
-    const sample = mapped.find(x => x.name && x._abilitiesIndex?.size);
-    if (sample) {
-      console.log("[DBG] Sample abilities", sample.name, sample._abilitiesIndex, sample.abilities);
-    } else {
-      console.log("[DBG] No cards with abilities index found");
-    }
-    
-    // Debug: Check if set fields are being normalized correctly
-    const setSample = mapped.find(x => x.name && x.set);
-    if (setSample) {
-      console.log("[DBG] Set fields sample", setSample.name, setSample.set, setSample.setName, setSample.setNum);
-    } else {
-      console.log("[DBG] No cards with set fields found");
-    }
-    
-    return mapped;
-  } catch (error) {
-    console.error('[API] Fallback failed:', error);
     return [];
   }
 }
@@ -4601,8 +4541,8 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
             <div key={deckKey(c)}>
               <CardTile
                 card={c}
-                onAdd={(card, count = 1) => onAdd(card, count)}
-                onInspect={() => onInspect(c)}
+                onAdd={onAdd}
+                onInspect={onInspect}
                 deckCount={getDeckCount(c)}
               />
             </div>
@@ -4625,7 +4565,7 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
 // Enhanced image function that supports multiple image sources
 // getCardImg is imported from ./lib/cardUtils.js
 
-function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
+const CardTile = React.memo(function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
   if (!card || typeof card !== 'object' || !card.name) {
     console.warn('[CardTile] Invalid card object, showing fallback:', card);
     return (
@@ -4649,7 +4589,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
           alt={card.name}
           className="block w-full h-auto aspect-[5/7] object-cover"
           loading="lazy"
-          onClick={onInspect}
+          onClick={() => onInspect(card)}
         />
       ) : (
         <div className="w-full aspect-[5/7] bg-gray-800 flex items-center justify-center">
@@ -4693,7 +4633,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
       </div>
     </div>
   );
-}
+});
 
 // Deck Manager Component
 // -----------------------------------------------------------------------------
@@ -9864,7 +9804,7 @@ useEffect(() => {
       <CardGrid
         cards={shownCards}
         onAdd={handleAdd}
-        onInspect={(c) => setInspectCard(c)}
+        onInspect={setInspectCard}
         deck={deck}
       />
     ) : (
