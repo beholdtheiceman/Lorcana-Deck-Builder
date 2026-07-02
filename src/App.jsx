@@ -1,5 +1,6 @@
 // Local utilities -------------------------------------------------------------
 import { CARD_TYPES, getCardImg } from "./lib/cardUtils.js";
+import { LS_KEYS, loadLS, saveLS } from "./lib/storage.js";
 import { exportDeck, generateTextExport, generateSimpleTextExport, generateCSVExport } from "./utils/deckExport.js";
 
 // React & ecosystem -----------------------------------------------------------
@@ -94,43 +95,6 @@ function WinRateBar({ win = 0, loss = 0 }) {
       <div className="text-xs text-gray-300 w-12 text-right">{Math.round(winPct)}%</div>
     </div>
   );
-}
-
-// -----------------------------------------------------------------------------
-// Local storage & caching
-// -----------------------------------------------------------------------------
-
-const LS_KEYS = {
-  DECK: "lorcana.deck.v1",
-  DECKS: "lorcana.decks.v2", // New: Multiple decks storage
-  CURRENT_DECK_ID: "lorcana.currentDeckId.v2", // New: Current deck ID
-  FILTERS: "lorcana.filters.v1",
-  CACHE_IMG: "lorcana.imageCache.v1",
-  CACHE_CARDS: "lorcana.cardsCache.v1",
-};
-
-function loadLS(key, fallback) {
-  try {
-    console.log('[loadLS] Loading key:', key);
-    const v = localStorage.getItem(key);
-    console.log('[loadLS] Raw value from localStorage:', v);
-    const result = v ? JSON.parse(v) : fallback;
-    console.log('[loadLS] Parsed result:', result);
-    return result;
-  } catch (error) {
-    console.error('[loadLS] Error loading from localStorage:', error);
-    return fallback;
-  }
-}
-
-function saveLS(key, value) {
-  try {
-    console.log('[saveLS] Saving key:', key, 'with value:', value);
-    localStorage.setItem(key, JSON.stringify(value));
-    console.log('[saveLS] Successfully saved to localStorage');
-  } catch (error) {
-    console.error('[saveLS] Error saving to localStorage:', error);
-  }
 }
 
 // -----------------------------------------------------------------------------
