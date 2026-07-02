@@ -16,6 +16,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 
 // Auth context
 import { useAuth } from './contexts/AuthContext';
@@ -687,26 +688,16 @@ function getCost(card) {
 
 // Get primary ink color for sorting (first ink in the array)
 function getPrimaryInk(card) {
-  console.log('[getPrimaryInk] Card:', card?.name, 'inks:', card?.inks, 'ink:', card?.ink, '_raw:', card?._raw);
-  
   if (Array.isArray(card?.inks) && card.inks.length > 0) {
-    console.log('[getPrimaryInk] Using inks array:', card.inks[0]);
     return card.inks[0];
   }
   if (card?.ink) {
-    const result = Array.isArray(card.ink) ? card.ink[0] : card.ink;
-    console.log('[getPrimaryInk] Using ink field:', result);
-    return result;
+    return Array.isArray(card.ink) ? card.ink[0] : card.ink;
   }
-  
   // Try to get from _raw data
   if (card?._raw?.ink) {
-    const result = Array.isArray(card._raw.ink) ? card._raw.ink[0] : card._raw.ink;
-    console.log('[getPrimaryInk] Using _raw.ink:', result);
-    return result;
+    return Array.isArray(card._raw.ink) ? card._raw.ink[0] : card._raw.ink;
   }
-  
-  console.log('[getPrimaryInk] No ink found, returning empty string');
   return "";
 }
 
@@ -4707,53 +4698,43 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
 // Deck Manager Component
 // -----------------------------------------------------------------------------
 
-function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onExportDeck, onImportDeck, onRefreshDecks }) {
+function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onImportDeck, onRefreshDecks, onRenameDeck }) {
+  const { user } = useAuth();
   const [selectedDeckId, setSelectedDeckId] = useState(currentDeckId);
   const [showNewDeckForm, setShowNewDeckForm] = useState(false);
   const [newDeckName, setNewDeckName] = useState("");
   const [exportFormat, setExportFormat] = useState("json");
   const [importFormat, setImportFormat] = useState("json");
   const [importData, setImportData] = useState("");
+  const [renamingDeckId, setRenamingDeckId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
 
-  // Only fix selectedDeckId if it's invalid - don't override user selections
   useEffect(() => {
-    // If selectedDeckId is invalid (null, undefined, or points to a non-existent deck)
-    // AND there are decks available, then set a valid selectedDeckId.
     if (Object.keys(decks).length > 0 && (!selectedDeckId || !decks[selectedDeckId])) {
-      // Prioritize currentDeckId if it's valid, otherwise pick the first available deck
-      const fallbackDeckId = currentDeckId && decks[currentDeckId] ? currentDeckId : Object.keys(decks)[0];
-      console.log('[DeckManager] Fixing invalid selectedDeckId. Setting to fallback:', fallbackDeckId);
-      setSelectedDeckId(fallbackDeckId);
+      const fallback = currentDeckId && decks[currentDeckId] ? currentDeckId : Object.keys(decks)[0];
+      setSelectedDeckId(fallback);
     }
   }, [currentDeckId, decks, selectedDeckId]);
 
-  // Additional safety check: ensure selectedDeckId is always valid
   useEffect(() => {
     if (selectedDeckId && !decks[selectedDeckId] && Object.keys(decks).length > 0) {
-      console.log('[DeckManager] Safety check: selectedDeckId is invalid, fixing...');
-      const firstDeckId = Object.keys(decks)[0];
-      setSelectedDeckId(firstDeckId);
+      setSelectedDeckId(Object.keys(decks)[0]);
     }
   }, [selectedDeckId, decks]);
 
   if (!isOpen) return null;
 
-  const currentDeck = decks[currentDeckId];
   const selectedDeck = decks[selectedDeckId];
-  
-  // Debug logging
-  console.log('[DeckManager] Debug info:', {
-    currentDeckId,
-    selectedDeckId,
-    decksKeys: Object.keys(decks),
-    currentDeck: currentDeck?.name,
-    selectedDeck: selectedDeck?.name,
-    selectedDeckExists: !!selectedDeck
-  });
+  const sortedDecks = Object.values(decks).sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
+
+  function formatDate(ts) {
+    return ts ? new Date(ts).toLocaleDateString() : 'Not saved';
+  }
 
   const handleNewDeck = () => {
-    if (String(newDeckName).trim()) {
-      onNewDeck(String(newDeckName).trim());
+    const name = String(newDeckName).trim();
+    if (name) {
+      onNewDeck(name);
       setNewDeckName("");
       setShowNewDeckForm(false);
     }
@@ -4761,55 +4742,29 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
   const handleExport = () => {
     if (!selectedDeck) return;
-    
-    const exportData = exportDeck(selectedDeck, exportFormat);
-    const blob = new Blob([exportData], { type: 'text/plain' });
+    const data = exportDeck(selectedDeck, exportFormat);
+    const blob = new Blob([data], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
-    // Handle file extension for different formats
-    let fileExtension = exportFormat;
-    if (exportFormat === 'simple-txt') {
-      fileExtension = 'txt';
-    }
-    
-    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${fileExtension}`;
+    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${exportFormat === 'simple-txt' ? 'txt' : exportFormat}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
-    if (!importData.trim()) return;
-    
-    try {
-      const importedDeck = importDeck(importData, importFormat);
-      onImportDeck(importedDeck);
-      setImportData("");
-      onClose();
-    } catch (error) {
-      alert(`Import failed: ${error.message}`);
-    }
-  };
-  
   const handleImportWithWarnings = () => {
     if (!importData.trim()) return;
-    
     try {
       const importedDeck = importDeck(importData, importFormat);
-      
-      // Check if any cards were not found in the database
       const unknownCards = Object.values(importedDeck.entries)
         .filter(entry => entry.card.set === "Unknown")
         .map(entry => entry.card.name);
-      
       let message = `Successfully imported deck with ${importedDeck.total} cards.`;
       if (unknownCards.length > 0) {
         message += `\n\nNote: ${unknownCards.length} cards were not found in the database and may need to be loaded first:\n${unknownCards.join(', ')}`;
       }
-      
       alert(message);
       onImportDeck(importedDeck);
       setImportData("");
@@ -4819,47 +4774,57 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
     }
   };
 
+  const startRename = (deck) => {
+    setRenamingDeckId(deck.id);
+    setRenameValue(deck.name);
+  };
+
+  const commitRename = () => {
+    if (renamingDeckId && renameValue.trim()) {
+      onRenameDeck(renamingDeckId, renameValue.trim());
+    }
+    setRenamingDeckId(null);
+    setRenameValue("");
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-xl border border-white/10 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-xl font-semibold">Deck Manager</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-          >
-            ✕
-          </button>
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-gray-900 rounded-xl border border-white/10 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+          <h2 className="text-xl font-semibold">My Decks</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">✕</button>
         </div>
 
-        <div className="flex h-96">
-          {/* Left side - Deck list */}
-          <div className="w-1/3 border-r border-white/10 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Your Decks</h3>
+        {/* Auth nudge */}
+        {!user && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-violet-900/30 border-b border-violet-700/40 text-sm text-violet-200 flex-shrink-0">
+            <span>☁</span>
+            <span>Log in to sync your decks across devices and keep them backed up.</span>
+          </div>
+        )}
+
+        <div className="flex flex-1 min-h-0">
+          {/* Left — deck list */}
+          <div className="w-72 border-r border-white/10 flex flex-col flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+              <span className="text-sm font-medium text-gray-300">Your Decks ({sortedDecks.length})</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={async () => {
-                    console.log('[DeckManager] Manual refresh triggered');
-                    try {
-                      if (onRefreshDecks) {
-                        await onRefreshDecks();
-                        console.log('[DeckManager] Manual refresh completed');
-                      } else {
-                        console.warn('[DeckManager] No onRefreshDecks function provided');
-                      }
-                    } catch (error) {
-                      console.error('[DeckManager] Manual refresh failed:', error);
-                    }
-                  }}
-                  className="px-3 py-1 bg-violet-600 hover:bg-violet-700 rounded text-sm"
-                  title="Refresh decks from cloud"
-                >
-                  ↻ Refresh
-                </button>
+                {user && (
+                  <button
+                    onClick={async () => { if (onRefreshDecks) await onRefreshDecks(); }}
+                    className="px-2 py-1 bg-white/5 border border-white/10 hover:bg-white/10 rounded text-xs text-gray-300 transition-colors"
+                    title="Refresh from cloud"
+                  >
+                    ↻
+                  </button>
+                )}
                 <button
                   onClick={() => setShowNewDeckForm(true)}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs transition-colors"
                 >
                   + New
                 </button>
@@ -4867,214 +4832,207 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
             </div>
 
             {showNewDeckForm && (
-              <div className="mb-4 p-3 bg-gray-800 rounded border border-gray-600">
+              <div className="m-3 p-3 bg-gray-800 rounded border border-gray-600 flex-shrink-0">
                 <input
                   type="text"
                   placeholder="Deck name"
                   value={newDeckName}
                   onChange={(e) => setNewDeckName(e.target.value)}
-                  className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm mb-2"
-                  onKeyPress={(e) => e.key === 'Enter' && handleNewDeck()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleNewDeck()}
+                  className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm mb-2 outline-none focus:border-violet-500"
+                  autoFocus
                 />
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleNewDeck}
-                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs"
-                  >
-                    Create
-                  </button>
-                  <button
-                    onClick={() => setShowNewDeckForm(false)}
-                    className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={handleNewDeck} className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs">Create</button>
+                  <button onClick={() => { setShowNewDeckForm(false); setNewDeckName(""); }} className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs">Cancel</button>
                 </div>
               </div>
             )}
 
-            <div className="space-y-2">
-              {Object.keys(decks).length === 0 ? (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {sortedDecks.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <div className="text-4xl mb-3">📁</div>
-                  <div className="font-medium mb-2">No Saved Decks</div>
-                  <div className="text-sm">
-                    Create a deck and save it to see it here.
-                  </div>
+                  <div className="font-medium mb-1">No Saved Decks</div>
+                  <div className="text-sm">Create a deck and save it to see it here.</div>
                 </div>
-              ) : (
-                Object.values(decks).map((deck) => (
-                  <div
-                    key={deck.id}
-                    className={`p-3 rounded border cursor-pointer transition ${
-                      deck.id === selectedDeckId
-                        ? 'border-emerald-500 bg-emerald-900/20'
-                        : 'border-gray-600 hover:border-gray-500'
-                    }`}
-                    onClick={() => {
-                    console.log('[DeckManager] Deck clicked:', deck);
-                    console.log('[DeckManager] Setting selectedDeckId to:', deck.id);
-                    setSelectedDeckId(deck.id);
-                  }}
-                  >
-                    <div className="font-medium">{deck.name}</div>
-                    <div className="text-sm text-gray-400">
-                      {deck.total} cards • {new Date(deck.updatedAt).toLocaleDateString()}
-                    </div>
-                    {deck.id === currentDeckId && (
-                      <div className="text-xs text-emerald-400 mt-1">Current</div>
-                    )}
+              ) : sortedDecks.map((deck) => (
+                <div
+                  key={deck.id}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    deck.id === selectedDeckId
+                      ? 'border-emerald-500 bg-emerald-900/20'
+                      : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                  }`}
+                  onClick={() => setSelectedDeckId(deck.id)}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="font-medium text-sm truncate">{deck.name}</div>
+                    <span
+                      title={deck._dbId ? 'Synced to cloud' : 'Local only'}
+                      className={`text-xs flex-shrink-0 mt-0.5 ${deck._dbId ? 'text-emerald-400' : 'text-gray-500'}`}
+                    >
+                      {deck._dbId ? '☁' : '💾'}
+                    </span>
                   </div>
-                ))
-              )}
+                  <div className="text-xs text-gray-400 mt-1">
+                    {deck.total} cards • {formatDate(deck.updatedAt ?? deck.createdAt)}
+                  </div>
+                  {deck.id === currentDeckId && (
+                    <div className="text-xs text-emerald-400 mt-1 font-medium">Active</div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right side - Deck details and actions */}
-          <div className="flex-1 p-4 overflow-y-auto">
-            {Object.keys(decks).length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
+          {/* Right — deck detail */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {sortedDecks.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">
                 <div className="text-4xl mb-3">💾</div>
                 <div className="font-medium mb-2">Save Your First Deck</div>
-                <div className="text-sm mb-4">
-                  Create a deck, add some cards, and click Save to get started.
-                </div>
-                <button
-                  onClick={() => setShowNewDeckForm(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded"
-                >
+                <div className="text-sm mb-4">Create a deck, add some cards, and click Save to get started.</div>
+                <button onClick={() => setShowNewDeckForm(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded transition-colors">
                   Create New Deck
                 </button>
               </div>
             ) : selectedDeck ? (
-              <div>
-                <h3 className="font-semibold mb-4">{selectedDeck.name}</h3>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                  <div>
-                    <span className="text-gray-400">Cards:</span> {selectedDeck.total}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Created:</span> {new Date(selectedDeck.createdAt).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Updated:</span> {new Date(selectedDeck.updatedAt).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Format:</span> {selectedDeck.format}
-                  </div>
+              <div className="space-y-4">
+                {/* Name — click pencil to rename */}
+                <div className="flex items-center gap-2">
+                  {renamingDeckId === selectedDeck.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') { setRenamingDeckId(null); setRenameValue(""); }
+                      }}
+                      className="flex-1 text-lg font-semibold bg-gray-800 border border-violet-500 rounded px-2 py-0.5 outline-none"
+                    />
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold">{selectedDeck.name}</h3>
+                      <button
+                        onClick={() => startRename(selectedDeck)}
+                        className="text-gray-500 hover:text-gray-300 text-sm px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
+                        title="Rename deck"
+                      >
+                        ✎
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                <div className="space-y-3">
+                {/* Meta grid */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <div><span className="text-gray-400">Cards:</span> {selectedDeck.total}</div>
+                  <div><span className="text-gray-400">Format:</span> {selectedDeck.format}</div>
+                  <div><span className="text-gray-400">Created:</span> {formatDate(selectedDeck.createdAt)}</div>
+                  <div><span className="text-gray-400">Updated:</span> {formatDate(selectedDeck.updatedAt)}</div>
+                </div>
+
+                {/* Cloud status badge */}
+                <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded ${selectedDeck._dbId ? 'bg-emerald-900/20 text-emerald-300' : 'bg-white/5 text-gray-400'}`}>
+                  <span>{selectedDeck._dbId ? '☁ Synced to your profile' : '💾 Saved locally only'}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
                   <button
-                    onClick={() => {
-                      console.log('[DeckManager] Switch button clicked for deck:', selectedDeck);
-                      console.log('[DeckManager] Calling onSwitchDeck with:', selectedDeck);
-                      onSwitchDeck(selectedDeck);
-                    }}
-                    className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-700 rounded"
+                    onClick={() => onSwitchDeck(selectedDeck)}
+                    disabled={selectedDeck.id === currentDeckId}
+                    className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
                   >
-                    Switch to This Deck
+                    {selectedDeck.id === currentDeckId ? 'Currently Active' : 'Switch to This Deck'}
                   </button>
-                  
+
                   <button
                     onClick={() => onDuplicateDeck(selectedDeck.id)}
-                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded"
+                    className="w-full px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-sm transition-colors"
                   >
-                    Duplicate Deck
+                    Duplicate
                   </button>
+                </div>
 
-                  <div className="border-t border-white/10 pt-3">
-                    <h4 className="font-medium mb-2">Export</h4>
-                    <div className="flex gap-2 mb-2">
-                      <select
-                        value={exportFormat}
-                        onChange={(e) => setExportFormat(e.target.value)}
-                        className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
-                      >
-                        <option value="json">JSON</option>
-                        <option value="txt">Text (Detailed)</option>
-                        <option value="simple-txt">Text (Simple)</option>
-                        <option value="csv">CSV</option>
-                      </select>
-                      <button
-                        onClick={handleExport}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
-                      >
-                        Export
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-white/10 pt-3">
-                    <h4 className="font-medium mb-2">Import</h4>
-                    <div className="space-y-2">
-                      <select
-                        value={importFormat}
-                        onChange={(e) => setImportFormat(e.target.value)}
-                        className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
-                      >
-                        <option value="json">JSON</option>
-                        <option value="txt">Text</option>
-                        <option value="csv">CSV</option>
-                      </select>
-                      {importFormat === 'txt' && (
-                        <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
-                          <div className="font-medium mb-1">Text format support:</div>
-                          <div>• Simple: "4 Rafiki - Mystical Fighter"</div>
-                          <div>• Legacy: "2x Card Name (Set #123)"</div>
-                          <div>• Comments: Lines starting with # or // are ignored</div>
-                          <div>• Empty lines are automatically skipped</div>
-                        </div>
-                      )}
-                      <textarea
-                        placeholder="Paste deck data here..."
-                        value={importData}
-                        onChange={(e) => setImportData(e.target.value)}
-                        className="w-full h-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm resize-none"
-                      />
-                      <button
-                        onClick={handleImportWithWarnings}
-                        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
-                      >
-                        Import
-                      </button>
-                    </div>
-                  </div>
-
-                    <button
-                    onClick={() => {
-                      if (selectedDeck.id === currentDeckId) {
-                        if (confirm(`Are you sure you want to delete the current deck "${selectedDeck.name}"? This will switch you to a new empty deck.`)) {
-                          onDeleteDeck(selectedDeck.id);
-                        }
-                      } else {
-                        if (confirm(`Are you sure you want to delete "${selectedDeck.name}"? This action cannot be undone.`)) {
-                          onDeleteDeck(selectedDeck.id);
-                        }
-                      }
-                    }}
-                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
+                {/* Export */}
+                <div className="border-t border-white/10 pt-4">
+                  <h4 className="text-sm font-medium mb-2">Export</h4>
+                  <div className="flex gap-2">
+                    <select
+                      value={exportFormat}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                      className="flex-1 px-2 py-1.5 bg-gray-800 border border-white/10 rounded text-sm"
                     >
-                      Delete Deck
+                      <option value="json">JSON</option>
+                      <option value="txt">Text (Detailed)</option>
+                      <option value="simple-txt">Text (Simple)</option>
+                      <option value="csv">CSV</option>
+                    </select>
+                    <button onClick={handleExport} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-sm transition-colors">
+                      Export
                     </button>
+                  </div>
+                </div>
+
+                {/* Import */}
+                <div className="border-t border-white/10 pt-4">
+                  <h4 className="text-sm font-medium mb-2">Import</h4>
+                  <div className="space-y-2">
+                    <select
+                      value={importFormat}
+                      onChange={(e) => setImportFormat(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-gray-800 border border-white/10 rounded text-sm"
+                    >
+                      <option value="json">JSON</option>
+                      <option value="txt">Text</option>
+                      <option value="csv">CSV</option>
+                    </select>
+                    {importFormat === 'txt' && (
+                      <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                        <div className="font-medium mb-1">Supported formats:</div>
+                        <div>• "4 Rafiki - Mystical Fighter"</div>
+                        <div>• "2x Card Name (Set #123)"</div>
+                        <div>• Lines starting with # or // are ignored</div>
+                      </div>
+                    )}
+                    <textarea
+                      placeholder="Paste deck data here..."
+                      value={importData}
+                      onChange={(e) => setImportData(e.target.value)}
+                      className="w-full h-20 px-2 py-1.5 bg-gray-800 border border-white/10 rounded text-sm resize-none"
+                    />
+                    <button onClick={handleImportWithWarnings} className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm transition-colors">
+                      Import
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete */}
+                <div className="border-t border-white/10 pt-4">
+                  <button
+                    onClick={() => {
+                      const msg = selectedDeck.id === currentDeckId
+                        ? `Delete the active deck "${selectedDeck.name}"? You'll be switched to another deck.`
+                        : `Delete "${selectedDeck.name}"? This cannot be undone.`;
+                      if (confirm(msg)) onDeleteDeck(selectedDeck.id);
+                    }}
+                    className="w-full px-3 py-2 bg-red-600/70 hover:bg-red-600 rounded text-sm transition-colors"
+                  >
+                    Delete Deck
+                  </button>
                 </div>
               </div>
-            ) : Object.keys(decks).length > 0 ? (
-              <div className="text-center text-gray-400 py-8">
+            ) : (
+              <div className="text-center text-gray-400 py-10">
                 <div className="text-4xl mb-3">📋</div>
                 <div className="font-medium mb-2">Select a Deck</div>
-                <div className="text-sm">
-                  Choose a deck from the list to view details and manage it.
-                </div>
-                {selectedDeckId && !decks[selectedDeckId] && (
-                  <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded text-red-300 text-xs">
-                    Warning: Selected deck ID ({selectedDeckId}) not found in decks collection.
-                    This might indicate a synchronization issue.
-                  </div>
-                )}
+                <div className="text-sm">Choose a deck from the list to view details and manage it.</div>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
@@ -6148,51 +6106,9 @@ function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
   const inkDistribution = {};
   const dualInkCards = [];
   
-  // Debug: log the first card to see what properties it has
-  if (entries.length > 0) {
-    console.log('[Ink Distribution Debug] First card structure:', {
-      name: entries[0].card.name,
-      card: entries[0].card,
-      raw: entries[0].card._raw
-    });
-    
-    // Also log a few more cards to check for dual-ink patterns
-    console.log('[Ink Distribution Debug] Checking for dual-ink cards...');
-    entries.slice(0, 5).forEach((e, i) => {
-      console.log(`[Ink Distribution Debug] Card ${i + 1}: ${e.card.name}`);
-      if (e.card._raw) {
-        const raw = e.card._raw;
-        console.log(`  - raw.ink: ${raw.ink}`);
-        console.log(`  - raw.Ink: ${raw.Ink}`);
-        console.log(`  - raw.inkColor: ${raw.inkColor}`);
-        console.log(`  - raw.Ink_Color: ${raw.Ink_Color}`);
-        console.log(`  - raw.color: ${raw.color}`);
-        console.log(`  - raw.Color: ${raw.Color}`);
-        console.log(`  - raw.colors: ${JSON.stringify(raw.colors)}`);
-        console.log(`  - raw.Colors: ${JSON.stringify(raw.Colors)}`);
-        console.log(`  - raw.inks: ${JSON.stringify(raw.inks)}`);
-        console.log(`  - raw.inkColors: ${JSON.stringify(raw.inkColors)}`);
-        
-        // Check for any other properties that might contain ink info
-        const inkRelatedProps = Object.keys(raw).filter(key => 
-          key.toLowerCase().includes('ink') || 
-          key.toLowerCase().includes('color') ||
-          key.toLowerCase().includes('colour')
-        );
-        if (inkRelatedProps.length > 0) {
-          console.log(`  - Other ink-related properties:`, inkRelatedProps);
-          inkRelatedProps.forEach(prop => {
-            console.log(`    ${prop}: ${JSON.stringify(raw[prop])}`);
-          });
-        }
-      }
-    });
-  }
-  
   entries.forEach(e => {
     const inks = getInks(e.card);
-    console.log(`[Ink Distribution Debug] ${e.card.name}: getInks returned:`, inks);
-    
+
     if (inks.length > 0) {
       // Track dual-ink cards for special presentation
       if (inks.length > 1) {
@@ -8611,90 +8527,9 @@ function AppInner() {
     setAllCards(cards);
   }, []);
   
-  // Debug: Check state immediately after initialization
-  console.log('[App] State variables initialized:');
-  console.log('[App] - allCards:', allCards?.length || 0);
-  console.log('[App] - shownCards:', shownCards?.length || 0);
-  console.log('[App] - loading:', loading);
-  
-  // FIXED: IMMEDIATE DETECTION - Accept hyphenated titles, don't force reload unnecessarily
-  console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
-  if (allCards && allCards.length > 0) {
-    const cardsWithSubnames = allCards.filter(hasSubtitleLike);
-    console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames/subtitles found:', cardsWithSubnames.length);
-    
-    if (cardsWithSubnames.length === 0) {
-      console.log('[App] 🚨 IMMEDIATE CHECK: SIMPLIFIED CARDS DETECTED! Need to reload...');
-      // This will trigger our useEffect to reload
-    } else {
-      console.log('[App] ✅ IMMEDIATE CHECK: Cards already have subnames/subtitles, no reload needed');
-    }
-  }
-  
-  // Debug: Check what's actually in allCards
-  if (allCards && allCards.length > 0) {
-    console.log('[App] allCards already has data! Sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
-    const cardsWithSubnames = allCards.filter(card => hasSubtitleLike(card));
-    console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
-    if (cardsWithSubnames.length > 0) {
-      console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
-    } else {
-      console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
-    }
-    
-    // Debug: Check if this is cached data
-    console.log('[App] ===== INVESTIGATING CARD SOURCE =====');
-    console.log('[App] Checking if cards are from localStorage or other cache...');
-    
-            // Check if there's a localStorage cache
-        try {
-          const cachedCards = localStorage.getItem('lorcana-cards-cache');
-          if (cachedCards) {
-            console.log('[App] Found cached cards in localStorage!');
-            const parsed = JSON.parse(cachedCards);
-            console.log('[App] Cached cards count:', parsed.length);
-            if (parsed.length > 0) {
-              const cachedWithSubnames = parsed.filter(card => hasSubtitleLike(card));
-              console.log('[App] Cached cards with subnames/subtitles:', cachedWithSubnames.length);
-              if (cachedWithSubnames.length > 0) {
-                console.log('[App] Sample cached subname/subtitle cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
-              }
-            }
-          } else {
-            console.log('[App] No cached cards found in localStorage');
-          }
-        } catch (error) {
-          console.log('[App] Error checking localStorage cache:', error);
-        }
-    
-    // Check if there's a sessionStorage cache
-    try {
-      const sessionCards = sessionStorage.getItem('lorcana-cards-session');
-      if (sessionCards) {
-        console.log('[App] Found cards in sessionStorage!');
-        const parsed = JSON.parse(sessionCards);
-        console.log('[App] Session cards count:', parsed.length);
-      } else {
-        console.log('[App] No cards found in sessionStorage');
-      }
-    } catch (error) {
-      console.log('[App] Error checking sessionStorage:', error);
-    }
-    
-    // Check if there are any global variables
-    if (window.lorcanaCards) {
-      console.log('[App] Found global lorcanaCards variable!');
-      console.log('[App] Global cards count:', window.lorcanaCards.length);
-    }
-    
-    if (window.allCards) {
-      console.log('[App] Found global allCards variable!');
-      console.log('[App] Global allCards count:', window.allCards.length);
-    }
-    
-    console.log('[App] ===== END INVESTIGATION =====');
-  }
-  
+  // (Removed a large per-render debug block that filtered the full card catalog
+  //  twice and parsed localStorage/sessionStorage on every render — see audit.)
+
   const [inspectCard, setInspectCard] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -8708,6 +8543,13 @@ function AppInner() {
   const [decks, setDecks] = useState({});
   const [currentDeckId, setCurrentDeckId] = useState(null);
   const [showDeckManager, setShowDeckManager] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('decks') === 'open') {
+      setShowDeckManager(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
   const [showTeamHub, setShowTeamHub] = useState(false);
 
   // Add batch image loader
@@ -9217,9 +9059,11 @@ async function saveDeckToCloud(deckData) {
       }
     } else {
       console.warn('[saveDeckToCloud] Failed to save to cloud, but local save succeeded');
+      addToast("Saved locally, but couldn't sync to the cloud. Your changes are on this device only.", "error", 5000);
     }
   } catch (error) {
     console.warn('[saveDeckToCloud] Cloud save failed, but local save succeeded:', error);
+    addToast("Saved locally, but couldn't sync to the cloud. Your changes are on this device only.", "error", 5000);
   }
 }
 
@@ -9412,18 +9256,8 @@ function handleNewDeck(name = "Untitled Deck") {
 }
 
 function handleSwitchDeck(deckToSwitch) {
-  console.log('[handleSwitchDeck] Switching to deck:', deckToSwitch);
-  console.log('[handleSwitchDeck] Current decks state:', decks);
-  console.log('[handleSwitchDeck] Deck to switch exists in decks:', decks[deckToSwitch.id]);
-  console.log('[handleSwitchDeck] Current deck before switch:', deck);
-  console.log('[handleSwitchDeck] Current currentDeckId before switch:', currentDeckId);
-  
   setCurrentDeckId(deckToSwitch.id);
   deckDispatch({ type: "SWITCH_DECK", deck: deckToSwitch });
-  
-  console.log('[handleSwitchDeck] After switch - new currentDeckId:', deckToSwitch.id);
-  console.log('[handleSwitchDeck] Switch operation completed');
-  
   addToast(`Switched to deck: "${deckToSwitch.name}"`, "success");
 }
 
@@ -9490,6 +9324,14 @@ async function handleDeleteDeck(deckId) {
     console.error('[handleDeleteDeck] Error deleting deck:', error);
     addToast(`Failed to delete deck: "${deckToDelete.name}"`, "error");
   }
+}
+
+function handleRenameDeck(deckId, newName) {
+  const updatedDecks = updateDeckMetadata(decks, deckId, { name: newName });
+  setDecks(updatedDecks);
+  const updatedDeck = updatedDecks[deckId];
+  if (updatedDeck) saveDeckToCloud(updatedDeck);
+  addToast(`Renamed deck to "${newName}"`, "success");
 }
 
 function handleDuplicateDeck(deckId) {
@@ -10182,6 +10024,7 @@ useEffect(() => {
   }}
   onImportDeck={handleImportDeck}
   onRefreshDecks={handleRefreshDecks}
+  onRenameDeck={handleRenameDeck}
 />
 
 {/* Team Hub */}
@@ -10226,17 +10069,7 @@ function applyFilters(cards, filters) {
   // Only apply text filter if there's actual search text
   if (filters.text && filters.text.trim()) {
     const q = filters.text.toLowerCase().trim();
-    console.log('[Search Debug] Searching for:', q);
-    console.log('[Search Debug] Sample card data for search:', list.slice(0, 3).map(c => ({
-      name: c.name,
-      text: c.text,
-      type: c.type,
-      rarity: c.rarity,
-      set: c.set,
-      _rawType: c._raw?.type,
-      _rawRarity: c._raw?.rarity
-    })));
-    
+
     list = list.filter((c) => {
       // Search in multiple fields based on Lorcast structure
       const searchableFields = [
@@ -10252,18 +10085,10 @@ function applyFilters(cards, filters) {
         c._raw?.set?.name
       ].filter(Boolean); // Remove undefined/null values
       
-      const matches = searchableFields.some(field => 
+      return searchableFields.some(field =>
         String(field).toLowerCase().includes(q)
       );
-      
-      if (matches) {
-        console.log(`[Search Debug] Card "${c.name}" matches search "${q}"`);
-      }
-      
-      return matches;
     });
-    
-    console.log('[Search Debug] After text filtering, cards remaining:', list.length);
   }
 
   if (filters.inks && filters.inks.size) {
@@ -10273,13 +10098,8 @@ function applyFilters(cards, filters) {
       filters.inks = new Set(filters.inks || []);
     }
     
-    console.log('[Filter Debug] Ink filter active:', Array.from(filters.inks));
-    console.log('[Filter Debug] Using improved dual-ink filtering logic');
-    
     // Use the new improved ink filtering logic
     list = list.filter(card => matchesInkFilter(card, filters.inks));
-    
-    console.log('[Filter Debug] After ink filtering, cards remaining:', list.length);
   }
 
   if (filters.rarities && filters.rarities.size) {
