@@ -16,6 +16,7 @@ import HubOverviewPage from './pages/hub/HubOverviewPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import JoinPage from './pages/JoinPage'
+import MyDecksPage from './pages/MyDecksPage'
 import { useAuth } from './contexts/AuthContext'
 
 function TopNav() {
@@ -37,6 +38,9 @@ function TopNav() {
           </NavLink>
           <NavLink to="/builder" className={linkClass}>
             Deck Lab
+          </NavLink>
+          <NavLink to="/my-decks" className={linkClass}>
+            My Decks
           </NavLink>
         </div>
 
@@ -97,6 +101,7 @@ export default function RouterApp() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join" element={<JoinPage />} />
+          <Route path="/my-decks" element={<MyDecksPage />} />
           <Route path="/team-hub" element={<RequireAuth><HubListPage /></RequireAuth>} />
           <Route path="/team-hub/:id" element={<RequireAuth><HubDetailLayout /></RequireAuth>}>
             <Route index element={<Navigate to="home" replace />} />
