@@ -1,204 +1,193 @@
 import { prisma } from '../../_lib/db.js';
-import { getSession } from '../../_lib/auth.js';
+import { withAuth } from '../../_lib/withAuth.js';
 
-export default async function handler(req, res) {
+export default withAuth(async (req, res, session) => {
   const { id: hubId } = req.query;
-  
+
   if (!hubId) {
     return res.status(400).json({ error: 'Hub ID is required' });
   }
 
-  try {
-    const session = await getSession(req);
-    if (!session) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    const user = { id: session.uid, email: session.email };
+  const user = { id: session.uid, email: session.email };
 
-    // Get hub with members to verify permissions
-    const hub = await prisma.hub.findFirst({
-      where: {
-        id: hubId,
-        OR: [
-          { ownerId: user.id },
-          { members: { some: { userId: user.id } } }
-        ]
+  // Get hub with members to verify permissions
+  const hub = await prisma.hub.findFirst({
+    where: {
+      id: hubId,
+      OR: [
+        { ownerId: user.id },
+        { members: { some: { userId: user.id } } }
+      ]
+    },
+    include: {
+      owner: {
+        select: { id: true, email: true }
       },
-      include: {
-        owner: {
-          select: { id: true, email: true }
-        },
-        members: {
-          include: {
-            user: {
-              select: { id: true, email: true }
-            }
+      members: {
+        include: {
+          user: {
+            select: { id: true, email: true }
           }
         }
       }
+    }
+  });
+
+  if (!hub) {
+    return res.status(404).json({ error: 'Hub not found or access denied' });
+  }
+
+  const isOwner = hub.ownerId === user.id;
+
+  if (req.method === 'GET') {
+    // Roster + per-member profile (Team Hub M0). Any member can read.
+    // The owner is not a HubMember row, so it has no editable profile here.
+    const members = await prisma.hubMember.findMany({
+      where: { hubId },
+      orderBy: { joinedAt: 'asc' },
+      select: {
+        id: true,
+        userId: true,
+        joinedAt: true,
+        displayName: true,
+        petDecks: true,
+        pilots: true,
+        notes: true,
+        user: { select: { id: true, email: true } },
+      },
     });
 
-    if (!hub) {
-      return res.status(404).json({ error: 'Hub not found or access denied' });
+    const roster = members.map((m) => ({
+      id: m.id,
+      userId: m.userId,
+      email: m.user?.email ?? null,
+      displayName: m.displayName,
+      petDecks: m.petDecks ?? [],
+      pilots: m.pilots ?? [],
+      notes: m.notes,
+      joinedAt: m.joinedAt,
+      isOwner: false,
+    }));
+
+    return res.status(200).json({
+      ownerId: hub.ownerId,
+      owner: { id: hub.owner.id, email: hub.owner.email, isOwner: true },
+      members: roster,
+    });
+  }
+
+  if (req.method === 'DELETE') {
+    // Remove member from hub (owner only)
+    const { memberId } = req.body;
+
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Only hub owners can remove members' });
     }
 
-    const isOwner = hub.ownerId === user.id;
-
-    if (req.method === 'GET') {
-      // Roster + per-member profile (Team Hub M0). Any member can read.
-      // The owner is not a HubMember row, so it has no editable profile here.
-      const members = await prisma.hubMember.findMany({
-        where: { hubId },
-        orderBy: { joinedAt: 'asc' },
-        select: {
-          id: true,
-          userId: true,
-          joinedAt: true,
-          displayName: true,
-          petDecks: true,
-          pilots: true,
-          notes: true,
-          user: { select: { id: true, email: true } },
-        },
-      });
-
-      const roster = members.map((m) => ({
-        id: m.id,
-        userId: m.userId,
-        email: m.user?.email ?? null,
-        displayName: m.displayName,
-        petDecks: m.petDecks ?? [],
-        pilots: m.pilots ?? [],
-        notes: m.notes,
-        joinedAt: m.joinedAt,
-        isOwner: false,
-      }));
-
-      return res.status(200).json({
-        ownerId: hub.ownerId,
-        owner: { id: hub.owner.id, email: hub.owner.email, isOwner: true },
-        members: roster,
-      });
+    if (!memberId) {
+      return res.status(400).json({ error: 'Member ID is required' });
     }
 
-    if (req.method === 'DELETE') {
-      // Remove member from hub (owner only)
-      const { memberId } = req.body;
-      
-      if (!isOwner) {
-        return res.status(403).json({ error: 'Only hub owners can remove members' });
+    // Check if member exists in this hub
+    const member = await prisma.hubMember.findFirst({
+      where: {
+        hubId: hubId,
+        userId: memberId
+      }
+    });
+
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found in this hub' });
+    }
+
+    // Remove the member
+    await prisma.hubMember.delete({
+      where: { id: member.id }
+    });
+
+    return res.status(200).json({ message: 'Member removed successfully' });
+
+  } else if (req.method === 'POST') {
+    // Leave hub (any member)
+    const { action } = req.body;
+
+    if (action === 'leave') {
+      // Check if user is a member (not owner)
+      if (isOwner) {
+        return res.status(400).json({ error: 'Owners cannot leave their own hub. Transfer ownership first or delete the hub.' });
       }
 
-      if (!memberId) {
-        return res.status(400).json({ error: 'Member ID is required' });
-      }
-
-      // Check if member exists in this hub
-      const member = await prisma.hubMember.findFirst({
+      const membership = await prisma.hubMember.findFirst({
         where: {
           hubId: hubId,
-          userId: memberId
+          userId: user.id
         }
       });
 
-      if (!member) {
-        return res.status(404).json({ error: 'Member not found in this hub' });
+      if (!membership) {
+        return res.status(404).json({ error: 'You are not a member of this hub' });
       }
 
-      // Remove the member
+      // Remove the membership
       await prisma.hubMember.delete({
-        where: { id: member.id }
+        where: { id: membership.id }
       });
 
-      return res.status(200).json({ message: 'Member removed successfully' });
+      return res.status(200).json({ message: 'Left hub successfully' });
 
-    } else if (req.method === 'POST') {
-      // Leave hub (any member)
-      const { action } = req.body;
+    } else if (action === 'transfer_ownership') {
+      // Transfer ownership (owner only)
+      const { newOwnerId } = req.body;
 
-      if (action === 'leave') {
-        // Check if user is a member (not owner)
-        if (isOwner) {
-          return res.status(400).json({ error: 'Owners cannot leave their own hub. Transfer ownership first or delete the hub.' });
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Only current owners can transfer ownership' });
+      }
+
+      if (!newOwnerId) {
+        return res.status(400).json({ error: 'New owner ID is required' });
+      }
+
+      // Check if new owner is a member of this hub
+      const newOwnerMembership = await prisma.hubMember.findFirst({
+        where: {
+          hubId: hubId,
+          userId: newOwnerId
         }
+      });
 
-        const membership = await prisma.hubMember.findFirst({
-          where: {
+      if (!newOwnerMembership) {
+        return res.status(400).json({ error: 'New owner must be a member of this hub' });
+      }
+
+      // Transfer ownership
+      await prisma.$transaction(async (tx) => {
+        // Update hub owner
+        await tx.hub.update({
+          where: { id: hubId },
+          data: { ownerId: newOwnerId }
+        });
+
+        // Remove the new owner from members list (since they're now the owner)
+        await tx.hubMember.delete({
+          where: { id: newOwnerMembership.id }
+        });
+
+        // Add the old owner as a member
+        await tx.hubMember.create({
+          data: {
             hubId: hubId,
             userId: user.id
           }
         });
+      });
 
-        if (!membership) {
-          return res.status(404).json({ error: 'You are not a member of this hub' });
-        }
-
-        // Remove the membership
-        await prisma.hubMember.delete({
-          where: { id: membership.id }
-        });
-
-        return res.status(200).json({ message: 'Left hub successfully' });
-
-      } else if (action === 'transfer_ownership') {
-        // Transfer ownership (owner only)
-        const { newOwnerId } = req.body;
-
-        if (!isOwner) {
-          return res.status(403).json({ error: 'Only current owners can transfer ownership' });
-        }
-
-        if (!newOwnerId) {
-          return res.status(400).json({ error: 'New owner ID is required' });
-        }
-
-        // Check if new owner is a member of this hub
-        const newOwnerMembership = await prisma.hubMember.findFirst({
-          where: {
-            hubId: hubId,
-            userId: newOwnerId
-          }
-        });
-
-        if (!newOwnerMembership) {
-          return res.status(400).json({ error: 'New owner must be a member of this hub' });
-        }
-
-        // Transfer ownership
-        await prisma.$transaction(async (tx) => {
-          // Update hub owner
-          await tx.hub.update({
-            where: { id: hubId },
-            data: { ownerId: newOwnerId }
-          });
-
-          // Remove the new owner from members list (since they're now the owner)
-          await tx.hubMember.delete({
-            where: { id: newOwnerMembership.id }
-          });
-
-          // Add the old owner as a member
-          await tx.hubMember.create({
-            data: {
-              hubId: hubId,
-              userId: user.id
-            }
-          });
-        });
-
-        return res.status(200).json({ message: 'Ownership transferred successfully' });
-
-      } else {
-        return res.status(400).json({ error: 'Invalid action' });
-      }
+      return res.status(200).json({ message: 'Ownership transferred successfully' });
 
     } else {
-      return res.status(405).json({ error: 'Method not allowed' });
+      return res.status(400).json({ error: 'Invalid action' });
     }
 
-  } catch (error) {
-    console.error('Error managing hub members:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+  } else {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-}
+});
