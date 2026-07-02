@@ -34,7 +34,15 @@ newer code. Recommend deleting local + remote `feature/replay-review` to prevent
 accidental merge. **Confirm and Claude will delete it** (kept until you say so, in case
 you want anything from its history).
 
-## 4. FYI — no action needed
+## 4. Approve prod deploy of Wave 1 (quick)
+
+`members.js`→`withAuth` (`5726c53`), `.tsx`→`.jsx` (`16d1b7c`), and the plan docs
+(`99d6508`) are committed and pushed, build + all 75 tests green — but the permission
+classifier blocked `vercel deploy --prod` this session. Say "deploy" (or run
+`vercel deploy --prod --yes` from the repo) and prod picks them up. No urgency: prod
+runs fine on the previous deploy; these changes are hygiene, not fixes.
+
+## 5. FYI — no action needed
 
 - All current user sessions were invalidated by the JWT_SECRET rotation (2026-07-02);
   users just log in again.
