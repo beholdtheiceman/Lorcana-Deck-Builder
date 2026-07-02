@@ -7,3 +7,7 @@ dist
 
 # Vercel CLI link
 .vercel
+
+# Local tooling artifacts
+ruvector.db
+.claude/settings.local.json
