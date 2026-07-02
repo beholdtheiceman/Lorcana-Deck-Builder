@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-
-const LS_DECKS = 'lorcana.decks.v2'
-const LS_CURRENT = 'lorcana.currentDeckId.v2'
+import { LS_KEYS, loadLS, saveLS } from '../lib/storage.js'
 
 const INK_COLORS = {
   Amber: '#F59E0B',
@@ -90,22 +88,20 @@ export default function MyDecksPage() {
   const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_DECKS)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        const arr = Object.values(parsed).sort(
-          (a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0)
-        )
-        setDecks(arr)
-      }
-    } catch {}
+    const parsed = loadLS(LS_KEYS.DECKS, null)
+    if (parsed) {
+      const arr = Object.values(parsed).sort(
+        (a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0)
+      )
+      setDecks(arr)
+    }
   }, [])
 
   const selectedDeck = decks.find(d => d.id === selectedId) ?? null
 
   function handleEdit(deck) {
-    localStorage.setItem(LS_CURRENT, deck.id)
+    // Must round-trip through the builder's loadLS (JSON.parse) — see myDecksEdit.test.jsx
+    saveLS(LS_KEYS.CURRENT_DECK_ID, deck.id)
     navigate('/builder')
   }
 
