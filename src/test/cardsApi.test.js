@@ -63,17 +63,16 @@ describe('normalizeSetMeta', () => {
     expect(meta.num).toBeNull();
   });
 
-  // SUSPECTED BUG (observed behavior locked in): the `code` resolution chain is
-  //   raw?.set_code ?? raw?.setCode ?? raw?.set ?? raw?.Set_Code ?? raw?.set?.code
-  // When `raw.set` is a nested object it is non-null, so `?? raw?.set` short-circuits
-  // and returns the OBJECT before `raw?.set?.code` is ever reached — stringifying to
-  // "[OBJECT OBJECT]". `name`/`num` read `raw?.set?.name`/`raw?.set?.num` correctly.
-  // Test asserts current (buggy) behavior; do NOT treat this as intended.
-  it('mis-handles a nested set object for code (documents suspected bug)', () => {
+  it('resolves code from a nested set object (bug fixed 2026-07-02)', () => {
     const meta = normalizeSetMeta({ set: { code: 'tfc', name: 'The First Chapter', num: '1' } });
-    expect(meta.code).toBe('[OBJECT OBJECT]');
+    expect(meta.code).toBe('TFC');
     expect(meta.name).toBe('The First Chapter');
     expect(meta.num).toBe(1);
+  });
+
+  it('still accepts a primitive set value as the code', () => {
+    expect(normalizeSetMeta({ set: '5' }).code).toBe('5');
+    expect(normalizeSetMeta({ set: 5 }).code).toBe('5');
   });
 });
 

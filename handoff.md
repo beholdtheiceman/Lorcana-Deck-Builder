@@ -17,22 +17,23 @@ limiting needs an external store. Options:
 
 → Once creds exist, implementation is delegated to Opus (no further input needed).
 
-## 2. Replay parser validation — need one real replay export (plan item 5)
+## 2. ✅ DONE (2026-07-02): Replay parser validated against a real duels.ink export
 
-`api/_lib/replayParse.js` has never seen a real duels.ink replay file. Please export a
-match replay from duels.ink (any recent game, BO1 or BO3) and drop the file at
-`docs/fixtures/` (create the folder) or paste/attach it in chat.
+Larry provided a real bo3 `.match-replay.zip`. The parser handled it with **zero code
+changes** — match score/winner, per-game results, victory reasons, 60-card decklists,
+64-78 events per game, lore curves, and ink-color archetype detection all correct
+(cross-checked against the raw logs). A sanitized copy is committed as the test fixture
+`src/test/fixtures/duels-match-replay.zip` with a 4-test regression suite
+(`src/test/replayParse.test.js`).
 
-→ Claude (Fable) will validate the parser against it, fix mismatches, and run an
-end-to-end AI review on preview before calling the feature production-ready.
+## 3. ✅ DONE (2026-07-02): stale `feature/replay-review` remote branch deleted
 
-## 3. Confirm deletion of the stale `feature/replay-review` branch (plan item 7)
-
-Verified 2026-07-02: `preview/team-hub-polish` (live prod) contains everything that
-branch has, plus newer work (hub pages, tests, deckExport). Merging it would delete
-newer code. Recommend deleting local + remote `feature/replay-review` to prevent an
-accidental merge. **Confirm and Claude will delete it** (kept until you say so, in case
-you want anything from its history).
+Remote deleted (accidental-merge risk gone). The LOCAL branch copy remains only because
+an old session's worktree pins it and the permission classifier won't let Claude remove
+another session's worktree. Optional manual cleanup:
+`git worktree remove "C:/Users/Larry/AppData/Local/Temp/claude/C--WINDOWS-system32/682ef509-58a7-40ab-9af0-a05acd2c25e2/scratchpad/wt-redesign"`
+then `git branch -D feature/replay-review`. (A June-28 stash `stash@{0}` lives in the
+shared repo and is unaffected.)
 
 ## 0. ALL THREE My Decks bugs FIXED — just needs a deploy (2026-07-02)
 

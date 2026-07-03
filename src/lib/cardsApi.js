@@ -67,8 +67,13 @@ export function normalizeSetMeta(raw) {
     'set.num': raw?.set?.num
   });
 
+  // raw.set may be a primitive code ("5") or a nested object ({code, name, num}).
+  // Only treat it as the code when primitive — otherwise the ?? chain would
+  // stringify the object to "[OBJECT OBJECT]" and set.code would be unreachable.
+  const setPrimitive =
+    (typeof raw?.set === "string" || typeof raw?.set === "number") ? raw.set : null;
   const code =
-    (raw?.set_code ?? raw?.setCode ?? raw?.set ?? raw?.Set_Code ?? raw?.set?.code ?? "")
+    (raw?.set_code ?? raw?.setCode ?? setPrimitive ?? raw?.Set_Code ?? raw?.set?.code ?? "")
       .toString().toUpperCase();
 
   const name =
