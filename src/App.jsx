@@ -1835,10 +1835,15 @@ function deckReducer(state, action) {
       const existing = state.entries[key]?.count || 0;
       const nextCount = clamp(existing + count, 0, DECK_RULES.MAX_COPIES);
       const nextEntries = { ...state.entries };
-      nextEntries[key] = {
-        card,
-        count: nextCount,
-      };
+      if (nextCount <= 0) {
+        // Decremented to zero — remove the entry instead of keeping a ghost.
+        delete nextEntries[key];
+      } else {
+        nextEntries[key] = {
+          card,
+          count: nextCount,
+        };
+      }
       const newTotal =
         Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0) || 0;
       const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
@@ -1848,10 +1853,14 @@ function deckReducer(state, action) {
       const { card, count } = action;
       const key = deckKey(card);
       const nextEntries = { ...state.entries };
-      nextEntries[key] = {
-        card,
-        count: clamp(count, 0, DECK_RULES.MAX_COPIES)
-      };
+      const clamped = clamp(count, 0, DECK_RULES.MAX_COPIES);
+      if (clamped <= 0) {
+        // Count 0 means the card is out of the deck — drop the entry entirely.
+        // Keeping it produced ghost "0x" rows in saved decks (My Decks page).
+        delete nextEntries[key];
+      } else {
+        nextEntries[key] = { card, count: clamped };
+      }
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
       const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
       return next;
@@ -6880,6 +6889,17 @@ function AppInner() {
       
       // Get deck entries
       const entries = Object.values(deck.entries || {}).filter(e => e.count > 0);
+
+      // Decks saved by older builds carry card objects whose image hosts are
+      // dead (cards.lorcast.io crd_* returns 404). Re-resolve each card against
+      // the live catalog by setCode+number so their current image URL is tried first.
+      const liveBySetNum = new Map();
+      for (const c of allCards || []) {
+        if (c?.setCode != null && c?.number != null) {
+          const k = `${String(c.setCode).toUpperCase()}-${String(c.number)}`;
+          if (!liveBySetNum.has(k)) liveBySetNum.set(k, c);
+        }
+      }
       
       // Simple grouping for deck image generation
       const groupedEntries = [
@@ -6983,10 +7003,16 @@ function AppInner() {
         const card = entry.card;
         let imageDrawn = false;
         
-        // Try multiple image sources in order of preference
+        // Try multiple image sources in order of preference. The live-catalog
+        // image comes first: legacy card objects have dead image_url hosts.
+        const liveSetKey = (card.setCode ?? card.set) != null && card.number != null
+          ? `${String(card.setCode ?? card.set).toUpperCase()}-${String(card.number)}`
+          : null;
+        const liveCard = liveSetKey ? liveBySetNum.get(liveSetKey) : null;
         const imageSources = [
-          card.image_url,
+          liveCard?.image,
           card.image,
+          card.image_url,
           card._imageFromAPI,
           card._raw?.image_uris?.digital?.large,
           card._raw?.image_uris?.digital?.normal,

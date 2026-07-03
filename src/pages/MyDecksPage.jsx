@@ -21,9 +21,15 @@ function getCardInks(card) {
   return []
 }
 
+// Entries with count 0 are ghosts left behind by older builds — a card that was
+// removed from the deck but whose entry was kept. Never render them.
+function liveEntries(deck) {
+  return Object.values(deck.entries || {}).filter(e => e?.count > 0)
+}
+
 function getDeckInks(deck) {
   const inkSet = new Set()
-  for (const entry of Object.values(deck.entries || {})) {
+  for (const entry of liveEntries(deck)) {
     getCardInks(entry.card).forEach(ink => inkSet.add(ink))
   }
   return [...inkSet]
@@ -41,7 +47,7 @@ function getCardType(card) {
 
 function groupEntriesByType(deck) {
   const groups = {}
-  for (const entry of Object.values(deck.entries || {})) {
+  for (const entry of liveEntries(deck)) {
     const type = getCardType(entry.card)
     if (!groups[type]) groups[type] = []
     groups[type].push(entry)

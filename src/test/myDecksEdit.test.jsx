@@ -60,4 +60,28 @@ describe('MyDecksPage — Edit in Deck Lab', () => {
     expect(screen.getByText('3x')).toBeTruthy()
     expect(screen.getByText('2x')).toBeTruthy()
   })
+
+  it('hides ghost entries (count 0) left behind by older builds', () => {
+    // Real-world shape: legacy decks contain entries whose count was set to 0
+    // when a card was removed, but the entry was never deleted.
+    const deck = {
+      id: 'deck_ghosts',
+      name: 'Ghost Deck',
+      total: 4,
+      createdAt: 1751400000000,
+      updatedAt: 1751400001000,
+      entries: {
+        'crd_live': { card: { id: 'crd_live', name: 'Woody', cost: 4, type: 'Character', inks: ['Amber'] }, count: 4 },
+        'crd_ghost': { card: { id: 'crd_ghost', name: 'Mulan', cost: 3, type: 'Character', inks: ['Ruby'] }, count: 0 },
+      },
+    }
+    saveLS(LS_KEYS.DECKS, { [deck.id]: deck })
+    render(<MyDecksPage />)
+    fireEvent.click(screen.getByText('Ghost Deck'))
+
+    expect(screen.getByText('4x')).toBeTruthy()
+    expect(screen.queryByText('0x')).toBeNull()   // no ghost rows
+    expect(screen.queryByText('Mulan')).toBeNull() // ghost card fully hidden
+    expect(screen.queryByText('Ruby')).toBeNull()  // ghost ink not in badges
+  })
 })
