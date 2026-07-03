@@ -34,24 +34,20 @@ newer code. Recommend deleting local + remote `feature/replay-review` to prevent
 accidental merge. **Confirm and Claude will delete it** (kept until you say so, in case
 you want anything from its history).
 
-## 0. URGENT-ish: deploy to fix the My Decks Edit bug (2026-07-02)
+## 0. ALL THREE My Decks bugs FIXED — just needs a deploy (2026-07-02)
 
-The "Edit in Deck Lab makes the deck disappear" bug is FIXED (`9cffb2f`, regression-tested,
-verified in the browser) — but prod still runs the old code until a deploy happens, which
-the session's permission classifier blocks. Say "deploy" and it ships together with
-everything below.
+Root-caused against your real synced deck data (read from your logged-in browser):
+1. **Edit made the deck disappear** — LS format mismatch (`9cffb2f`).
+2. **"0 copies" rows** — decks contain ghost entries at count 0 (e.g. RS DINO has 8);
+   the reducer now deletes entries at zero and My Decks hides existing ghosts (`d53eaef`).
+3. **Bad generated deck images** — pre-2026 decks carry dead image hosts
+   (`cards.lorcast.io/crd_*` 404s); the generator now re-resolves every card against
+   the live catalog by set+number first (`d53eaef`).
 
-## 0b. "0 copies / weird data" decks — need one piece of evidence
-
-Locally-saved decks render perfectly (verified end-to-end), so the corrupted decks are
-almost certainly ones that round-tripped through cloud sync — possibly rows saved by an
-older app version in a different JSON shape (which would ALSO explain bad generated deck
-images: slimmed card objects lose their image URLs, so the canvas fallback kicks in).
-To confirm, either:
-- approve a **read-only, shape-only** query of your `Deck` rows in the prod DB (no card
-  contents printed), or
-- open My Decks on prod, click a weird deck, and paste a screenshot + the output of
-  `JSON.parse(localStorage.getItem('lorcana.decks.v2'))` for that deck from DevTools.
+All regression-tested (114/114) and browser-verified. **Prod still runs the broken
+code until you say "deploy"** — the session's permission classifier blocks
+`vercel --prod` without your explicit word. Existing decks' ghost data self-heals on
+each deck's next save; until then it's hidden by the display fix.
 
 ## 4. Approve prod deploy of Wave 1 (quick)
 
