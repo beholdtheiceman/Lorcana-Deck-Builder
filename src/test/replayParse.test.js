@@ -63,6 +63,28 @@ describe('parseReplayBuffer — real duels.ink match-replay zip', () => {
     expect(events.filter(e => e.type === 'quest' && e.player === 'me')).toHaveLength(0)
   })
 
+  it('carries card ids on play/quest/ink and challenge events', async () => {
+    const r = await parseReplayBuffer(fixture(), 'duels-match-replay.zip')
+    const events = r.games[0].events
+    const idRe = /^\d+-\d+$/ // "<set>-<num>" card ids
+
+    const carriers = events.filter(e => ['play_card', 'quest', 'add_to_ink'].includes(e.type))
+    expect(carriers.length).toBeGreaterThan(0)
+    for (const e of carriers) {
+      expect(typeof e.cardId).toBe('string')
+      expect(e.cardId).toMatch(idRe)
+    }
+
+    const challenges = events.filter(e => e.type === 'challenge')
+    expect(challenges.length).toBeGreaterThan(0)
+    for (const e of challenges) {
+      expect(typeof e.attackerCardId).toBe('string')
+      expect(e.attackerCardId).toMatch(idRe)
+      expect(typeof e.defenderCardId).toBe('string')
+      expect(e.defenderCardId).toMatch(idRe)
+    }
+  })
+
   it('parses a single .replay.gz game file (non-zip path)', async () => {
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(fixture())

@@ -270,6 +270,8 @@ function normalizeGame(game, gameMeta, myPlayerNum, myName, oppName) {
         action: `challenged ${dName} with ${aName} (${outcome})`,
         card: aName,
         target: dName,
+        attackerCardId: ta.attackerCardId ?? null,
+        defenderCardId: ta.defenderCardId ?? null,
         attackerBanished: ta.attackerBanished ?? false,
         defenderBanished: ta.defenderBanished ?? false,
       });
@@ -281,6 +283,7 @@ function normalizeGame(game, gameMeta, myPlayerNum, myName, oppName) {
         type: "quest",
         action: `quested with ${cardName} (+${ta.loreGained ?? "?"} lore, total: ${ta.newLoreTotal ?? "?"})`,
         card: cardName,
+        cardId: ta.cardId ?? null,
         loreGained: ta.loreGained,
         newLoreTotal: ta.newLoreTotal,
       });
@@ -298,6 +301,7 @@ function normalizeGame(game, gameMeta, myPlayerNum, myName, oppName) {
         type: actionType.toLowerCase(),
         action: `${verb} ${cardName}`,
         card: cardName,
+        cardId: ta.cardId ?? null,
       });
     }
   }

@@ -1,4 +1,55 @@
-# HANDOFF — items that need Larry (2026-07-02)
+# HANDOFF — Review agent deck-context upgrade (2026-07-04)
+
+## Status: implementation complete, all 134 tests green, NOT committed / NOT deployed.
+
+Post-mortem with file/line detail: `docs/review-agent-postmortem.md`.
+
+## What was done (branch `preview/team-hub-polish`, uncommitted working tree)
+
+1. **Card oracle fixed** (was 100% broken — every card rendered "unknown — do not infer").
+   Parser now keeps `cardId`/`attackerCardId`/`defenderCardId` on events; context builder
+   resolves by id with name fallback. (Opus subagent, verified.)
+2. **LLM pipeline deduplicated** into `api/_lib/reviewLlm.js`; both review endpoints import
+   it; leftover debug block + dead `replay.playerDeck` fallback removed. (Opus subagent, verified.)
+3. **Deck context added — the headline feature.** New `api/_lib/deckContext.js`:
+   deck summary (counts, inks, curve, types, inkable ratio), rendered YOUR DECK +
+   OPPONENT REVEALED CARDS sections; deck cards merged into the card-text glossary;
+   system prompt now tells the coach to infer the deck's game plan and judge lines
+   against it, and to name better outs still in the deck.
+4. **Cross-source id mismatch discovered & mitigated** (found by running the real fixture):
+   duels.ink and `cards.min.json` number some sets differently (e.g. duels `8-33` = Lady -
+   Decisive Dog; local `8-33` = Jafar - High Sultan of Lorcana). Resolution policy: replay
+   names are authoritative; ids trusted only when they agree. Never-played deck cards from
+   misaligned sets, or whose color falls outside the deck's verified 2-ink identity, are
+   marked `(unverified)`, excluded from profile stats and glossary, with an explicit
+   do-not-infer note to the model.
+5. **Auto-primer upgraded**: receives the full deck list + opponent reveals, names both
+   archetypes from actual cards (aligned with `meta-archetypes.md` names instead of
+   colors-only labels); reads full knowledge files (15k cap) instead of 3×4000-char slices.
+   `PRIMER_MAX_TOKENS` 600 → 800 for the two extra fields.
+6. **Regenerate drift bug fixed**: auto-primer reviews (primerId=null) were permanently
+   un-regenerable (400). `api/reviews/[id].js` now re-runs the shared auto-primer path.
+7. **Truncation calibration**: context overflow now elides the EARLIEST log lines (endgame
+   preserved) instead of chopping the tail.
+
+## Next / open questions for Larry
+
+- **Deploy**: changes are backend-only (`api/` + tests), no schema migration. Needs the
+  usual commit + deploy approval.
+- **Token cost**: primer call input grew (~23k chars knowledge + deck list ≈ +6k tokens per
+  auto-primer). Review context grew ~8-10k chars (deck + opponent + bigger glossary). Default
+  hub budget is 500k tokens/month — consider raising it or trimming the knowledge caps.
+- **Root fix for set numbering**: the evidence heuristic is a mitigation. The real fix is
+  aligning `cards.min.json` ids with duels.ink numbering (risky: saved decks reference
+  current ids). Not attempted.
+- **Optional future**: link a saved Deck Lab `Deck` to a review for paper games with no
+  replay decklist — schema change (`Review.deckId`), deferred.
+- **One live-fire test recommended**: upload a real replay in the UI and generate a review
+  with `ANTHROPIC_API_KEY` set — LLM output quality wasn't exercised here (no key locally).
+
+---
+
+# PRIOR HANDOFF (2026-07-02) — items that still need Larry
 
 Everything else is proceeding autonomously per `docs/implementation-plans.md`.
 Nothing below blocks Waves 1–3 (withAuth, .tsx→.jsx, App.jsx lib extraction, tests).
@@ -13,7 +64,8 @@ limiting needs an external store. Options:
   `UPSTASH_REDIS_REST_TOKEN` → add both to Vercel env (all environments), or paste them
   in chat and Claude will add them.
 - **Vercel KV / Marketplace Redis:** can be provisioned from the Vercel dashboard
-  (Storage tab) — say the word and Claude can walk that flow with you.
+  (Storage tab) — sets env vars automatically.
+- **Skip for now:** accept the risk on auth endpoints.
 
 → Once creds exist, implementation is delegated to Opus (no further input needed).
 
