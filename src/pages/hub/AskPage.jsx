@@ -30,6 +30,12 @@ export default function AskPage() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [attachedDeck, setAttachedDeck] = useState(null); // { type:'saved', deckId, title, cardCount } | { type:'text', text }
+  const [deckWarnings, setDeckWarnings] = useState([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState('saved'); // 'saved' | 'paste'
+  const [savedDecks, setSavedDecks] = useState(null); // null = not loaded
+  const [pasteText, setPasteText] = useState('');
 
   const ask = async (q) => {
     const text = (q || question).trim();
@@ -40,10 +46,21 @@ export default function AskPage() {
       const res = await fetch(`/api/hubs/${hub.id}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text }),
+        body: JSON.stringify({
+          question: text,
+          ...(attachedDeck
+            ? {
+                deck:
+                  attachedDeck.type === 'saved'
+                    ? { deckId: attachedDeck.deckId }
+                    : { text: attachedDeck.text },
+              }
+            : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
+      setDeckWarnings(data.deckWarnings || []);
       setHistory(prev => [{ question: text, answer: data.answer }, ...prev].slice(0, 5));
       setQuestion('');
     } catch (e) {
@@ -53,16 +70,149 @@ export default function AskPage() {
     }
   };
 
+  const openPanel = async () => {
+    setPanelOpen(true);
+    if (savedDecks === null) {
+      try {
+        const res = await fetch(`/api/hubs/${hub.id}/decks`);
+        const data = await res.json();
+        setSavedDecks(res.ok && Array.isArray(data) ? data : []);
+      } catch {
+        setSavedDecks([]);
+      }
+    }
+  };
+
+  const attachSaved = (d) => {
+    setAttachedDeck({ type: 'saved', deckId: d.id, title: d.title, cardCount: d.cardCount });
+    setDeckWarnings([]);
+    setPanelOpen(false);
+  };
+
+  const attachPasted = () => {
+    const text = pasteText.trim();
+    if (!text) return;
+    setAttachedDeck({ type: 'text', text });
+    setDeckWarnings([]);
+    setPanelOpen(false);
+  };
+
+  const removeDeck = () => {
+    setAttachedDeck(null);
+    setDeckWarnings([]);
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-white mb-0.5">Ask the Meta</h3>
         <p className="text-sm text-gray-400">
           Ask questions about your team's data — matchup win rates, primers, and meta reports are all in context.
+          Attach a deck to ask about a specific list.
         </p>
       </div>
 
       <LlmBudgetBar hubId={hub.id} />
+
+      <div className="space-y-2">
+        {!attachedDeck && (
+          <button
+            type="button"
+            onClick={() => (panelOpen ? setPanelOpen(false) : openPanel())}
+            className="text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06] transition-colors"
+          >
+            📎 Attach a deck
+          </button>
+        )}
+
+        {attachedDeck && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/[0.08] text-violet-200">
+              🃏 {attachedDeck.type === 'saved'
+                ? `${attachedDeck.title}${attachedDeck.cardCount ? ` · ${attachedDeck.cardCount} cards` : ''}`
+                : 'Pasted list'}
+              <button
+                type="button"
+                onClick={removeDeck}
+                aria-label="Remove attached deck"
+                className="text-violet-300 hover:text-white"
+              >
+                ✕
+              </button>
+            </span>
+            <span className="text-xs text-gray-500">Attached to every question until removed</span>
+          </div>
+        )}
+
+        {deckWarnings.length > 0 && (
+          <p className="text-xs text-amber-400">
+            {deckWarnings.length} deck line{deckWarnings.length > 1 ? 's' : ''} not recognized: {deckWarnings.join('; ')}
+          </p>
+        )}
+
+        {panelOpen && !attachedDeck && (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+            <div className="flex gap-2">
+              {[['saved', 'Saved decks'], ['paste', 'Paste a list']].map(([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setPanelTab(tab)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    panelTab === tab
+                      ? 'border-violet-500/50 bg-violet-500/[0.12] text-violet-200'
+                      : 'border-white/10 text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {panelTab === 'saved' && (
+              <div className="max-h-56 overflow-y-auto space-y-1">
+                {savedDecks === null && <p className="text-xs text-gray-500">Loading decks…</p>}
+                {savedDecks?.length === 0 && (
+                  <p className="text-xs text-gray-500">No saved decks in this hub yet — try pasting a list instead.</p>
+                )}
+                {savedDecks?.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => attachSaved(d)}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] transition-colors"
+                  >
+                    <span className="text-sm text-gray-200">{d.title}</span>
+                    <span className="text-xs text-gray-500 ml-2">
+                      {d.cardCount} cards · {d.user?.email}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {panelTab === 'paste' && (
+              <div className="space-y-2">
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder={'4 Be Prepared\n3 Mickey Mouse - Brave Little Tailor\n…'}
+                  rows={6}
+                  className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm font-mono resize-none focus:border-violet-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={attachPasted}
+                  disabled={!pasteText.trim()}
+                  className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                >
+                  Attach list
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <form onSubmit={(e) => { e.preventDefault(); ask(); }} className="space-y-3">
         <textarea
