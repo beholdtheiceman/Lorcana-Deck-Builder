@@ -295,15 +295,26 @@ export function summarizeNamedCards(pairs) {
 /**
  * Extract name+count pairs from a saved Deck row's `data` JSON
  * ({ entries: { [key]: { card, count } } }). Malformed entries are skipped.
+ *
+ * The app stores a card's subtitle separately from its base name (`card.name`
+ * = "Mickey Mouse", `card.subname`/`card.version` = "Brave Little Tailor") —
+ * only the UI joins them for display. The oracle indexes cards by their full
+ * "Name - Subtitle" (falling back to the bare name only when no other card
+ * shares it), so a bare-name lookup can silently match the wrong printing
+ * when a character has multiple versions. Recombine here so resolution sees
+ * the same full name the UI shows the user.
  */
 export function namedPairsFromDeckData(data) {
   const entries = data?.entries;
   if (!entries || typeof entries !== "object") return [];
   const pairs = [];
   for (const e of Object.values(entries)) {
-    const name = e?.card?.name;
+    const card = e?.card;
     const count = Number(e?.count) || 0;
-    if (name && count > 0) pairs.push({ name, count });
+    if (!card?.name || count <= 0) continue;
+    const subtitle = card.subname || card.version || card._raw?.version || null;
+    const name = subtitle && !card.name.includes(" - ") ? `${card.name} - ${subtitle}` : card.name;
+    pairs.push({ name, count });
   }
   return pairs;
 }

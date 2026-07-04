@@ -211,4 +211,28 @@ describe('namedPairsFromDeckData', () => {
       })
     ).toEqual([])
   })
+
+  it('recombines a base name + subname into "Name - Subname" (saved decks store them separately)', () => {
+    const data = {
+      entries: {
+        k1: { card: { name: 'Mickey Mouse', subname: 'Brave Little Tailor' }, count: 3 },
+      },
+    }
+    expect(namedPairsFromDeckData(data)).toEqual([
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 3 },
+    ])
+  })
+
+  it('falls back to card.version when subname is absent, and does not double-append an already-combined name', () => {
+    const data = {
+      entries: {
+        k1: { card: { name: 'Elsa', version: 'Snow Queen' }, count: 1 },
+        k2: { card: { name: 'Mickey Mouse - Brave Little Tailor' }, count: 2 },
+      },
+    }
+    expect(namedPairsFromDeckData(data)).toEqual([
+      { name: 'Elsa - Snow Queen', count: 1 },
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 2 },
+    ])
+  })
 })
