@@ -261,6 +261,53 @@ export function collectOpponentRevealed(game) {
   return [...seen.values()];
 }
 
+/**
+ * Summarize a deck given as name+count pairs (saved-deck entries or a parsed
+ * pasted list). Names resolve through the oracle; resolved cards are expanded
+ * to their oracle ids and fed through summarizeDecklist so all profile math
+ * and rendering stay in one place. Unresolved names with an explicit count
+ * stay in the deck via the unknown-id path; count-less lines that don't
+ * resolve are dropped — they're section headers, not cards.
+ *
+ * @param {Array<{name:string, count:number, implicit?:boolean}>} pairs
+ * @returns {{summary: object|null, warnings: string[]}}
+ */
+export function summarizeNamedCards(pairs) {
+  const ids = [];
+  const warnings = [];
+  for (const { name, count, implicit } of pairs ?? []) {
+    if (!name || !Number.isFinite(count) || count < 1) continue;
+    const card = getByName(name);
+    if (!card) {
+      if (implicit) {
+        warnings.push(`Skipped line: "${name}"`);
+        continue;
+      }
+      warnings.push(`Card not found: "${name}"`);
+      for (let i = 0; i < count; i++) ids.push(name);
+      continue;
+    }
+    for (let i = 0; i < count; i++) ids.push(card.id);
+  }
+  return { summary: summarizeDecklist(ids), warnings };
+}
+
+/**
+ * Extract name+count pairs from a saved Deck row's `data` JSON
+ * ({ entries: { [key]: { card, count } } }). Malformed entries are skipped.
+ */
+export function namedPairsFromDeckData(data) {
+  const entries = data?.entries;
+  if (!entries || typeof entries !== "object") return [];
+  const pairs = [];
+  for (const e of Object.values(entries)) {
+    const name = e?.card?.name;
+    const count = Number(e?.count) || 0;
+    if (name && count > 0) pairs.push({ name, count });
+  }
+  return pairs;
+}
+
 /** Render the "--- OPPONENT REVEALED CARDS ---" section, or null when empty. */
 export function renderOpponentSection(revealed) {
   if (!Array.isArray(revealed) || revealed.length === 0) return null;

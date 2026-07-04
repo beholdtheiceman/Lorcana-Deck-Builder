@@ -7,6 +7,8 @@ import {
   renderDeckSection,
   collectOpponentRevealed,
   renderOpponentSection,
+  summarizeNamedCards,
+  namedPairsFromDeckData,
 } from '../../api/_lib/deckContext.js'
 import { getById } from '../../api/_lib/cards.js'
 
@@ -133,5 +135,80 @@ describe('collectOpponentRevealed / renderOpponentSection', () => {
   it('returns null / [] on games with no events', () => {
     expect(collectOpponentRevealed({})).toEqual([])
     expect(renderOpponentSection([])).toBeNull()
+  })
+})
+
+describe('summarizeNamedCards', () => {
+  it('resolves names, aggregates counts, and reports no warnings for clean input', () => {
+    const { summary, warnings } = summarizeNamedCards([
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 3 },
+    ])
+    expect(warnings).toEqual([])
+    expect(summary.totalCards).toBe(3)
+    expect(summary.cards).toHaveLength(1)
+    expect(summary.cards[0].card.name).toBe('Mickey Mouse - Brave Little Tailor')
+    expect(summary.cards[0].count).toBe(3)
+    expect(summary.colors).toContain('Ruby')
+  })
+
+  it('keeps explicit-count unknown names in the deck as unresolved, with a warning', () => {
+    const { summary, warnings } = summarizeNamedCards([
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 1 },
+      { name: 'Totally Fake Card', count: 2 },
+    ])
+    expect(warnings).toEqual(['Card not found: "Totally Fake Card"'])
+    expect(summary.totalCards).toBe(3)
+    expect(summary.unknownIds).toEqual(['Totally Fake Card'])
+  })
+
+  it('drops implicit (count-less) unresolved lines with a warning', () => {
+    const { summary, warnings } = summarizeNamedCards([
+      { name: 'Ruby / Sapphire Midrange', count: 1, implicit: true },
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 4 },
+    ])
+    expect(warnings).toEqual(['Skipped line: "Ruby / Sapphire Midrange"'])
+    expect(summary.totalCards).toBe(4)
+    expect(summary.unknownIds).toEqual([])
+  })
+
+  it('resolves implicit lines that ARE real card names as count 1', () => {
+    const { summary, warnings } = summarizeNamedCards([
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 1, implicit: true },
+    ])
+    expect(warnings).toEqual([])
+    expect(summary.totalCards).toBe(1)
+  })
+
+  it('returns null summary when nothing resolves', () => {
+    const { summary, warnings } = summarizeNamedCards([
+      { name: 'Header Line', count: 1, implicit: true },
+    ])
+    expect(summary).toBeNull()
+    expect(warnings).toHaveLength(1)
+  })
+})
+
+describe('namedPairsFromDeckData', () => {
+  it('maps deck data entries to name+count pairs', () => {
+    const data = {
+      entries: {
+        k1: { card: { name: 'Mickey Mouse - Brave Little Tailor' }, count: 4 },
+        k2: { card: { name: 'Some Other Card' }, count: 2 },
+      },
+    }
+    expect(namedPairsFromDeckData(data)).toEqual([
+      { name: 'Mickey Mouse - Brave Little Tailor', count: 4 },
+      { name: 'Some Other Card', count: 2 },
+    ])
+  })
+
+  it('skips malformed entries and handles missing data', () => {
+    expect(namedPairsFromDeckData(null)).toEqual([])
+    expect(namedPairsFromDeckData({})).toEqual([])
+    expect(
+      namedPairsFromDeckData({
+        entries: { a: { card: {}, count: 3 }, b: { card: { name: 'X' }, count: 0 }, c: null },
+      })
+    ).toEqual([])
   })
 })
