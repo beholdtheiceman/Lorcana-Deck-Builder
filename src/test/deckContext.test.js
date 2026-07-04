@@ -55,6 +55,13 @@ describe('renderDeckSection', () => {
   it('returns null when there is no summary', () => {
     expect(renderDeckSection(null)).toBeNull()
   })
+
+  it('accepts a custom section title', () => {
+    const s = summarizeDecklist(['1-1'])
+    const text = renderDeckSection(s, 'ATTACHED DECK: My Ruby List')
+    expect(text).toContain('--- ATTACHED DECK: My Ruby List (1 cards) ---')
+    expect(text).not.toContain('YOUR DECK')
+  })
 })
 
 describe('summarizeDecklist — id↔name evidence cross-checking', () => {

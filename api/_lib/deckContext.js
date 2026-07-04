@@ -165,10 +165,10 @@ export function summarizeDecklist(decklist, evidence) {
  * Compact one-line-per-card format; full card text lives in the shared
  * card-oracle glossary (deck ids are merged into it by the caller).
  */
-export function renderDeckSection(summary) {
+export function renderDeckSection(summary, title = "YOUR DECK") {
   if (!summary) return null;
   const out = [];
-  out.push(`--- YOUR DECK (${summary.totalCards} cards) ---`);
+  out.push(`--- ${title} (${summary.totalCards} cards) ---`);
 
   const profile = [];
   if (summary.colors.length) profile.push(`Inks: ${summary.colors.join("/")}`);
