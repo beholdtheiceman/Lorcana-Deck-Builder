@@ -5,6 +5,12 @@ import { withAuth } from "../../_lib/withAuth.js";
 import { readJson } from "../../_lib/http.js";
 import { requireHubMember } from "../../_lib/hubAuth.js";
 import { getBudgetStatus, recordUsage } from "../../_lib/llmBudget.js";
+import {
+  summarizeNamedCards,
+  namedPairsFromDeckData,
+  renderDeckSection,
+} from "../../_lib/deckContext.js";
+import { parseDeckText, MAX_DECK_TEXT_CHARS } from "../../_lib/deckTextParse.js";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 1500;
@@ -12,6 +18,12 @@ const MAX_CONTEXT_CHARS = 50000;
 
 const AskSchema = z.object({
   question: z.string().min(1).max(1000),
+  deck: z
+    .union([
+      z.object({ deckId: z.string().min(1) }),
+      z.object({ text: z.string().min(1).max(MAX_DECK_TEXT_CHARS) }),
+    ])
+    .optional(),
 });
 
 const SYSTEM_PROMPT =
@@ -53,7 +65,49 @@ export default withAuth(async (req, res, session) => {
   const body = req.body ?? (await readJson(req));
   const parsed = AskSchema.safeParse(body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
-  const { question } = parsed.data;
+  const { question, deck } = parsed.data;
+
+  // Resolve the optional attached deck to a rendered prompt section before
+  // anything expensive — every failure here must return without an LLM call.
+  let deckSection = null;
+  let deckWarnings = [];
+  if (deck) {
+    let pairs;
+    let deckLabel;
+    if ("deckId" in deck) {
+      const deckRow = await prisma.deck.findUnique({
+        where: { id: deck.deckId },
+        select: { title: true, data: true, userId: true },
+      });
+      if (!deckRow) return res.status(404).json({ error: "Deck not found" });
+      // The deck must belong to someone in this hub (owner or member).
+      const inHub = await prisma.hub.findFirst({
+        where: {
+          id: hubId,
+          OR: [{ ownerId: deckRow.userId }, { members: { some: { userId: deckRow.userId } } }],
+        },
+        select: { id: true },
+      });
+      if (!inHub) return res.status(403).json({ error: "That deck does not belong to this hub" });
+      pairs = namedPairsFromDeckData(deckRow.data);
+      deckLabel = deckRow.title;
+    } else {
+      const parsedText = parseDeckText(deck.text);
+      if (parsedText.error) return res.status(400).json({ error: parsedText.error });
+      pairs = parsedText.pairs;
+      deckLabel = "Pasted list";
+    }
+
+    const { summary, warnings } = summarizeNamedCards(pairs);
+    deckWarnings = warnings;
+    if (!summary) {
+      return res.status(400).json({
+        error: "No cards in that deck list could be recognized.",
+        deckWarnings,
+      });
+    }
+    deckSection = renderDeckSection(summary, `ATTACHED DECK: ${deckLabel}`);
+  }
 
   const [recentGames, recentReports, primers] = await Promise.all([
     prisma.playtestGame.findMany({
@@ -81,14 +135,18 @@ export default withAuth(async (req, res, session) => {
     context = context.slice(0, MAX_CONTEXT_CHARS) + "\n…[context truncated]";
   }
 
-  const userMessage = `Question: ${question}\n\n=== TEAM DATA ===\n${context}`;
+  const deckPart = deckSection ? `${deckSection}\n\n` : "";
+  const userMessage = `Question: ${question}\n\n${deckPart}=== TEAM DATA ===\n${context}`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
     temperature: 0.3,
-    system: SYSTEM_PROMPT,
+    system: deckSection
+      ? SYSTEM_PROMPT +
+        " A deck list is attached to this question; treat the question as being about that deck unless it says otherwise."
+      : SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   });
 
@@ -100,7 +158,10 @@ export default withAuth(async (req, res, session) => {
     .join("")
     .trim();
 
-  return res.status(200).json({ answer });
+  return res.status(200).json({
+    answer,
+    ...(deckWarnings.length > 0 ? { deckWarnings } : {}),
+  });
 });
 
 function buildContext(games, reports, primers) {
