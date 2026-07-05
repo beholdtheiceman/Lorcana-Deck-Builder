@@ -62,7 +62,7 @@ import {
 //   - "cards": deck-name header + the cards-by-type grid only.
 //   - "info": stats, charts, tournament results, and every action button.
 //   - undefined/omitted (default): renders both, exactly as before.
-export default function DeckPresentationView({ deck, allCards, onSave, onGenerateImage, toast, onEditInLab, mobileSection }) {
+export default function DeckPresentationView({ deck, allCards, onSave, onGenerateImage, toast, onEditInLab, mobileSection, onAdjustCount }) {
   const showCardsSection = mobileSection == null || mobileSection === 'cards';
   const showInfoSection = mobileSection == null || mobileSection === 'info';
   const [deckName, setDeckName] = useState(deck.name || "Untitled Deck");
@@ -621,9 +621,31 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         </div>
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
+                            {onAdjustCount ? (
+                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, -1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  aria-label={`Remove one ${e.card.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="text-sm font-bold tracking-tight tabular-nums w-4 text-center">{e.count}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, 1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  aria-label={`Add one ${e.card.name}`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                                {e.count}
+                              </div>
+                            )}
                             <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
                           </div>
                         </div>
@@ -686,9 +708,31 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         </div>
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
+                            {onAdjustCount ? (
+                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, -1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  aria-label={`Remove one ${e.card.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="text-sm font-bold tracking-tight tabular-nums w-4 text-center">{e.count}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, 1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  aria-label={`Add one ${e.card.name}`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                                {e.count}
+                              </div>
+                            )}
                             <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
                           </div>
                         </div>
@@ -751,9 +795,31 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         </div>
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
+                            {onAdjustCount ? (
+                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, -1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  aria-label={`Remove one ${e.card.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="text-sm font-bold tracking-tight tabular-nums w-4 text-center">{e.count}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, 1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  aria-label={`Add one ${e.card.name}`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                                {e.count}
+                              </div>
+                            )}
                             <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
                           </div>
                         </div>
@@ -816,9 +882,31 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         </div>
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
+                            {onAdjustCount ? (
+                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, -1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  aria-label={`Remove one ${e.card.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="text-sm font-bold tracking-tight tabular-nums w-4 text-center">{e.count}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, 1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  aria-label={`Add one ${e.card.name}`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                                {e.count}
+                              </div>
+                            )}
                             <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
                           </div>
                         </div>
@@ -881,9 +969,31 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         </div>
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
+                            {onAdjustCount ? (
+                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, -1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  aria-label={`Remove one ${e.card.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="text-sm font-bold tracking-tight tabular-nums w-4 text-center">{e.count}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustCount(e.card, 1)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  aria-label={`Add one ${e.card.name}`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                                {e.count}
+                              </div>
+                            )}
                             <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
                           </div>
                         </div>

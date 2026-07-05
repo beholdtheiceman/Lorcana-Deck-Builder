@@ -6430,8 +6430,10 @@ useEffect(() => {
   </div>
 </div>
 
-{/* Floating Filter Button */}
-<div className="fixed bottom-6 right-6 z-50">
+{/* Floating Filter Button — desktop only. Below lg this duplicates the
+    "Filters" button already in the toolbar, and its fixed position collides
+    with the mobile Cards/Deck bottom tab bar. */}
+<div className="hidden lg:block fixed bottom-6 right-6 z-50">
   <button
     onClick={() => filterDispatch({ type: "TOGGLE_PANEL" })}
     className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 rounded-full shadow-lg border-2 border-emerald-500 text-white font-bold text-lg transition-all hover:scale-110"
@@ -6734,6 +6736,7 @@ useEffect(() => {
         onGenerateImage={generateDeckImage}
         toast={addToast}
         mobileSection={mobileDeckSection}
+        onAdjustCount={(card, delta) => handleAdd(card, delta)}
       />
     </div>
   </div>
