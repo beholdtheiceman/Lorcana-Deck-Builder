@@ -4558,6 +4558,31 @@ function PrintableSheet({ deck, onClose }) {
   );
 }
 
+// Normalize card types to handle Songs and other subtypes consistently.
+// Shared at module scope so every component (DeckPresentationPopup, AppInner's
+// generateDeckImage, etc.) sees the same definition instead of relying on a
+// per-component closure that isn't in scope elsewhere.
+function normalizedType(card) {
+  const rawType =
+    card.type ||
+    card._raw?.type ||
+    card._raw?.type_line ||
+    "";
+
+  const sub = (card.subtypes || card._raw?.subtypes || []).map(String);
+  const kws = (card.keywords || card._raw?.keywords || []).map(String);
+
+  const hay = `${rawType} ${sub.join(" ")} ${kws.join(" ")}`.toLowerCase();
+
+  // Many feeds mark Songs as Action + Song (subtype/keyword/type_line)
+  if (hay.includes("song")) return "Song";
+  if (hay.includes("character")) return "Character";
+  if (hay.includes("item")) return "Item";
+  if (hay.includes("location")) return "Location";
+  if (hay.includes("action")) return "Action";
+  return card.type || "Other";
+}
+
 // Deck Presentation Popup ----------------------------------------------------
 
 function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
@@ -4567,31 +4592,9 @@ function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
   const [loadingHubs, setLoadingHubs] = useState(false);
   const [savingToHub, setSavingToHub] = useState(false);
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
-  
+
   // Lorcanito export constants and functions
   const GROUP_ORDER = ["Character", "Action", "Song", "Item", "Location"];
-
-  // Normalize card types to handle Songs and other subtypes consistently
-  function normalizedType(card) {
-    const rawType =
-      card.type ||
-      card._raw?.type ||
-      card._raw?.type_line ||
-      "";
-
-    const sub = (card.subtypes || card._raw?.subtypes || []).map(String);
-    const kws = (card.keywords || card._raw?.keywords || []).map(String);
-
-    const hay = `${rawType} ${sub.join(" ")} ${kws.join(" ")}`.toLowerCase();
-
-    // Many feeds mark Songs as Action + Song (subtype/keyword/type_line)
-    if (hay.includes("song")) return "Song";
-    if (hay.includes("character")) return "Character";
-    if (hay.includes("item")) return "Item";
-    if (hay.includes("location")) return "Location";
-    if (hay.includes("action")) return "Action";
-    return card.type || "Other";
-  }
 
   function groupAndSortForText(entries) {
     try {
