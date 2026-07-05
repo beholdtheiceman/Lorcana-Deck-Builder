@@ -96,7 +96,7 @@ function AppLayout() {
   // this same provider once it mounts under /builder.
   return (
     <ToastProvider>
-      <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-gray-950 to-black text-gray-100">
+      <div className="min-h-screen overflow-x-clip bg-gradient-to-b from-gray-950 to-black text-gray-100">
         <TopNav />
         <div className="mx-auto max-w-7xl px-4 py-6">
           <Outlet />
