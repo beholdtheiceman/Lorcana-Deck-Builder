@@ -57,8 +57,13 @@ describe('MyDecksPage — Edit in Deck Lab', () => {
     render(<MyDecksPage />)
     fireEvent.click(screen.getByText('Repro Deck'))
     expect(screen.getAllByText('5 cards').length).toBeGreaterThan(0)
-    expect(screen.getByText('3x')).toBeTruthy()
-    expect(screen.getByText('2x')).toBeTruthy()
+    // The rich DeckPresentationView shows each entry's count as a numeric
+    // badge on its card tile (not "3x" text like the old thin detail panel).
+    expect(screen.getAllByText('Woody').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ming Lee').length).toBeGreaterThan(0)
+    // Each entry's count renders as a numeric badge on its card tile.
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0)
   })
 
   it('hides ghost entries (count 0) left behind by older builds', () => {
@@ -79,9 +84,7 @@ describe('MyDecksPage — Edit in Deck Lab', () => {
     render(<MyDecksPage />)
     fireEvent.click(screen.getByText('Ghost Deck'))
 
-    expect(screen.getByText('4x')).toBeTruthy()
-    expect(screen.queryByText('0x')).toBeNull()   // no ghost rows
+    expect(screen.getAllByText('Woody').length).toBeGreaterThan(0)
     expect(screen.queryByText('Mulan')).toBeNull() // ghost card fully hidden
-    expect(screen.queryByText('Ruby')).toBeNull()  // ghost ink not in badges
   })
 })

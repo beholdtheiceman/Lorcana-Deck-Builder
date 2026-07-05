@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { LS_KEYS, loadLS, saveLS } from '../lib/storage.js'
+import { fetchAllCards } from '../lib/cardsApi.js'
+import { generateDeckImagePNG } from '../lib/deckImage.js'
+import { useToasts } from '../App.jsx'
+import DeckPresentationView from '../components/DeckPresentationView.jsx'
 
 const INK_COLORS = {
   Amber: '#F59E0B',
@@ -11,8 +15,6 @@ const INK_COLORS = {
   Sapphire: '#3B82F6',
   Steel: '#6B7280',
 }
-
-const TYPE_ORDER = ['Character', 'Action', 'Song', 'Item', 'Location', 'Other']
 
 function getCardInks(card) {
   const raw = card.ink || card.inks || card.color || ''
@@ -35,45 +37,9 @@ function getDeckInks(deck) {
   return [...inkSet]
 }
 
-function getCardType(card) {
-  const t = card.type || ''
-  if (t.includes('Song')) return 'Song'
-  if (t.includes('Action')) return 'Action'
-  if (t.includes('Character')) return 'Character'
-  if (t.includes('Item')) return 'Item'
-  if (t.includes('Location')) return 'Location'
-  return 'Other'
-}
-
-function groupEntriesByType(deck) {
-  const groups = {}
-  for (const entry of liveEntries(deck)) {
-    const type = getCardType(entry.card)
-    if (!groups[type]) groups[type] = []
-    groups[type].push(entry)
-  }
-  for (const type in groups) {
-    groups[type].sort((a, b) => {
-      const costDiff = (a.card.cost ?? 0) - (b.card.cost ?? 0)
-      return costDiff !== 0 ? costDiff : (a.card.name || '').localeCompare(b.card.name || '')
-    })
-  }
-  return groups
-}
-
 function formatDate(ts) {
   if (!ts) return null
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function InkDot({ ink }) {
-  return (
-    <span
-      className="w-2.5 h-2.5 rounded-full inline-block"
-      style={{ backgroundColor: INK_COLORS[ink] ?? '#6B7280' }}
-      title={ink}
-    />
-  )
 }
 
 function InkBadge({ ink, small }) {
@@ -90,8 +56,16 @@ function InkBadge({ ink, small }) {
 export default function MyDecksPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { addToast } = useToasts()
   const [decks, setDecks] = useState([])
   const [selectedId, setSelectedId] = useState(null)
+
+  // The full card catalog is only needed once a deck's rich presentation is
+  // shown, so fetch it lazily the first time a deck is opened rather than
+  // eagerly on page load.
+  const [allCards, setAllCards] = useState([])
+  const [loadingCards, setLoadingCards] = useState(false)
+  const cardsRequestedRef = React.useRef(false)
 
   useEffect(() => {
     const parsed = loadLS(LS_KEYS.DECKS, null)
@@ -105,10 +79,42 @@ export default function MyDecksPage() {
 
   const selectedDeck = decks.find(d => d.id === selectedId) ?? null
 
+  useEffect(() => {
+    if (!selectedDeck || cardsRequestedRef.current) return
+    cardsRequestedRef.current = true
+    setLoadingCards(true)
+    fetchAllCards()
+      .then(cards => setAllCards(cards || []))
+      .catch(err => {
+        console.error('[MyDecksPage] Failed to load card catalog:', err)
+        addToast?.('Failed to load card data for deck preview.', 'error')
+      })
+      .finally(() => setLoadingCards(false))
+  }, [selectedDeck, addToast])
+
   function handleEdit(deck) {
     // Must round-trip through the builder's loadLS (JSON.parse) — see myDecksEdit.test.jsx
     saveLS(LS_KEYS.CURRENT_DECK_ID, deck.id)
     navigate('/builder')
+  }
+
+  function handleSaveDeck(customDeckName) {
+    if (!selectedDeck) return
+    const finalName = customDeckName || selectedDeck.name || 'Untitled Deck'
+    const updatedDeck = { ...selectedDeck, name: finalName, updatedAt: Date.now() }
+    const allDecks = loadLS(LS_KEYS.DECKS, {}) || {}
+    allDecks[updatedDeck.id] = updatedDeck
+    saveLS(LS_KEYS.DECKS, allDecks)
+    setDecks(prev => prev.map(d => (d.id === updatedDeck.id ? updatedDeck : d)))
+    addToast?.(`Deck "${finalName}" saved.`, 'success')
+  }
+
+  // DeckPresentationView doesn't import the image-generation logic itself —
+  // it just awaits whatever onGenerateImage prop it's given (same pattern as
+  // the Deck Lab's docked panel in App.jsx). Here there's no AppInner wrapper
+  // to reuse, so call the pure generateDeckImagePNG helper directly.
+  function handleGenerateImage() {
+    return generateDeckImagePNG(selectedDeck, allCards, { username: user?.email })
   }
 
   if (decks.length === 0) {
@@ -127,11 +133,20 @@ export default function MyDecksPage() {
   }
 
   return (
-    <div className="flex gap-6 items-start">
-      {/* Left: deck list */}
-      <div className={selectedDeck ? 'w-72 shrink-0' : 'w-full'}>
+    <div className={selectedDeck ? 'flex flex-col lg:flex-row gap-6 lg:items-start' : 'flex gap-6 items-start'}>
+      {/* Left: deck list. Below lg, a selected deck's list collapses into a
+          horizontally-scrollable strip above the presentation instead of a
+          fixed-width column squeezed beside it — there's no room for
+          side-by-side at mobile widths. */}
+      <div className={selectedDeck ? 'lg:w-72 lg:shrink-0' : 'w-full'}>
         <h1 className="text-xl font-bold text-white mb-4">My Decks</h1>
-        <div className={selectedDeck ? 'flex flex-col gap-3' : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4'}>
+        <div
+          className={
+            selectedDeck
+              ? 'flex flex-row gap-3 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0'
+              : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4'
+          }
+        >
           {decks.map(deck => {
             const inks = getDeckInks(deck)
             const isSelected = deck.id === selectedId
@@ -141,6 +156,8 @@ export default function MyDecksPage() {
                 key={deck.id}
                 onClick={() => setSelectedId(isSelected ? null : deck.id)}
                 className={`text-left rounded-xl border p-4 transition-all ${
+                  selectedDeck ? 'w-48 shrink-0 lg:w-full' : ''
+                } ${
                   isSelected
                     ? 'border-violet-500 bg-violet-900/20'
                     : 'border-gray-800 bg-gray-900/60 hover:border-gray-600 hover:bg-gray-900'
@@ -162,109 +179,46 @@ export default function MyDecksPage() {
         </div>
       </div>
 
-      {/* Right: deck detail */}
-      {selectedDeck && (() => {
-        const groups = groupEntriesByType(selectedDeck)
-        const inks = getDeckInks(selectedDeck)
-        return (
-          <div className="flex-1 min-w-0">
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-bold text-white truncate">
-                    {selectedDeck.name || 'Untitled Deck'}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-400">
-                    <span>{selectedDeck.total ?? 0} cards</span>
-                    {formatDate(selectedDeck.updatedAt ?? selectedDeck.createdAt) && (
-                      <span>Updated {formatDate(selectedDeck.updatedAt ?? selectedDeck.createdAt)}</span>
-                    )}
-                    {selectedDeck._dbId && (
-                      <span className="text-emerald-400">☁ Cloud saved</span>
-                    )}
-                  </div>
-                  {inks.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {inks.map(ink => <InkBadge key={ink} ink={ink} />)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => setSelectedId(null)}
-                    className="px-3 py-2 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg text-sm transition-colors"
-                  >
-                    Close
-                  </button>
-                  <button
-                    onClick={() => handleEdit(selectedDeck)}
-                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Edit in Deck Lab
-                  </button>
-                </div>
-              </div>
-
-              {/* Cards grouped by type */}
-              <div className="space-y-5">
-                {TYPE_ORDER.map(type => {
-                  const entries = groups[type]
-                  if (!entries?.length) return null
-                  const typeTotal = entries.reduce((s, e) => s + e.count, 0)
-                  return (
-                    <div key={type}>
-                      <div className="flex items-center gap-2 mb-2 pb-1 border-b border-gray-800">
-                        <span className="text-sm font-semibold text-gray-200">{type}s</span>
-                        <span className="text-xs text-gray-500">({typeTotal})</span>
-                      </div>
-                      <div className="space-y-1">
-                        {entries.map(entry => {
-                          const cardInks = getCardInks(entry.card)
-                          return (
-                            <div
-                              key={entry.card.id ?? entry.card.name}
-                              className="flex items-center gap-2 text-sm py-0.5"
-                            >
-                              <span className="w-5 text-right text-gray-400 shrink-0 tabular-nums">
-                                {entry.count}x
-                              </span>
-                              {entry.card.cost != null && (
-                                <span className="w-5 h-5 rounded-full bg-gray-800 border border-gray-700 text-xs flex items-center justify-center text-gray-300 shrink-0 tabular-nums">
-                                  {entry.card.cost}
-                                </span>
-                              )}
-                              <span className="text-gray-100 truncate">{entry.card.name}</span>
-                              {entry.card.subtitle && (
-                                <span className="text-gray-500 text-xs truncate hidden sm:inline">
-                                  — {entry.card.subtitle}
-                                </span>
-                              )}
-                              {cardInks.length > 0 && (
-                                <div className="ml-auto flex gap-0.5 shrink-0">
-                                  {cardInks.map(ink => <InkDot key={ink} ink={ink} />)}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Notes */}
-              {selectedDeck.notes && (
-                <div className="mt-5 pt-4 border-t border-gray-800">
-                  <p className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Notes</p>
-                  <p className="text-sm text-gray-300 whitespace-pre-wrap">{selectedDeck.notes}</p>
-                </div>
-              )}
+      {/* Right: deck detail — the same rich presentation used by the Deck
+          Lab's docked panel, shown inline here instead of a thinner summary. */}
+      {selectedDeck && (
+        <div className="flex-1 min-w-0">
+          <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={() => setSelectedId(null)}
+                className="px-3 py-2 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg text-sm transition-colors"
+              >
+                Close
+              </button>
             </div>
+
+            {/* The deck's own entries already carry full card data, so the
+                presentation renders immediately — allCards (used only to
+                re-resolve fresh image URLs for the PNG download) can arrive
+                a beat later without blocking the view. */}
+            {loadingCards && (
+              <div className="text-xs text-gray-500 mb-2">Loading card catalog for image export…</div>
+            )}
+            <DeckPresentationView
+              deck={selectedDeck}
+              allCards={allCards}
+              onSave={handleSaveDeck}
+              onGenerateImage={handleGenerateImage}
+              onEditInLab={() => handleEdit(selectedDeck)}
+              toast={addToast}
+            />
+
+            {/* Notes */}
+            {selectedDeck.notes && (
+              <div className="mt-5 pt-4 border-t border-gray-800">
+                <p className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Notes</p>
+                <p className="text-sm text-gray-300 whitespace-pre-wrap">{selectedDeck.notes}</p>
+              </div>
+            )}
           </div>
-        )
-      })()}
+        </div>
+      )}
     </div>
   )
 }

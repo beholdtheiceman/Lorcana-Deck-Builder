@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, Navigate } from 'react-router-dom'
 import AuthButton from './components/AuthButton'
-import DeckBuilderApp from './App.jsx'
+import DeckBuilderApp, { ToastProvider } from './App.jsx'
 import HubListPage from './pages/HubListPage'
 import HubDetailLayout from './pages/HubDetailLayout'
 import RosterPage from './pages/hub/RosterPage'
@@ -21,49 +22,87 @@ import AskAiPage from './pages/AskAiPage'
 import { useAuth } from './contexts/AuthContext'
 
 function TopNav() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   const linkClass = ({ isActive }) =>
     `px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
       isActive ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-900/40 border-gray-800 text-gray-200 hover:bg-gray-800'
     }`
 
+  const NAV_ITEMS = [
+    { to: '/team-hub', label: 'Team Hub' },
+    { to: '/builder', label: 'Deck Lab' },
+    { to: '/my-decks', label: 'My Decks' },
+    { to: '/ask', label: 'Ask AI' },
+  ]
+
+  const renderNavLinks = () =>
+    NAV_ITEMS.map((item) => (
+      <NavLink key={item.to} to={item.to} className={linkClass} onClick={() => setMobileMenuOpen(false)}>
+        {item.label}
+      </NavLink>
+    ))
+
   return (
     <div className="sticky top-0 z-50 border-b border-gray-800 bg-black/70 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link to="/team-hub" className="flex items-center gap-2 font-semibold text-violet-400">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to="/team-hub" className="flex items-center gap-2 font-semibold text-violet-400 shrink-0">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 shadow-[0_0_14px_-2px_rgba(139,108,255,0.7)] inline-block" aria-hidden="true"></span>
-            Team Lorcana
+            <span className="hidden sm:inline">Team Lorcana</span>
           </Link>
-          <NavLink to="/team-hub" className={linkClass}>
-            Team Hub
-          </NavLink>
-          <NavLink to="/builder" className={linkClass}>
-            Deck Lab
-          </NavLink>
-          <NavLink to="/my-decks" className={linkClass}>
-            My Decks
-          </NavLink>
-          <NavLink to="/ask" className={linkClass}>
-            Ask AI
-          </NavLink>
+          {/* Full nav links — visible from md breakpoint up */}
+          <div className="hidden md:flex items-center gap-3">
+            {renderNavLinks()}
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <AuthButton />
+          {/* Hamburger toggle — mobile/tablet only */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="md:hidden w-9 h-9 shrink-0 rounded-lg bg-gray-900/40 border border-gray-800 text-gray-200 hover:bg-gray-800 transition-colors flex items-center justify-center"
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* Mobile nav drawer — stacked links below the bar */}
+      {mobileMenuOpen && (
+        <div className="md:hidden px-4 pb-3 flex flex-col gap-2 border-t border-gray-800 pt-3">
+          {renderNavLinks()}
+        </div>
+      )}
     </div>
   )
 }
 
 function AppLayout() {
+  // Hoisted here (rather than left wrapping only AppInner's own render) so
+  // every route sharing this layout — including /my-decks, which now renders
+  // DeckPresentationView inline and needs a `toast` prop — shares the same
+  // toast context. AppInner's own useToasts() call still resolves against
+  // this same provider once it mounts under /builder.
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
-      <TopNav />
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <Outlet />
+    <ToastProvider>
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-gray-950 to-black text-gray-100">
+        <TopNav />
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          <Outlet />
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   )
 }
 
