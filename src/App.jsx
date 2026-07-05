@@ -6608,9 +6608,10 @@ useEffect(() => {
     )}
   </div>
 
-  {/* Sticky Deck Panel - Fixed width, sticky to bottom of viewport */}
+  {/* Sticky Deck Panel - own fixed-height scroll region below the header, so
+      scrolling the card grid on the left no longer scrolls this list too. */}
   <div className="hidden lg:block w-96 flex-shrink-0">
-    <div className="sticky bottom-0 border-l border-white/10 bg-gray-950/95 backdrop-blur-sm">
+    <div className="sticky top-16 border-l border-white/10 bg-gray-950/95 backdrop-blur-sm h-[calc(100vh-4rem)] overflow-y-auto">
       <DeckPanel
         deck={deck}
         onSetCount={handleSetCount}
