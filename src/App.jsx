@@ -2170,7 +2170,7 @@ function filterReducer(state, action) {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
+function TopBar({ onResetDeck, onExport, onImport, onPrint, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[#0a0d13]/70 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
       {/* Search bar - always visible */}
@@ -3847,7 +3847,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
 // Deck panel -----------------------------------------------------------------
 
-function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPresentation }) {
+function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
     () => groupBy(entries, (e) => getCost(e.card)),
@@ -3910,13 +3910,6 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
               onClick={onImport}
             >
               Import
-            </button>
-            <button
-              className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition text-sm"
-              onClick={onDeckPresentation}
-              title="View deck presentation with stats and charts"
-            >
-              Present
             </button>
           </div>
         </div>
@@ -5231,11 +5224,6 @@ function AppInner() {
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
-  // Docked "Deck Preview" panel next to the card grid (Deck Lab only). Defaults
-  // to collapsed (slim rail) so it doesn't disrupt the existing card-grid /
-  // deck-panel layout for people who are mid-edit; the Present button (and the
-  // rail itself) toggle it open.
-  const [presentationOpen, setPresentationOpen] = useState(false);
   // Mobile-only (below lg): a persistent two-tab bottom bar replaces the
   // "Present -> full-screen overlay" pattern. "cards" shows the existing
   // search/filter/grid UI (the default), "deck" shows a small header +
@@ -5949,12 +5937,6 @@ async function syncDecksWithCloud() {
   }
 }
 
-function handleDeckPresentation() {
-  // No more separate close button inside a modal — Present (and the panel's
-  // own collapse chevron / collapsed rail) all toggle the same open state.
-  setPresentationOpen((open) => !open);
-}
-
 // Enhanced deck management functions
 function handleNewDeck(name = "Untitled Deck") {
   const newDeck = createNewDeck(name);
@@ -6300,7 +6282,6 @@ useEffect(() => {
             onExport={handleExport}
             onImport={handleImport}
             onPrint={handlePrint}
-            onDeckPresentation={handleDeckPresentation}
             onSaveDeck={handleSaveDeck}
             onToggleFilters={() => filterDispatch({ type: "TOGGLE_PANEL" })}
             searchText={filters?.text || ""}
@@ -6618,7 +6599,6 @@ useEffect(() => {
         onRemove={handleRemove}
         onExport={() => setExportOpen(true)}
         onImport={() => setImportOpen(true)}
-        onDeckPresentation={handleDeckPresentation}
       />
       <DeckStatistics
         entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}
@@ -6632,59 +6612,6 @@ useEffect(() => {
     </div>
   </div>
 
-  {/* Docked Deck Presentation panel (Deck Lab only, desktop). Sits beside the
-      card grid instead of covering it, so people can keep editing while the
-      presentation is open. Collapses to a slim rail when not in use. Below
-      the lg breakpoint there's no room for a side-by-side dock, so this whole
-      block is hidden and replaced by the full-width mobile version below. */}
-  <div className={`hidden lg:block flex-shrink-0 ${presentationOpen ? "w-[380px]" : "w-[46px]"}`}>
-    <div className="sticky top-16 border-l border-white/10 bg-gray-950/95 backdrop-blur-sm h-[calc(100vh-4rem)] flex flex-col">
-      {presentationOpen ? (
-        <>
-          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 shrink-0">
-            <span className="text-sm font-semibold text-gray-200 truncate">
-              {deck?.name || "Untitled Deck"} — Preview
-            </span>
-            <button
-              type="button"
-              onClick={handleDeckPresentation}
-              title="Collapse preview"
-              className="w-7 h-7 shrink-0 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition flex items-center justify-center"
-            >
-              ›
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <DeckPresentationView
-              deck={deck}
-              allCards={allCards}
-              onSave={handleSaveDeck}
-              onGenerateImage={generateDeckImage}
-              toast={addToast}
-            />
-          </div>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={handleDeckPresentation}
-          title="Open deck preview"
-          className="w-full h-full flex flex-col items-center justify-start gap-3 pt-4 text-gray-300 hover:text-white hover:bg-white/5 transition"
-        >
-          <span className="text-lg">‹</span>
-          <span
-            className="text-[11px] font-semibold uppercase tracking-wider text-gray-400"
-            style={{ writingMode: "vertical-rl" }}
-          >
-            Deck Preview
-          </span>
-          <span className="text-[11px] font-semibold text-emerald-300 tabular-nums">
-            {Object.values(deck?.entries || {}).filter((e) => e.count > 0).reduce((sum, e) => sum + e.count, 0)}/60
-          </span>
-        </button>
-      )}
-    </div>
-  </div>
 </div>
 
 {/* Mobile "Deck" tab — dreamborn-style persistent tab switch, not a modal/
