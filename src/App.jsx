@@ -5143,7 +5143,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
 // Deck panel -----------------------------------------------------------------
 
-function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPresentation }) {
+function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPresentation, onSaveDeck }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
     () => groupBy(entries, (e) => getCost(e.card)),
@@ -5206,6 +5206,13 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
               onClick={onImport}
             >
               Import
+            </button>
+            <button
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-emerald-500 to-teal-500 border border-emerald-400/40 text-white shadow-[0_3px_12px_-3px_rgba(52,211,153,0.7)] hover:brightness-110 transition text-sm"
+              onClick={onSaveDeck}
+              title="Save deck to storage"
+            >
+              Save
             </button>
             <button
               className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition text-sm"
@@ -10113,6 +10120,7 @@ useEffect(() => {
         onExport={() => setExportOpen(true)}
         onImport={() => setImportOpen(true)}
         onDeckPresentation={handleDeckPresentation}
+        onSaveDeck={() => handleSaveDeck()}
       />
       <DeckStatistics
         entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}
@@ -10137,6 +10145,7 @@ useEffect(() => {
       onExport={() => setExportOpen(true)}
       onImport={() => setImportOpen(true)}
       onDeckPresentation={handleDeckPresentation}
+      onSaveDeck={() => handleSaveDeck()}
     />
     <DeckStatistics
       entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}
