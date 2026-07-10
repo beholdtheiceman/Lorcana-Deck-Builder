@@ -10,7 +10,7 @@ import { getSession } from "./auth.js";
  */
 export function withAuth(handler) {
   return async function wrapped(req, res) {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Unauthorized" });
     try {
       return await handler(req, res, session);

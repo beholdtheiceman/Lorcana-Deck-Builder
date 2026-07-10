@@ -14,6 +14,7 @@ export default function PodsTab({ hubId, currentUser }) {
   const [error, setError] = useState('');
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +91,7 @@ export default function PodsTab({ hubId, currentUser }) {
   };
 
   const deletePod = async (id) => {
-    if (!window.confirm('Delete this pod?')) return;
+    setPendingDelete(null);
     const prev = pods;
     setPods((list) => list.filter((p) => p.id !== id));
     try {
@@ -170,7 +171,14 @@ export default function PodsTab({ hubId, currentUser }) {
                   <h5 className="text-gray-100 font-semibold">{pod.name}</h5>
                   <div className="flex gap-2 shrink-0">
                     <button onClick={() => renamePod(pod)} className="text-gray-500 hover:text-violet-300 text-xs">Rename</button>
-                    <button onClick={() => deletePod(pod.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                    {pendingDelete === pod.id ? (
+                      <>
+                        <button onClick={() => deletePod(pod.id)} className="text-red-400 hover:text-red-300 text-xs">Sure?</button>
+                        <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setPendingDelete(pod.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                    )}
                   </div>
                 </div>
 

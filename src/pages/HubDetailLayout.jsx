@@ -1,19 +1,18 @@
 import { useParams, NavLink, Outlet, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Skeleton from '../components/ui/Skeleton'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 const NAV_TABS = [
   { label: 'Home',      path: 'home' },
   { label: 'Roster',    path: 'roster' },
-  { label: 'Pods',      path: 'pods' },
   { label: 'Practices', path: 'practices' },
   { label: 'Events',    path: 'events' },
-  { label: 'Reports',   path: 'reports' },
-  { label: 'Reviews',   path: 'reviews' },
+  { label: 'Meta',      path: 'reports' },
+  { label: 'Replays',   path: 'reviews' },
   { label: 'Primers',   path: 'primers' },
-  { label: 'Playtest',  path: 'playtest' },
-  { label: 'Ask',       path: 'ask' },
+  { label: 'Match Log', path: 'playtest' },
+  { label: 'Ask AI',    path: 'ask' },
 ]
 
 export default function HubDetailLayout() {
@@ -21,8 +20,17 @@ export default function HubDetailLayout() {
   const [hub, setHub] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [copied, setCopied] = useState(false)
   // Get current user from localStorage (same pattern as existing code)
   const user = JSON.parse(localStorage.getItem('user') || 'null')
+
+  const copyInviteLink = useCallback((inviteCode) => {
+    const url = `${window.location.origin}/join?code=${inviteCode}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [])
 
   useEffect(() => {
     fetch(`/api/hubs/${hubId}`)
@@ -55,11 +63,17 @@ export default function HubDetailLayout() {
       {/* Header */}
       <div className="mb-4 pb-4 border-b border-line">
         <h2 className="text-xl font-semibold text-gray-100">{hub.name}</h2>
-        <p className="text-sm text-gray-400 mt-0.5">
+        <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
           {memberCount} member{memberCount !== 1 ? 's' : ''} · Invite:{' '}
           <span className="font-mono bg-bg-overlay px-1.5 py-0.5 rounded text-gray-300">
             {hub.inviteCode}
           </span>
+          <button
+            onClick={() => copyInviteLink(hub.inviteCode)}
+            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+          >
+            {copied ? '✓ Copied!' : 'Copy link'}
+          </button>
         </p>
       </div>
 

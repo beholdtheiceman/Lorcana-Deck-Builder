@@ -64,4 +64,53 @@ export function getByName(name) {
   return byName[normalizeName(name)] || null;
 }
 
-export default { getById, getByName };
+/**
+ * Filtered scan over the full oracle (3k cards — a plain scan is cheap).
+ * All filters are optional and AND together; `name`/`text`/`keyword` are
+ * case-insensitive substring matches.
+ *
+ * @param {object} filters
+ * @param {string} [filters.name]      substring match against card name
+ * @param {string} [filters.color]     substring match against ink color(s)
+ * @param {string} [filters.type]      exact match against type (Character/Item/Action/Location/Song)
+ * @param {string} [filters.keyword]   substring match against a keyword ability (e.g. "Evasive", "Shift")
+ * @param {string} [filters.text]      substring match against oracle/body text
+ * @param {number} [filters.minCost]
+ * @param {number} [filters.maxCost]
+ * @param {number} [filters.limit=15]
+ * @returns {Array<object>} cards (each includes `id`), best-relevance first
+ */
+export function searchCards({ name, color, type, keyword, text, minCost, maxCost, limit = 15 } = {}) {
+  const { map } = loadOnce();
+  const nameNorm = name ? normalizeName(name) : null;
+  const colorNorm = color ? String(color).toLowerCase() : null;
+  const typeNorm = type ? String(type).toLowerCase() : null;
+  const kwNorm = keyword ? normalizeName(keyword) : null;
+  const textNorm = text ? String(text).toLowerCase() : null;
+
+  const results = [];
+  for (const id of Object.keys(map)) {
+    const card = map[id];
+    if (nameNorm && !normalizeName(card.name).includes(nameNorm)) continue;
+    if (colorNorm && !String(card.color || "").toLowerCase().includes(colorNorm)) continue;
+    if (typeNorm && String(card.type || "").toLowerCase() !== typeNorm) continue;
+    if (kwNorm && !(card.keywords || []).some((k) => normalizeName(k).includes(kwNorm))) continue;
+    if (textNorm && !String(card.bodyText || "").toLowerCase().includes(textNorm)) continue;
+    if (minCost != null && (card.cost ?? -1) < minCost) continue;
+    if (maxCost != null && (card.cost ?? Infinity) > maxCost) continue;
+    results.push({ id, ...card });
+  }
+
+  results.sort((a, b) => {
+    if (nameNorm) {
+      const an = normalizeName(a.name) === nameNorm ? 0 : normalizeName(a.name).startsWith(nameNorm) ? 1 : 2;
+      const bn = normalizeName(b.name) === nameNorm ? 0 : normalizeName(b.name).startsWith(nameNorm) ? 1 : 2;
+      if (an !== bn) return an - bn;
+    }
+    return String(a.name).localeCompare(String(b.name));
+  });
+
+  return results.slice(0, Math.max(1, Math.min(limit, 50)));
+}
+
+export default { getById, getByName, searchCards };

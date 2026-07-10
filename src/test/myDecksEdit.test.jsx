@@ -1,0 +1,90 @@
+// Regression test: My Decks "Edit in Deck Lab" must write the current-deck id
+// in the same JSON format the builder reads back via loadLS (JSON.parse).
+// Bug: MyDecksPage wrote the id with raw localStorage.setItem (unquoted), so
+// loadLS threw on JSON.parse, returned null, and the builder opened an empty
+// deck — "the deck disappears".
+import React from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { LS_KEYS, loadLS, saveLS } from '../lib/storage.js'
+import MyDecksPage from '../pages/MyDecksPage.jsx'
+
+const navigateMock = vi.fn()
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => navigateMock,
+}))
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: null }),
+}))
+
+function seedDeck() {
+  const deck = {
+    id: 'deck_123_abc',
+    name: 'Repro Deck',
+    total: 5,
+    createdAt: 1751400000000,
+    updatedAt: 1751400001000,
+    entries: {
+      '13-1': { card: { id: '13-1', name: 'Woody', cost: 4, type: 'Character', ink: 'Amber' }, count: 3 },
+      '13-2': { card: { id: '13-2', name: 'Ming Lee', cost: 3, type: 'Character', ink: 'Amber' }, count: 2 },
+    },
+  }
+  saveLS(LS_KEYS.DECKS, { [deck.id]: deck })
+  return deck
+}
+
+describe('MyDecksPage — Edit in Deck Lab', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    navigateMock.mockClear()
+  })
+
+  it('writes the current deck id so the builder (loadLS) can read it back', () => {
+    const deck = seedDeck()
+    render(<MyDecksPage />)
+
+    // open the detail panel, then click Edit
+    fireEvent.click(screen.getByText('Repro Deck'))
+    fireEvent.click(screen.getByText('Edit in Deck Lab'))
+
+    // the builder reads via loadLS (JSON.parse) — this must round-trip
+    expect(loadLS(LS_KEYS.CURRENT_DECK_ID, null)).toBe(deck.id)
+    expect(navigateMock).toHaveBeenCalledWith('/builder')
+  })
+
+  it('renders saved counts and totals from localStorage', () => {
+    seedDeck()
+    render(<MyDecksPage />)
+    fireEvent.click(screen.getByText('Repro Deck'))
+    expect(screen.getAllByText('5 cards').length).toBeGreaterThan(0)
+    // The rich DeckPresentationView shows each entry's count as a numeric
+    // badge on its card tile (not "3x" text like the old thin detail panel).
+    expect(screen.getAllByText('Woody').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ming Lee').length).toBeGreaterThan(0)
+    // Each entry's count renders as a numeric badge on its card tile.
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0)
+  })
+
+  it('hides ghost entries (count 0) left behind by older builds', () => {
+    // Real-world shape: legacy decks contain entries whose count was set to 0
+    // when a card was removed, but the entry was never deleted.
+    const deck = {
+      id: 'deck_ghosts',
+      name: 'Ghost Deck',
+      total: 4,
+      createdAt: 1751400000000,
+      updatedAt: 1751400001000,
+      entries: {
+        'crd_live': { card: { id: 'crd_live', name: 'Woody', cost: 4, type: 'Character', inks: ['Amber'] }, count: 4 },
+        'crd_ghost': { card: { id: 'crd_ghost', name: 'Mulan', cost: 3, type: 'Character', inks: ['Ruby'] }, count: 0 },
+      },
+    }
+    saveLS(LS_KEYS.DECKS, { [deck.id]: deck })
+    render(<MyDecksPage />)
+    fireEvent.click(screen.getByText('Ghost Deck'))
+
+    expect(screen.getAllByText('Woody').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Mulan')).toBeNull() // ghost card fully hidden
+  })
+})

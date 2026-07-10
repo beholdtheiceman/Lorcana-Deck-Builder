@@ -1,0 +1,189 @@
+import { z } from "zod";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const KNOWLEDGE_DIR = join(__dirname, "../../src/data/agent-knowledge");
+
+export const MODEL = "claude-sonnet-4-6";
+export const MAX_CONTEXT_CHARS = 60000;
+export const MAX_TOKENS = 2000;
+export const PRIMER_MAX_TOKENS = 800;
+
+export const SYSTEM_PROMPT =
+  "You are a Lorcana coach. The context gives you the player's full deck list, the " +
+  "opponent's revealed cards, a card-text oracle, a matchup primer, and the game log. " +
+  "First infer what the player's deck is trying to do — its win condition, key synergies, " +
+  "and role in this matchup (beatdown or control: whoever has the worse late game must be " +
+  "the aggressor) — and judge every decision against that game plan, not in a vacuum. " +
+  "Ground every claim in the provided log, deck list, and card text; never invent card text. " +
+  "Give the flow of the game, not a play-by-play. Identify 2-4 decision points where a " +
+  "different line was stronger, citing the turn. Respect the matchup primer. Where relevant, " +
+  "note cards still in the deck that offered a better out than the line taken.";
+
+export const PRIMER_SYSTEM_PROMPT =
+  "You are a Disney Lorcana competitive expert. Generate concise matchup primers in JSON only.";
+
+/** Shape we expect the review model to return. */
+export const ModelOutSchema = z.object({
+  recap: z.string(),
+  decisionPoints: z
+    .array(
+      z.object({
+        turn: z.union([z.number(), z.string()]).optional(),
+        whatHappened: z.string().optional(),
+        betterLine: z.string().optional(),
+        why: z.string().optional(),
+      })
+    )
+    .default([]),
+  leakTags: z.array(z.string()).default([]),
+});
+
+export function extractJson(text) {
+  if (!text) return null;
+  let t = text.trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  const start = t.indexOf("{");
+  const end = t.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return null;
+  return t.slice(start, end + 1);
+}
+
+export async function callModel(client, userInstruction) {
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    temperature: 0.2,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userInstruction }],
+  });
+  const text = (resp.content || [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+  const usage = resp.usage;
+  const json = extractJson(text);
+  if (!json) return { data: null, usage };
+  let obj;
+  try {
+    obj = JSON.parse(json);
+  } catch {
+    return { data: null, usage };
+  }
+  const validated = ModelOutSchema.safeParse(obj);
+  return { data: validated.success ? validated.data : null, usage };
+}
+
+/** Build the exact user-instruction string for a review generation. */
+export function buildUserInstruction(context) {
+  return (
+    "Using only the context below, write the review as JSON with exactly this shape:\n" +
+    '{ "recap": string, "decisionPoints": [{ "turn": number|string, "whatHappened": string, ' +
+    '"betterLine": string, "why": string }], "leakTags": string[] }\n' +
+    "Return ONLY the JSON object, no prose, no markdown fences.\n\n" +
+    "=== CONTEXT ===\n" +
+    context
+  );
+}
+
+/** Truncate context to MAX_CONTEXT_CHARS, appending a marker when it overflows. */
+export function truncateContext(context) {
+  if (context.length > MAX_CONTEXT_CHARS) {
+    context = context.slice(0, MAX_CONTEXT_CHARS) + "\n…[context truncated]";
+  }
+  return context;
+}
+
+/** Shape we expect the auto-primer model to return. */
+export const AutoPrimerSchema = z.object({
+  deckArchetype: z.string().optional(),
+  vsArchetype: z.string().optional(),
+  verdict: z.string(),
+  confidence: z.string().optional(),
+  gameplan: z.string(),
+  mustKill: z.string().optional(),
+  mistakes: z.string().optional(),
+  keyCards: z.array(z.object({ name: z.string(), note: z.string().optional() })).default([]),
+});
+
+// Per-file cap so a runaway knowledge file can't blow up the primer call.
+const KNOWLEDGE_FILE_CAP = 15000;
+
+/**
+ * Auto-generate a matchup primer using knowledge files + a fast LLM call.
+ * When a deck list / opponent reveals are provided, the model is asked to
+ * identify both archetypes from the actual cards (aligning names with the
+ * knowledge base) instead of trusting the colors-only labels.
+ * Falls back gracefully if files are missing or the model returns bad JSON.
+ *
+ * @param {object} opts
+ * @param {string} opts.deckArchetype   colors-only fallback label, e.g. "Amber/Steel"
+ * @param {string} opts.vsArchetype     colors-only fallback label for the opponent
+ * @param {string} [opts.deckList]      rendered "Nx Card Name" lines for the player's deck
+ * @param {string} [opts.oppRevealed]   rendered card names the opponent showed
+ * @param {import("@anthropic-ai/sdk").default} opts.client
+ * @returns {Promise<{data: object|null, usage: object|null}>}
+ */
+export async function autoGeneratePrimer({ deckArchetype, vsArchetype, deckList, oppRevealed, client }) {
+  let knowledgeSnippet = "";
+  for (const file of ["meta-archetypes.md", "matchup-guide.md"]) {
+    try {
+      const text = readFileSync(join(KNOWLEDGE_DIR, file), "utf8");
+      knowledgeSnippet += `\n\n=== ${file} ===\n${text.slice(0, KNOWLEDGE_FILE_CAP)}`;
+    } catch {
+      // File absent in this environment — skip it.
+    }
+  }
+
+  const prompt =
+    `Matchup (by ink colors): ${deckArchetype} vs ${vsArchetype}\n` +
+    (deckList
+      ? `\nThe player's full deck list:\n${deckList}\n`
+      : "") +
+    (oppRevealed
+      ? `\nCards the opponent revealed this game (partial — their full list is unknown):\n${oppRevealed}\n`
+      : "") +
+    (knowledgeSnippet
+      ? `\nUse the knowledge below to inform your answer.${knowledgeSnippet}\n\n`
+      : "") +
+    "If the deck list matches a known archetype from the knowledge, use that archetype's " +
+    "established name in deckArchetype (same for the opponent from their revealed cards); " +
+    "otherwise use the ink colors plus a style word (e.g. \"Ruby/Sapphire ramp\").\n" +
+    "Return ONLY a JSON object with this exact shape (no prose, no fences):\n" +
+    '{ "deckArchetype": "string", "vsArchetype": "string", ' +
+    '"verdict": "Favored|Even|Unfavored", "confidence": "High|Medium|Low", ' +
+    '"gameplan": "string", "mustKill": "string", "mistakes": "string", ' +
+    '"keyCards": [{ "name": "string", "note": "string" }] }';
+
+  try {
+    const resp = await client.messages.create({
+      model: MODEL,
+      max_tokens: PRIMER_MAX_TOKENS,
+      temperature: 0.1,
+      system: PRIMER_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const text = (resp.content || [])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    const usage = resp.usage;
+    const json = extractJson(text);
+    if (!json) return { data: null, usage };
+    let obj;
+    try {
+      obj = JSON.parse(json);
+    } catch {
+      return { data: null, usage };
+    }
+    const v = AutoPrimerSchema.safeParse(obj);
+    return { data: v.success ? v.data : null, usage };
+  } catch {
+    return { data: null, usage: null };
+  }
+}

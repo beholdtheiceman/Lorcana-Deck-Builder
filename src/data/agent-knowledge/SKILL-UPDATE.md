@@ -37,6 +37,10 @@ You have access to structured knowledge files in the repository. Read these befo
 - `src/data/agent-knowledge/gameplay-heuristics.md` — quest vs. challenge decisions, ink management, curve principles
 - `src/data/agent-knowledge/matchup-guide.md` — detailed matchup breakdowns between major archetypes
 - `src/data/agent-knowledge/set-changelog.md` — meta history by set, format notes
+- `src/data/agent-knowledge/role-theory.md` — who is the beatdown per matchup; how role changes all decision-making
+- `src/data/agent-knowledge/archetype-playbooks.md` — turn-by-turn thinking for each Tier 1 archetype
+- `src/data/agent-knowledge/game-state-evaluation.md` — reading board states, types of advantage, threat priority
+- `src/data/agent-knowledge/synergy-theory.md` — framework for understanding any deck's synergy engine; five synergy types, core loop template, order of operations, how to read unknown decks mid-game
 
 ### Live Card Data
 - `src/data/card-summary.json` — condensed card database (name, cost, ink, type, keywords, abilities)
@@ -71,14 +75,17 @@ Triggered by: "what's the meta", "what's tier 1", "what's good right now", "what
 - Flag that meta shifts with each new set
 
 ### MODE: Gameplay Advice
-Triggered by: "what should I do here", "was this play correct", "how do I sequence this turn", "quest or challenge?"
+Triggered by: "what should I do here", "was this play correct", "how do I sequence this turn", "quest or challenge?", "review this game", "what did I do wrong"
 
-→ Read `gameplay-heuristics.md` and apply the Core Priority Framework to the described situation. Walk through:
-1. Can I win this turn?
-2. Can opponent win next turn?
-3. Lore math on the quest vs. challenge decision
-4. Ink efficiency check
-5. Recommended line of play with explanation
+→ Read `role-theory.md` FIRST to determine the player's role in this matchup (beatdown vs. control). Then read `synergy-theory.md` to identify which synergy type is active this turn and what the correct order of operations is. Then read `game-state-evaluation.md` to assess the board state. Then read `archetype-playbooks.md` for the specific deck's turn-by-turn logic. Finally apply `gameplay-heuristics.md` for specific decisions.
+
+Answer in this order:
+1. What is this deck's role in this matchup? (beatdown / control / tempo)
+2. What synergy type is dominant right now — trigger chain, cost reduction, stat modification, resource generation, or condition creation? What's the correct order of operations?
+3. What does the current board state say? (who's ahead, what kind of ahead)
+4. What does the archetype playbook say to do at this stage of the game?
+5. Apply lore math and ink efficiency to the specific decision
+6. State the recommended line of play — not "quest or challenge" as a binary, but the exact sequence: which trigger fires first, which buff applies before which challenge, what order maximizes value
 
 ### MODE: Tech Recommendations
 Triggered by: "what should I run against X", "what tech is good for Y meta", "what do I add to beat Z"

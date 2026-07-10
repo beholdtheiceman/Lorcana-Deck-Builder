@@ -143,6 +143,52 @@ Before swinging for the win, verify:
 
 ---
 
+## Synergy-Aware Decision Making
+
+_Read synergy-theory.md for the full framework. This section applies it to specific in-game decisions._
+
+### Before ANY Action: Find Your Active Synergy
+
+Before deciding to quest, challenge, or play a card, ask: **"What synergy type is my deck executing this turn?"**
+
+- **Trigger chain turn:** Draw effects FIRST. Resolve all card draw before committing ink or declaring challenges. Every card you draw before acting is more information and potentially more triggers.
+- **Cost reduction turn:** Have the enabler in play BEFORE attempting to deploy the reduced-cost threat. Shift requires the base card in play. Song requires a character of equal/greater cost ready.
+- **Stat modification turn:** Buff BEFORE challenging. "+X strength when you pay 2 or less" must be calculated at challenge declaration time — play the cheap card THEN challenge with the newly-buffed character.
+- **Resource generation turn:** Trigger all draw effects before spending any ink. The card you draw might be the play you make.
+- **Condition creation turn:** Create the condition 1 turn BEFORE executing the payoff. Playing Sid into a full board is wasted because opponent gets optimal "choice." Clear 1–2 characters, THEN Sid.
+
+### The Synergy Order of Operations
+
+Every turn has a correct order. Violating it loses triggers and value:
+
+1. **Draw** — Quest draw characters (Jesse, Woody), fire "on quest" triggers, sing draw songs
+2. **Assess** — With maximum information, decide your play sequence
+3. **Buff** — Play stat-modifying cards before combat (low-cost cards that trigger Babyhead, Jesse shrink effects)
+4. **Combat** — Challenge now that buffs are in effect and you've reduced opponent's "choice" for Sid
+5. **Deploy threats** — Play characters (Sid, Horseman, new threats) into the post-combat board state
+6. **Flood** — Dump free/discounted characters AFTER main plays to maximize board presence
+7. **Quest remaining characters** — Quest everything that's safe after combat and deployment
+8. **Ink** — Set ink only after all actions are confirmed (avoid inking a card you end up needing)
+
+### Identifying the Opponent's Core Loop Mid-Game
+
+When reviewing "what went wrong" or giving advice mid-game:
+
+1. Look at what the opponent has played at 4 copies — that's their key piece
+2. Identify which synergy type is active (trigger chain? condition creation?)
+3. Find their "condition card" — the one that everything else needs
+4. Ask: "What would collapse their plan?" — THAT is the removal target, not the biggest card
+
+### When to Break Your Own Synergy
+
+Sometimes the correct play violates your own synergy for tempo or survival:
+
+- **If opponent wins in 1 turn:** Forget your combo setup. Any defensive play is correct.
+- **If the game state demands aggression:** A wide pressure deck in a position where they're behind on lore should abandon the "hold your free toys for the right moment" rule and dump everything NOW.
+- **If you've been disrupted:** Your Jesse was bounced; your Babyhead is dead. Don't try to rebuild the same engine — pivot to whichever path (disruption or pressure) is available with your current hand.
+
+---
+
 ## Common Mistakes to Flag
 
 When reviewing gameplay or deck lists, flag these patterns:
@@ -155,3 +201,8 @@ When reviewing gameplay or deck lists, flag these patterns:
 6. **Forgetting to challenge before questing** — order matters; exhausted characters can't be rearranged
 7. **Playing high-cost characters into empty inkwells** — you need mana to respond to opponent's bounce/removal
 8. **Singing with a 3-lore character** when paying 4 ink is fine — the math often favors not singing
+9. **Playing Sid (or condition payoff) without setting up the condition** — Sid into a full board is wasted; Sid after clearing 2 characters is game-winning
+10. **Not drawing first** — making ink and play decisions before resolving available draw effects
+11. **Spending free/discounted cards too early** — free toys should be held for explosive post-combat or post-disruption dumps, not played on curve
+12. **Buffing after challenging** — stat modifications must be in place at challenge declaration; reversing the order loses the buff
+13. **Removing the wrong card** — targeting the largest card instead of the "condition card" that everything else needs (e.g., killing Elsa when Dale is the problem)

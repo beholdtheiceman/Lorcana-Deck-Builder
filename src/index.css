@@ -36,6 +36,10 @@ h1, h2, h3, .font-display { font-family: "Space Grotesk", "Inter", sans-serif; }
 button { cursor: pointer; }
 ::selection { background: rgba(139,108,255,.35); }
 
+/* Force native <select> dropdowns to render in dark mode */
+select { color-scheme: dark; }
+select option { background-color: #111827; color: #e8ecf4; }
+
 /* slim, on-theme scrollbars */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 8px; }

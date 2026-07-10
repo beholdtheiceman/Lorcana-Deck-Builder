@@ -102,14 +102,17 @@ a {
   margin: 0 0 8px;
 }
 
-.grid {
+/* Renamed from ".grid" - that name collided with Tailwind's own ".grid"
+   utility class and silently won the cascade, forcing every plain
+   Tailwind grid/grid-cols-N usage in the app back to a single column. */
+.legacy-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
 }
 
 @media (min-width: 900px) {
-  .grid.two {
+  .legacy-grid.two {
     grid-template-columns: 1.1fr 0.9fr;
   }
 }

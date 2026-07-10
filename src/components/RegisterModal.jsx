@@ -77,7 +77,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
                 placeholder="Enter your email"
                 autoComplete="email"
                 required
@@ -94,7 +94,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
                 placeholder="Create a password"
                 autoComplete="new-password"
                 required
@@ -112,7 +112,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
                 placeholder="Confirm your password"
                 autoComplete="new-password"
                 required
@@ -122,7 +122,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
+              className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-violet-800 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
@@ -133,9 +133,9 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
               Already have an account?{' '}
               <button
                 onClick={onSwitchToLogin}
-                className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                className="text-violet-400 hover:text-violet-300 transition-colors"
               >
-                Login here
+                Sign in
               </button>
             </p>
           </div>

@@ -60,8 +60,8 @@ export default withAuth(async (req, res, session) => {
   await assertHubMember(hubId, userId, res);
   if (res.writableEnded) return;
 
-  let imported = 0;
-  let skipped = 0;
+  const withExternalId = [];
+  const plainInserts = [];
   for (const r of results) {
     const data = {
       hubId,
@@ -75,22 +75,30 @@ export default withAuth(async (req, res, session) => {
       placement: r.placement ?? null,
       record: r.record?.trim() || null,
     };
-
-    // Dedupe rows that carry an externalId; otherwise just insert.
-    if (data.externalId) {
-      await prisma.tournamentResult.upsert({
-        where: { hubId_source_externalId: { hubId, source: data.source, externalId: data.externalId } },
-        update: data,
-        create: data,
-      });
-      imported++;
-    } else {
-      await prisma.tournamentResult.create({ data });
-      imported++;
-    }
+    if (data.externalId) withExternalId.push(data);
+    else plainInserts.push(data);
   }
 
-  return res.status(201).json({ imported, skipped });
+  // Insert non-keyed rows in a single batch instead of one round trip each.
+  if (plainInserts.length) {
+    await prisma.tournamentResult.createMany({ data: plainInserts });
+  }
+
+  // Upsert externalId-keyed rows atomically in one round trip (dedupe per hub).
+  if (withExternalId.length) {
+    await prisma.$transaction(
+      withExternalId.map((data) =>
+        prisma.tournamentResult.upsert({
+          where: { hubId_source_externalId: { hubId, source: data.source, externalId: data.externalId } },
+          update: data,
+          create: data,
+        })
+      )
+    );
+  }
+
+  const imported = withExternalId.length + plainInserts.length;
+  return res.status(201).json({ imported, skipped: 0 });
 });
 
 /** Writes a 403 response if the user is not owner/member of the hub. */

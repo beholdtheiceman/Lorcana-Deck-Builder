@@ -3,6 +3,7 @@ import { prisma } from "../../_lib/db.js";
 import { withAuth } from "../../_lib/withAuth.js";
 import { readJson } from "../../_lib/http.js";
 import { requireHubMember } from "../../_lib/hubAuth.js";
+import { postDiscord } from "../../_lib/discord.js";
 
 const tagList = z.array(z.string().trim().min(1).max(40)).max(20);
 const CreateSchema = z.object({
@@ -51,6 +52,11 @@ export default withAuth(async (req, res, session) => {
     },
     include: { author: { select: { id: true, email: true } } },
   });
+
+  // Fire-and-forget Discord notification
+  prisma.hub.findUnique({ where: { id: hubId }, select: { name: true, discordWebhookUrl: true } })
+    .then(hub => postDiscord(hub?.discordWebhookUrl, `📝 **New report in ${hub?.name}**: ${report.title}`))
+    .catch(() => {});
 
   return res.status(201).json(serialize(report));
 });

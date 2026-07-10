@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { serialize, parse } from "cookie";
+import { prisma } from "./db.js";
 
 const COOKIE = "deckbuilder_auth";
 const SECURE = process.env.NODE_ENV === "production";
@@ -30,14 +31,32 @@ export function clearSession(res) {
   }));
 }
 
-export function getSession(req) {
+export async function getSession(req) {
   const cookies = parse(req.headers.cookie || "");
   const token = cookies[COOKIE];
-  if (!token) return null;
-  
-  try { 
-    return jwt.verify(token, process.env.JWT_SECRET); 
-  } catch { 
-    return null; 
+
+  if (!token) {
+    // Dev-only auto-login. Requires an explicit opt-in flag in addition to
+    // NODE_ENV so a misconfigured preview/prod env can never silently
+    // authenticate every visitor as DEV_USER_EMAIL.
+    if (
+      process.env.NODE_ENV === "development" &&
+      process.env.ALLOW_DEV_AUTH_BYPASS === "true" &&
+      process.env.DEV_USER_EMAIL
+    ) {
+      const user = await prisma.user.findUnique({
+        where: { email: process.env.DEV_USER_EMAIL },
+        select: { id: true, email: true },
+      });
+      if (user) return { uid: user.id, email: user.email };
+    }
+    return null;
+  }
+
+  try {
+    // Pin the algorithm so a token can't be verified under an unexpected alg.
+    return jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+  } catch {
+    return null;
   }
 }

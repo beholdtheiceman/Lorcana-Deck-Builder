@@ -5,6 +5,51 @@ Use this when a user asks about a specific set, wants historical context, or ask
 
 ---
 
+## Set 12 — Wilds Unknown (Current Set)
+
+**Meta Impact: Major — Established new dominant archetypes**
+
+### Key Cards Added
+- **Woody (1-cost):** Best 1-drop in current meta. Shift line into Woody (5) is a premier turn-3 play.
+- **Sid Phillips (6-cost):** Forces opponent to banish their own character. Does NOT specify your toys — works in any toy mirror.
+- **Headless Horseman (5-cost):** Catch-all removal. 4-of in Amber Ruby Toys.
+- **Jesse Woodard:** Card draw + shrinks opposing challengers. Non-once-per-turn triggers.
+- **Babyhead:** Draw engine + combat power buff when paying 2 or less. Enables small toys to trade up.
+- **Bullseye:** Sings You've Got a Friend in Me — finds 2 toys from top 4. Honorary 2-drop.
+- **Bouncing Ducky:** Costs 1 less per toy in discard — often free; 5/5/2 body.
+- **Candy Drift:** Action — lets small characters trade into ANY large character.
+- **You've Got a Friend in Me:** Song — look at top 4, add 2 toys to hand. One of the most powerful archetypal songs ever printed.
+- **Akood:** Ramp enabler for Amber Steel.
+- **Merryweather:** 4/5 Ward — Blurple's new premier blocker (replacing Genie in many builds).
+- **Enigmatic Inkcaster:** Item — creates ongoing burn lore effect; no item removal in Amber/Ruby.
+- **Snowfort:** Location — ongoing burn effect; similarly unchecked by many decks.
+- **Dash Parr:** Burn lore character — generates lore without questing.
+- **Giant Cobra:** Burn lore effect.
+
+### Format Shifts in Set 12
+- **Amber/Ruby Toys emerges** as a competitive Tier 2 deck — 51/60 cards from Set 12
+- **Toys theme** becomes cross-color (Amber/Ruby and Amber/Emerald variants)
+- **Burn lore** becomes a viable alternate win condition — bypasses board state entirely
+- **Dogs (Amber/Emerald)** consolidates as Tier 1 with Under the Sea synergies
+- **Blurple (Amethyst/Sapphire)** evolves — Merryweather replaces Genie in many lists
+
+### Cards That Aged Well into Set 12
+- Demona (Blurple core)
+- Elsa shifted (Blurple/YP Dale)
+- Dale (YP Dale shell)
+- Cheshire Cat (Blurple/YP Dale/Amethyst Steel disruption)
+- Yzma (Amethyst Steel card advantage engine)
+- Goliath (Sapphire Steel draw engine)
+
+### Rotation Awareness
+- Most competitive Set 12 decks are 80–90% Sets 9–12 cards
+- Amber Ruby Toys is 51/60 cards from Set 12 alone — extremely rotation-proof
+- Dogs and Blurple also heavily Set 9+ — expect minimal impact from rotation
+
+---
+
+---
+
 ## Set 1 — The First Chapter
 **Release:** August 2023  
 **Size:** 204 cards

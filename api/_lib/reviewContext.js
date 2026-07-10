@@ -1,4 +1,11 @@
-import { getById } from "./cards.js";
+import { getById, getByName } from "./cards.js";
+import {
+  summarizeDecklist,
+  renderDeckSection,
+  collectOpponentRevealed,
+  renderOpponentSection,
+  resolveWithEvidence,
+} from "./deckContext.js";
 
 /**
  * Builds the grounding context string handed to the LLM (or stored alongside an
@@ -7,17 +14,21 @@ import { getById } from "./cards.js";
  * It renders, in order:
  *   1. A header (perspective player + result + game number + matchup).
  *   2. The matchup primer (verdict / gameplan / mustKill / mistakes / keyCards).
- *   3. A card oracle glossary for every card referenced by the game log (and the
- *      primer's key cards), each shown as "Name — <oracle bodyText>". Any id the
- *      oracle does not know is rendered as "unknown — do not infer".
- *   4. The rendered game log.
+ *   3. The player's full deck list (from the replay's decklist) + a profile
+ *      (inks, curve, type mix), and the opponent's revealed cards.
+ *   4. A card oracle glossary for every card referenced by the game log, the
+ *      player's deck, and the primer's key cards, each shown as
+ *      "Name — <oracle bodyText>".
+ *   5. The rendered game log. When maxChars is given, the EARLIEST log entries
+ *      are elided to fit — the endgame is where reviews are decided, so the
+ *      tail is always preserved.
  *
  * The parsed replay shape is intentionally treated defensively because the
  * Phase 3 parser may emit slightly different field names across sources.
  *
  * @returns {Promise<string>}
  */
-export async function buildReviewContext({ replay, primer, gameNumber } = {}) {
+export async function buildReviewContext({ replay, primer, gameNumber, maxChars } = {}) {
   const parsed = (replay && replay.parsed) || {};
   const game = findGame(parsed, gameNumber);
 
@@ -43,6 +54,27 @@ export async function buildReviewContext({ replay, primer, gameNumber } = {}) {
   };
   for (const e of entries) for (const id of cardIdsOf(e)) addId(id);
 
+  // id → name pairs the replay itself asserts (drawn from ALL games of the
+  // match, not just this one) — used to detect id-numbering mismatches
+  // between the replay source and local card data.
+  const evidence = collectNameEvidence(parsed, game);
+
+  // The player's deck list (duels.ink replays carry it as "set-num" ids).
+  const deckSummary = summarizeDecklist(game && game.decklistMe, evidence);
+  // Deck cards belong in the glossary too — the coach must know what the
+  // player was drawing toward, not just what hit the table. Cards whose
+  // identity could not be verified are excluded: wrong card text is worse
+  // than no card text.
+  if (deckSummary) {
+    for (const { id, unverified } of deckSummary.cards) {
+      if (!unverified) addId(id);
+    }
+  }
+
+  // The opponent's revealed cards (the honest limit of what a replay knows).
+  const oppRevealed = collectOpponentRevealed(game);
+  for (const r of oppRevealed) addId(r.key);
+
   // Primer key cards are referenced too; include their ids in the glossary.
   const keyCards = Array.isArray(primer && primer.keyCards) ? primer.keyCards : [];
   for (const kc of keyCards) addId(kc && kc.id);
@@ -51,7 +83,7 @@ export async function buildReviewContext({ replay, primer, gameNumber } = {}) {
   const oracle = new Map();
   await Promise.all(
     referenced.map(async (id) => {
-      oracle.set(id, await renderCard(id));
+      oracle.set(id, await renderCard(id, evidence.get(id)));
     })
   );
 
@@ -87,7 +119,19 @@ export async function buildReviewContext({ replay, primer, gameNumber } = {}) {
   }
   out.push("");
 
-  out.push("--- CARD ORACLE (cards referenced this game) ---");
+  const deckSection = renderDeckSection(deckSummary);
+  if (deckSection) {
+    out.push(deckSection);
+    out.push("");
+  }
+
+  const oppSection = renderOpponentSection(oppRevealed);
+  if (oppSection) {
+    out.push(oppSection);
+    out.push("");
+  }
+
+  out.push("--- CARD ORACLE (cards in this game and the player's deck) ---");
   if (referenced.length) {
     for (const id of referenced) out.push(oracle.get(id));
   } else {
@@ -96,31 +140,85 @@ export async function buildReviewContext({ replay, primer, gameNumber } = {}) {
   out.push("");
 
   out.push("--- GAME LOG ---");
-  if (entries.length) {
-    for (const e of entries) out.push(renderEntry(e, oracle));
-  } else {
-    out.push("(empty game log)");
+  const logLines = entries.length
+    ? entries.map((e) => renderEntry(e, oracle))
+    : ["(empty game log)"];
+
+  // Budget-aware log assembly: when the context would overflow, drop the
+  // EARLIEST log lines (the endgame decides reviews) rather than the tail.
+  if (typeof maxChars === "number" && maxChars > 0) {
+    const fixed = out.join("\n").length + 1; // +1 for the joining newline
+    let logBudget = maxChars - fixed - 80; // headroom for the elision marker
+    const total = logLines.reduce((n, l) => n + l.length + 1, 0);
+    if (total > logBudget) {
+      const kept = [];
+      let used = 0;
+      for (let i = logLines.length - 1; i >= 0; i--) {
+        const cost = logLines[i].length + 1;
+        if (used + cost > logBudget) break;
+        kept.unshift(logLines[i]);
+        used += cost;
+      }
+      const dropped = logLines.length - kept.length;
+      out.push(`[… ${dropped} early log entries elided to fit the context budget …]`);
+      out.push(...kept);
+      return out.join("\n");
+    }
   }
+  out.push(...logLines);
 
   return out.join("\n");
 }
 
-/** Resolve a card id to "Name — <bodyText>", or "unknown — do not infer". */
-async function renderCard(id) {
+/**
+ * Resolve a card id to "Name — <bodyText>". When the replay supplied a name
+ * for this id (evidence), the id is only trusted if it agrees with the name —
+ * some sources number sets differently than local card data.
+ */
+async function renderCard(id, evidenceName) {
   let card = null;
   try {
-    card = await getById(id);
+    card = resolveWithEvidence(id, evidenceName).card;
   } catch {
     card = null;
   }
-  if (!card) return "unknown — do not infer";
+  if (!card) {
+    return `${evidenceName ?? id} — (not found in oracle — do not infer card text)`;
+  }
   const name = card.name ?? "unknown";
   const body = card.bodyText ?? card.body ?? "";
   return `${name} — ${body}`.trimEnd();
 }
 
+/**
+ * Collect id → name assertions from the replay's own events, across every
+ * game of the match (a card unplayed in this game may have been played in
+ * another, and the decklist is the same).
+ */
+function collectNameEvidence(parsed, currentGame) {
+  const evidence = new Map();
+  const note = (id, name) => {
+    if (typeof id === "string" && id && typeof name === "string" && name && !evidence.has(id)) {
+      evidence.set(id, name);
+    }
+  };
+  const games =
+    (Array.isArray(parsed && parsed.games) && parsed.games) ||
+    (Array.isArray(parsed && parsed.matches) && parsed.matches) ||
+    [currentGame];
+  for (const g of games) {
+    for (const e of logEntriesOf(g)) {
+      if (!e || typeof e !== "object") continue;
+      note(e.cardId, e.card);
+      note(e.attackerCardId, e.card);
+      note(e.defenderCardId, e.target);
+    }
+  }
+  return evidence;
+}
+
 /** Select the game matching gameNumber from a parsed replay, defensively. */
-function findGame(parsed, gameNumber) {
+export function findGame(parsed, gameNumber) {
   const games =
     (Array.isArray(parsed.games) && parsed.games) ||
     (Array.isArray(parsed.matches) && parsed.matches) ||
@@ -153,8 +251,13 @@ function cardIdsOf(entry) {
     if (typeof v === "string") ids.push(v);
     else if (v && typeof v === "object" && typeof v.id === "string") ids.push(v.id);
   };
+  const hasCardId = typeof entry.cardId === "string" && entry.cardId;
   if (entry.cardId != null) push(entry.cardId);
-  if (entry.card != null) push(entry.card);
+  // entry.card is the same card's display name; only collect it when there's no
+  // resolvable id, to avoid a duplicate unresolvable glossary row.
+  if (!hasCardId && entry.card != null) push(entry.card);
+  if (typeof entry.attackerCardId === "string" && entry.attackerCardId) push(entry.attackerCardId);
+  if (typeof entry.defenderCardId === "string" && entry.defenderCardId) push(entry.defenderCardId);
   if (Array.isArray(entry.cardIds)) entry.cardIds.forEach(push);
   if (Array.isArray(entry.cards)) entry.cards.forEach(push);
   return ids;

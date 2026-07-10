@@ -1,5 +1,10 @@
 // Local utilities -------------------------------------------------------------
 import { CARD_TYPES, getCardImg } from "./lib/cardUtils.js";
+import { LS_KEYS, loadLS, saveLS } from "./lib/storage.js";
+import { exportDeck, generateTextExport, generateSimpleTextExport, generateCSVExport } from "./utils/deckExport.js";
+import { fetchAllCards, normalizeAbilityToken, ABILITIES_CANON } from "./lib/cardsApi.js";
+import { IMG_CACHE_CAP, tryLoadImage, tryLoadImageWithCORSFallback, tryLoadImageWithBetterCORS, getWorkingImageUrl, getCardImageUrl, generateLocalCardImage, createSimpleCardImage, getCORSProxyUrl, getAlternativeCORSProxyUrl, createCanvasImage, generateLorcastURL, generateAlternativeImageUrls, resetFailedImageCache } from "./lib/images.js";
+import { generateDeckImagePNG } from "./lib/deckImage.js";
 
 // React & ecosystem -----------------------------------------------------------
 import React, {
@@ -15,6 +20,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 
 // Auth context
 import { useAuth } from './contexts/AuthContext';
@@ -50,6 +56,7 @@ import {
 import AuthButton from './components/AuthButton';
 import TeamHub from './components/TeamHub';
 import DeckStatistics from './components/DeckStats';
+import DeckPresentationView from './components/DeckPresentationView';
 
 // OCR (tesseract.js) is heavy; load it on demand only when the image-import tab is opened.
 const StandingsImageImportLazy = lazy(() => import("./components/StandingsImageImport"));
@@ -95,73 +102,42 @@ function WinRateBar({ win = 0, loss = 0 }) {
 }
 
 // -----------------------------------------------------------------------------
-// Local storage & caching
-// -----------------------------------------------------------------------------
-
-const LS_KEYS = {
-  DECK: "lorcana.deck.v1",
-  DECKS: "lorcana.decks.v2", // New: Multiple decks storage
-  CURRENT_DECK_ID: "lorcana.currentDeckId.v2", // New: Current deck ID
-  FILTERS: "lorcana.filters.v1",
-  CACHE_IMG: "lorcana.imageCache.v1",
-  CACHE_CARDS: "lorcana.cardsCache.v1",
-};
-
-function loadLS(key, fallback) {
-  try {
-    console.log('[loadLS] Loading key:', key);
-    const v = localStorage.getItem(key);
-    console.log('[loadLS] Raw value from localStorage:', v);
-    const result = v ? JSON.parse(v) : fallback;
-    console.log('[loadLS] Parsed result:', result);
-    return result;
-  } catch (error) {
-    console.error('[loadLS] Error loading from localStorage:', error);
-    return fallback;
-  }
-}
-
-function saveLS(key, value) {
-  try {
-    console.log('[saveLS] Saving key:', key, 'with value:', value);
-    localStorage.setItem(key, JSON.stringify(value));
-    console.log('[saveLS] Successfully saved to localStorage');
-  } catch (error) {
-    console.error('[saveLS] Error saving to localStorage:', error);
-  }
-}
-
-// -----------------------------------------------------------------------------
 // Card image cache context
 // -----------------------------------------------------------------------------
 
-console.log('[Context] Creating ImageCacheContext...');
 const ImageCacheContext = createContext();
-console.log('[Context] ImageCacheContext created:', ImageCacheContext);
+
 
 function ImageCacheProvider({ children }) {
-  console.log('[ImageCacheProvider] Initializing...');
   const [cache, setCache] = useState(() => loadLS(LS_KEYS.CACHE_IMG, {}));
   const [cacheVersion, setCacheVersion] = useState(0);
-  
+
+  // Debounced persist: rapid image loads no longer serialize the entire cache
+  // synchronously on every put. We write at most once ~800ms after the last change.
   useEffect(() => {
-    console.log('[ImageCacheProvider] Cache updated, saving to localStorage');
-    saveLS(LS_KEYS.CACHE_IMG, cache);
+    const t = setTimeout(() => saveLS(LS_KEYS.CACHE_IMG, cache), 800);
+    return () => clearTimeout(t);
   }, [cache]);
 
+  const setEntry = useCallback((key, value) => {
+    setCache((c) => {
+      const next = { ...c, [key]: value };
+      const overflow = Object.keys(next).length - IMG_CACHE_CAP;
+      if (overflow > 0) {
+        // Drop the oldest entries (objects preserve string-key insertion order).
+        const keys = Object.keys(next);
+        for (let i = 0; i < overflow; i++) delete next[keys[i]];
+      }
+      return next;
+    });
+    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
+  }, []);
+
   const get = useCallback((key) => cache[key], [cache]);
-  const put = useCallback((key, value) => {
-    setCache((c) => ({ ...c, [key]: value }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
-  const putFailed = useCallback((key) => {
-    setCache((c) => ({ ...c, [key]: 'FAILED' }));
-    setCacheVersion(v => v + 1); // Increment version to trigger re-renders
-  }, []);
+  const put = useCallback((key, value) => setEntry(key, value), [setEntry]);
+  const putFailed = useCallback((key) => setEntry(key, 'FAILED'), [setEntry]);
 
   const value = useMemo(() => ({ get, put, putFailed, cache, cacheVersion }), [get, put, putFailed, cache, cacheVersion]);
-
-  console.log('[ImageCacheProvider] About to render with value:', value);
 
   return (
     <ImageCacheContext.Provider value={value}>
@@ -172,17 +148,13 @@ function ImageCacheProvider({ children }) {
 
 // Debug component to trace context
 function ContextDebugger() {
-  const context = useContext(ImageCacheContext);
-  console.log('[ContextDebugger] Context value:', context);
+  useContext(ImageCacheContext);
   return null; // This component doesn't render anything
 }
 
 function useImageCache() {
-  console.log('[useImageCache] Hook called');
   const context = useContext(ImageCacheContext);
-  console.log('[useImageCache] Context value:', context);
   if (!context) {
-    console.error('[useImageCache] Context is null/undefined - this will cause the error');
     throw new Error('useImageCache must be used within ImageCacheProvider');
   }
   return context;
@@ -206,11 +178,6 @@ const CLASSIFICATIONS = [
   "Storyborn", "Super", "Tigger", "Titan", "Toy", "Villain", "Whisper"
 ];
 
-// Canonical ability names you expose in the UI
-const ABILITIES_CANON = [
-  "Alert", "Bodyguard", "Boost", "Challenger", "Evasive", "Reckless", "Resist", "Rush",
-  "Shift", "Sing Together", "Singer", "Support", "Vanish", "Ward"
-];
 
 // Legacy ABILITIES constant for backward compatibility
 const ABILITIES = ABILITIES_CANON;
@@ -218,44 +185,7 @@ const ABILITIES = ABILITIES_CANON;
 // Missing constant - add fallback image
 const FALLBACK_IMG = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQyMCIgdmlld0JveD0iMCAwIDMwMCA0MjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iNDIwIiBmaWxsPSIjMmQzNzQ4Ii8+CjxyZWN0IHg9IjUiIHk9IjUiIHdpZHRoPSIyOTAiIGhlaWdodD0iNDEwIiBzdHJva2U9IiM3MTgwOTYiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIxNTAiIHk9IjIxMCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q2FyZDwvdGV4dD4KPC9zdmc+";
 
-function normalizeAbilityToken(s) {
-  // "Singer 5" -> "singer", "Resist +2" -> "resist"
-  return String(s).toLowerCase().replace(/\s*[\+\-]?\d+.*$/, "").trim();
-}
 
-function extractAbilities(raw) {
-  const text = String(
-    raw?.oracle_text || raw?.rules_text || raw?.text || raw?.Body_Text || ""
-  );
-
-  const fromArrays = [
-    ...(Array.isArray(raw?.keywords) ? raw.keywords : []),
-    ...(Array.isArray(raw?.ability_keywords) ? raw.ability_keywords : []),
-    ...(Array.isArray(raw?.abilities) ? raw.abilities : []),
-    ...(raw?.Abilities ? [raw.Abilities] : []), // Lorcast sometimes uses this
-  ];
-
-  // scan text as a fallback
-  const fromText = ABILITIES_CANON.filter(a =>
-    text.toLowerCase().includes(a.toLowerCase())
-  );
-
-  // merge + normalize for matching + keep a pretty version too
-  const pretty = Array.from(new Set([...fromArrays, ...fromText].map(String)));
-  const index  = new Set(pretty.map(normalizeAbilityToken)); // lowercase, no numbers
-
-  return { pretty, index };
-}
-
-function normalizedType(raw) {
-  const t = `${raw?.type_line || raw?.type || ""}`.toLowerCase();
-  if (t.includes("character")) return "Character";
-  if (t.includes("location"))  return "Location";
-  if (t.includes("item"))      return "Item";
-  if (t.includes("song"))      return "Song";     // Action — Song
-  if (t.includes("action"))    return "Action";
-  return "Other";
-}
 
 function normalizedSetCode(raw) {
   return String(
@@ -263,40 +193,6 @@ function normalizedSetCode(raw) {
   ).toUpperCase();
 }
 
-function normalizeSetMeta(raw) {
-  console.log('[normalizeSetMeta] Raw set data:', {
-    set_code: raw?.set_code,
-    setCode: raw?.setCode,
-    set: raw?.set,
-    Set_Code: raw?.Set_Code,
-    'set.code': raw?.set?.code,
-    set_name: raw?.set_name,
-    setName: raw?.setName,
-    Set_Name: raw?.Set_Name,
-    'set.name': raw?.set?.name,
-    set_num: raw?.set_num,
-    setNum: raw?.setNum,
-    Set_Num: raw?.Set_Num,
-    'set.num': raw?.set?.num
-  });
-
-  const code =
-    (raw?.set_code ?? raw?.setCode ?? raw?.set ?? raw?.Set_Code ?? raw?.set?.code ?? "")
-      .toString().toUpperCase();
-
-  const name =
-    (raw?.set_name ?? raw?.setName ?? raw?.Set_Name ?? raw?.set?.name ?? "")
-      .toString();
-
-  const numRaw =
-    raw?.set_num ?? raw?.setNum ?? raw?.Set_Num ?? raw?.set?.num ?? null;
-
-  const num = numRaw == null ? null : Number(numRaw);
-
-  const result = { code, name, num };
-  console.log('[normalizeSetMeta] Normalized result:', result);
-  return result;
-}
 
 // New filter constants
 // const FRANCHISES = ["Bolt", "Disney", "Pixar", "Marvel", "Star Wars", "Indiana Jones"]; // Commented out - no longer used
@@ -686,26 +582,16 @@ function getCost(card) {
 
 // Get primary ink color for sorting (first ink in the array)
 function getPrimaryInk(card) {
-  console.log('[getPrimaryInk] Card:', card?.name, 'inks:', card?.inks, 'ink:', card?.ink, '_raw:', card?._raw);
-  
   if (Array.isArray(card?.inks) && card.inks.length > 0) {
-    console.log('[getPrimaryInk] Using inks array:', card.inks[0]);
     return card.inks[0];
   }
   if (card?.ink) {
-    const result = Array.isArray(card.ink) ? card.ink[0] : card.ink;
-    console.log('[getPrimaryInk] Using ink field:', result);
-    return result;
+    return Array.isArray(card.ink) ? card.ink[0] : card.ink;
   }
-  
   // Try to get from _raw data
   if (card?._raw?.ink) {
-    const result = Array.isArray(card._raw.ink) ? card._raw.ink[0] : card._raw.ink;
-    console.log('[getPrimaryInk] Using _raw.ink:', result);
-    return result;
+    return Array.isArray(card._raw.ink) ? card._raw.ink[0] : card._raw.ink;
   }
-  
-  console.log('[getPrimaryInk] No ink found, returning empty string');
   return "";
 }
 
@@ -854,162 +740,6 @@ function encodeImageURL(u) {
   }
 }
 
-// Global image loading function for batch operations with CORS handling
-function tryLoadImage(imageUrl) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const timeout = setTimeout(() => {
-      img.onload = null;
-      img.onerror = null;
-      console.warn(`[Image Load] Timeout for: ${imageUrl}`);
-      reject(new Error('Image load timeout'));
-    }, 5000); // Increased timeout
-    
-    img.onload = () => {
-      clearTimeout(timeout);
-      console.log(`[Image Load] Success: ${imageUrl}`);
-      resolve(imageUrl);
-    };
-    
-    img.onerror = () => {
-      clearTimeout(timeout);
-      console.warn(`[Image Load] Failed: ${imageUrl}`);
-      reject(new Error('Image failed to load'));
-    };
-    
-    // Simple CORS handling
-    img.crossOrigin = 'anonymous';
-    img.src = imageUrl;
-  });
-}
-
-// Enhanced image loading with CORS fallback
-async function tryLoadImageWithCORSFallback(imageUrl, originalUrl = null) {
-  try {
-    // First try with the current URL (which might be proxied)
-    return await tryLoadImage(imageUrl);
-  } catch (error) {
-    console.warn(`[CORS Fallback] Primary image load failed: ${imageUrl}`, error.message);
-    
-    // If we have an original URL and the current one is proxied, try the original
-    if (originalUrl && imageUrl !== originalUrl) {
-      try {
-        console.log(`[CORS Fallback] Trying original URL: ${originalUrl}`);
-        return await tryLoadImage(originalUrl);
-      } catch (fallbackError) {
-        console.warn(`[CORS Fallback] Original URL also failed: ${originalUrl}`, fallbackError.message);
-      }
-    }
-    
-    // If all else fails, try alternative CORS proxies
-    const alternativeProxies = [
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`,
-      `https://cors-anywhere.herokuapp.com/${imageUrl}`,
-      `https://thingproxy.freeboard.io/fetch/${imageUrl}`
-    ];
-    
-    for (const proxyUrl of alternativeProxies) {
-      try {
-        console.log(`[CORS Fallback] Trying alternative proxy: ${proxyUrl}`);
-        return await tryLoadImage(proxyUrl);
-      } catch (proxyError) {
-        console.warn(`[CORS Fallback] Proxy failed: ${proxyUrl}`, proxyError.message);
-      }
-    }
-    
-    // If everything fails, throw the original error
-    throw error;
-  }
-}
-
-// Better CORS handling function
-async function tryLoadImageWithBetterCORS(imageUrl) {
-  // Strategy 1: Try direct loading with crossOrigin
-  try {
-    console.log(`[CORS Strategy] Attempting direct load with crossOrigin: ${imageUrl}`);
-    return await tryLoadImage(imageUrl);
-  } catch (error) {
-    console.warn(`[CORS Strategy] Direct load failed: ${imageUrl}`, error.message);
-  }
-  
-  // Strategy 2: Try with a more reliable CORS proxy
-  const reliableProxies = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`,
-    `https://cors.bridged.cc/${imageUrl}`,
-    `https://cors-anywhere.herokuapp.com/${imageUrl}`
-  ];
-  
-  for (const proxyUrl of reliableProxies) {
-    try {
-      console.log(`[CORS Strategy] Trying reliable proxy: ${proxyUrl}`);
-      return await tryLoadImage(proxyUrl);
-    } catch (proxyError) {
-      console.warn(`[CORS Strategy] Proxy failed: ${proxyUrl}`, proxyError.message);
-    }
-  }
-  
-  // Strategy 3: Try to fetch the image as a blob and create a local URL
-  try {
-    console.log(`[CORS Strategy] Attempting blob fetch: ${imageUrl}`);
-    const response = await fetch(imageUrl, { 
-      mode: 'cors',
-      credentials: 'omit'
-    });
-    if (response.ok) {
-      const blob = await response.blob();
-      const localUrl = URL.createObjectURL(blob);
-      console.log(`[CORS Strategy] Blob fetch successful, created local URL: ${localUrl}`);
-      return localUrl;
-    }
-  } catch (blobError) {
-    console.warn(`[CORS Strategy] Blob fetch failed: ${imageUrl}`, blobError.message);
-  }
-  
-  // If all strategies fail, throw an error
-  throw new Error(`All CORS strategies failed for: ${imageUrl}`);
-}
-
-// Working solution: Try multiple image sources to find one that works
-async function getWorkingImageUrl(card) {
-  if (!card) return null;
-  
-  // Strategy 1: Try to construct a working URL from the card data
-  if (card.set && card.number) {
-    const setCode = card.set.toString().toUpperCase();
-    const cardNumber = card.number.toString().padStart(3, '0');
-    
-    // Try different URL patterns that might work
-    const urlPatterns = [
-      `https://api.lorcast.com/v0/cards/${setCode}/${cardNumber}/image`,
-      `https://api.lorcast.com/v0/images/${setCode}/${cardNumber}.jpg`,
-      `https://api.lorcast.com/v0/images/${setCode}-${cardNumber}.jpg`,
-      `https://api.lorcast.com/v0/cards/${setCode}-${cardNumber}/image`
-    ];
-    
-    for (const url of urlPatterns) {
-      try {
-        console.log(`[Image Source] Trying URL pattern: ${url}`);
-        const response = await fetch(url, { method: 'HEAD' });
-        if (response.ok) {
-          console.log(`[Image Source] Found working URL: ${url}`);
-          return url;
-        }
-      } catch (error) {
-        console.warn(`[Image Source] URL pattern failed: ${url}`, error.message);
-      }
-    }
-  }
-  
-  // Strategy 2: If we have an original image URL, try to use it with different approach
-  if (card._originalImageUrl) {
-    console.log(`[Image Source] Using original URL as fallback: ${card._originalImageUrl}`);
-    return card._originalImageUrl;
-  }
-  
-  // Strategy 3: Return null and let the component handle it with a placeholder
-  console.warn(`[Image Source] No working image URL found for card: ${card.name}`);
-  return null;
-}
 
 // Utility to reduce noisy logs in dev (StrictMode double-runs)
 const logged = new Set();
@@ -1200,324 +930,6 @@ console.log('[DEBUG] Function references:', {
   proxyImageUrlName: proxyImageUrl.name
 });
 
-// HARDENED: Get card image URL - prefer canonical Lorcast ID, fallback to feed Image
-function getCardImageUrl(card) {
-  // GUARD: Handle undefined/null cards gracefully
-  if (!card) {
-    console.warn(`[getCardImageUrl] No card provided, returning placeholder`);
-    return "/img/placeholders/card.avif";
-  }
-  
-  // PREFER: Canonical Lorcast ID (most reliable)
-  if (card?.id?.startsWith("crd_")) {
-    const url = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
-    console.log(`[getCardImageUrl] Using canonical Lorcast ID for ${card.name}:`, url);
-    return url;
-  }
-  
-  // FALLBACK: Accept either imageUrl or image_url (handle both field names)
-  const direct = card.imageUrl || card.image_url;
-  if (typeof direct === 'string' && direct) {
-    console.log(`[getCardImageUrl] Using direct image for ${card.name}:`, direct);
-    return direct;
-  }
-  
-  // LAST RESORT: Generate URL only if absolutely necessary
-  try {
-    const generated = generateLorcastURL(card);
-    console.log(`[getCardImageUrl] Generated fallback URL for ${card.name}:`, generated);
-    return generated;
-  } catch (error) {
-    console.warn(`[getCardImageUrl] Failed to generate URL for ${card.name}:`, error);
-    return "/img/placeholders/card.avif";
-  }
-}
-
-// New approach: Generate local placeholder images with card data
-function generateLocalCardImage(card) {
-  if (!card || typeof card !== 'object') return null;
-  
-  try {
-    // Create a canvas-based image with card information
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Set canvas size (standard card dimensions)
-    canvas.width = 300;
-    canvas.height = 420;
-    
-    // Background gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#1a1a2e');
-    gradient.addColorStop(1, '#16213e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Card border
-    ctx.strokeStyle = '#4a90e2';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-    
-    // Card name
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    
-    // Wrap text if too long
-    const maxWidth = canvas.width - 40;
-    const words = (card.name || 'Unknown Card').split(' ');
-    let line = '';
-    let y = 80;
-    
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
-      const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
-      
-      if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, canvas.width / 2, y);
-        line = words[n] + ' ';
-        y += 25;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line, canvas.width / 2, y);
-    
-    // Card details
-    y += 40;
-    ctx.font = '14px Arial, sans-serif';
-    ctx.fillStyle = '#cccccc';
-    
-    if (card.set) {
-      ctx.fillText(`Set: ${card.set}`, canvas.width / 2, y);
-      y += 20;
-    }
-    
-    if (card.number) {
-      ctx.fillText(`#${card.number}`, canvas.width / 2, y);
-      y += 20;
-    }
-    
-    if (card.type) {
-      ctx.fillText(`Type: ${card.type}`, canvas.width / 2, y);
-      y += 20;
-    }
-    
-    if (card.cost !== undefined) {
-      ctx.fillText(`Cost: ${card.cost}`, canvas.width / 2, y);
-      y += 20;
-    }
-    
-    // Convert canvas to data URL
-    const dataUrl = canvas.toDataURL('image/png');
-    console.log(`[Local Image] Generated local image for ${card.name}`);
-    
-    return dataUrl;
-    
-  } catch (error) {
-    console.error(`[Local Image] Failed to generate local image for ${card.name}:`, error);
-    return null;
-  }
-}
-
-// Simple fallback image generator for when the main one fails
-function createSimpleCardImage(card) {
-  if (!card || typeof card !== 'object') return null;
-  
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = 300;
-    canvas.height = 420;
-    
-    // Simple background
-    ctx.fillStyle = '#2d3748';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Simple border
-    ctx.strokeStyle = '#718096';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-    
-    // Card name (simple)
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '16px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(card.name || 'Card', canvas.width / 2, canvas.height / 2);
-    
-    const dataUrl = canvas.toDataURL('image/png');
-    console.log(`[Simple Image] Generated simple image for ${card.name}`);
-    
-    return dataUrl;
-    
-  } catch (error) {
-    console.error(`[Simple Image] Failed to generate simple image for ${card.name}:`, error);
-    return null;
-  }
-}
-
-// Working CORS solution: Use a reliable CORS proxy service
-function getCORSProxyUrl(originalUrl) {
-  if (!originalUrl || !originalUrl.includes('cards.lorcast.io')) {
-    return originalUrl;
-  }
-  
-  // Use a reliable CORS proxy service
-  // This will fetch the image server-side and serve it with proper CORS headers
-  const proxyUrl = `https://cors.bridged.cc/${originalUrl}`;
-  
-  console.log(`[CORS Proxy] Converting URL: ${originalUrl} -> ${proxyUrl}`);
-  return proxyUrl;
-}
-
-// Alternative CORS proxy if the first one fails
-function getAlternativeCORSProxyUrl(originalUrl) {
-  if (!originalUrl || !originalUrl.includes('cards.lorcast.io')) {
-    return originalUrl;
-  }
-  
-  // Alternative proxy services
-  const proxyServices = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`,
-    `https://cors-anywhere.herokuapp.com/${originalUrl}`,
-    `https://thingproxy.freeboard.io/fetch/${originalUrl}`
-  ];
-  
-  // Return the first one for now - the image component can try others if it fails
-  const proxyUrl = proxyServices[0];
-  
-  console.log(`[CORS Proxy] Using alternative proxy: ${originalUrl} -> ${proxyUrl}`);
-  return proxyUrl;
-}
-
-// Alternative approach: Create a canvas-based image to bypass CORS
-function createCanvasImage(imageUrl) {
-  return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    
-    img.crossOrigin = 'anonymous';
-    
-    img.onload = () => {
-      try {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        
-        // Convert canvas to blob URL
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            console.log(`[Canvas CORS] Successfully created canvas image: ${url}`);
-            resolve(url);
-          } else {
-            reject(new Error('Failed to create blob from canvas'));
-          }
-        }, 'image/jpeg', 0.9);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    
-    img.onerror = () => {
-      reject(new Error('Failed to load image into canvas'));
-    };
-    
-    img.src = imageUrl;
-  });
-}
-
-// New function: Generate clean Lorcast URLs from card data - UPDATED for transformed cards
-function generateLorcastURL(card) {
-  console.log(`[generateLorcastURL] Called with card:`, { 
-    name: card?.name, 
-    id: card?.id, 
-    setId: card?.setId, 
-    cardNum: card?.cardNum,
-    imageUrl: card?.imageUrl 
-  });
-  
-  if (!card || typeof card !== 'object') {
-    console.warn(`[URL Generation] Invalid card object:`, card);
-    return null;
-  }
-  
-  // PREFER: Use existing imageUrl from transformed card data
-  if (card.imageUrl && typeof card.imageUrl === 'string' && card.imageUrl.startsWith('http')) {
-    console.log(`[URL Generation] Using existing imageUrl for ${card.name}:`, card.imageUrl);
-    return String(card.imageUrl);
-  }
-  
-  // FALLBACK: Generate URL using card ID or set/number
-  if (card.id) {
-    const imageUrl = `https://cards.lorcast.io/card/digital/large/${card.id}.avif`;
-    console.log(`[URL Generation] Generated image URL using card ID for ${card.name}:`, imageUrl);
-    return String(imageUrl);
-  }
-  
-  // LAST RESORT: Try to construct URL using set and number
-  if (card.setId && card.cardNum) {
-    const setCode = card.setId.toString().toUpperCase();
-    const cardNumber = card.cardNum.toString().padStart(3, '0');
-    
-    const imageUrl = `https://cards.lorcast.io/card/digital/large/crd_${setCode}_${cardNumber}.avif`;
-    console.log(`[URL Generation] Generated fallback URL using set/number for ${card.name}:`, imageUrl);
-    return String(imageUrl);
-  }
-  
-  console.warn(`[URL Generation] Could not generate URL for card: ${card.name}`, card);
-  return null;
-}
-
-// Enhanced function to generate multiple alternative image URLs
-function generateAlternativeImageUrls(card) {
-  if (!card || typeof card !== 'object') {
-    return [];
-  }
-  
-  const urls = [];
-  
-  // If we have an existing image URL, add it first
-  if (card._imageFromAPI && typeof card._imageFromAPI === 'string' && card._imageFromAPI.startsWith('http')) {
-    urls.push(card._imageFromAPI);
-  }
-  
-  // Generate URLs based on card data using the correct Lorcast API structure
-  if (card.set && card.number) {
-    const setCode = card.set.toString().toUpperCase();
-    const cardNumber = card.number.toString().padStart(3, '0');
-    
-    // Multiple URL patterns to try using the correct API structure
-    const patterns = [
-      // Primary: Use card ID if available (most reliable)
-      card.id ? `https://cards.lorcast.io/card/digital/large/${card.id}.avif` : null,
-      card.id ? `https://cards.lorcast.io/card/digital/normal/${card.id}.avif` : null,
-      card.id ? `https://cards.lorcast.io/card/digital/small/${card.id}.avif` : null,
-      
-      // Fallback: Construct URLs using set and number
-      `https://cards.lorcast.io/card/digital/large/crd_${setCode}_${cardNumber}.avif`,
-      `https://cards.lorcast.io/card/digital/normal/crd_${setCode}_${cardNumber}.avif`,
-      `https://cards.lorcast.io/card/digital/small/crd_${setCode}_${cardNumber}.avif`,
-      
-      // Alternative domains (if main domain fails)
-      `https://api.lorcast.com/v0/cards/${setCode}/${cardNumber}/image`,
-      `https://lorcast.com/images/${setCode}/${cardNumber}.jpg`
-    ].filter(Boolean); // Remove null values
-    
-    urls.push(...patterns);
-  }
-  
-  // Remove duplicates and invalid URLs
-  const uniqueUrls = [...new Set(urls)].filter(url => 
-    url && typeof url === 'string' && url.startsWith('http')
-  );
-  
-  console.log(`[Alternative URLs] Generated ${uniqueUrls.length} URLs for ${card.name}:`, uniqueUrls);
-  return uniqueUrls;
-}
 
 // Enhanced function to search Lorcast API for card resolution
 async function searchLorcastForCard(cardName, subtitle = null) {
@@ -1572,30 +984,6 @@ async function searchLorcastForCard(cardName, subtitle = null) {
   }
 }
 
-// New function: Reset failed image cache entries
-function resetFailedImageCache() {
-  try {
-    const cache = loadLS(LS_KEYS.CACHE_IMG, {});
-    let resetCount = 0;
-    
-    // Find and remove all 'FAILED' entries
-    Object.keys(cache).forEach(key => {
-      if (cache[key] === 'FAILED') {
-        delete cache[key];
-        resetCount++;
-      }
-    });
-    
-    // Save the cleaned cache
-    saveLS(LS_KEYS.CACHE_IMG, cache);
-    
-    console.log(`[Cache Reset] Reset ${resetCount} failed image cache entries`);
-    return resetCount;
-  } catch (error) {
-    console.error('[Cache Reset] Error resetting failed cache:', error);
-    return 0;
-  }
-}
 
 // -----------------------------------------------------------------------------
 // Lorcast Image Resolver
@@ -1625,621 +1013,7 @@ function resetFailedImageCache() {
  *   }
  */
 
-// -----------------------------------------------------------------------------
-// Single Source of Truth - API Configuration & Helpers
-// -----------------------------------------------------------------------------
-
-// Bases + defaults
-const LORCAST_BASE = "https://api.lorcast.com/v0";
-const DEFAULT_Q = "";
-const ALL_QUERY = "ink:amber or ink:amethyst or ink:emerald or ink:ruby or ink:sapphire or ink:steel or ink:colorless"; // Working query that returns cards
-const APP_VERSION = "1.0.1-lorcast-monolith+api";
-
-async function apiSearchCards({
-  q,
-  page = 1,
-  pageSize = 24,
-  inks = [],
-  types = [],
-  sets = [],
-  costs = [],
-  keywords = [],
-  archetypes = [],
-  format = "",
-}) {
-  // ----- Prefer Lorcast -----
-  try {
-    // Lorcast uses /cards/search and expects a single q expression.
-    // Keep it simple and feed the text query; advanced filters can be folded into q later.
-    const params = new URLSearchParams({
-      q: (q && q.trim()) || DEFAULT_Q,  // default so it never returns empty on first try
-      per_page: String(pageSize),
-      page: String(page),
-      unique: "cards",
-      order: "set",
-      dir: "asc",
-    });
-    const url = `${LORCAST_BASE}/cards/search?${params.toString()}`;
-    console.log("[API] Lorcast search:", url);
-    const res = await fetch(url, { headers: { Accept: "application/json" }, mode: "cors" });
-    if (res.ok) {
-      const json = await res.json();
-      
-      // Safe debugging - wrapped in try-catch to prevent any interference
-      try {
-        console.log('[API] Raw API response structure:', {
-          hasData: !!json?.data,
-          dataLength: json?.data?.length,
-          hasResults: !!json?.results,
-          resultsLength: json?.results?.length,
-          totalCards: json?.total_cards,
-          keys: Object.keys(json || {})
-        });
-      } catch (debugError) {
-        console.warn('[API] Debug logging failed:', debugError);
-      }
-      
-      const cards = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
-      const total = Number(json?.total_cards ?? cards.length);
-      const mapped = cards
-        .map(c => normalizeLorcast(c)) // <<— you already have this
-        .map(card => ({
-          id: card.id,
-          name: card.name,
-          // normalized set fields you can rely on
-          set: card.setCode,        // use the code as your canonical "set"
-          setCode: card.setCode,
-          setName: card.setName,
-          setNum: card.setNum,
-          number: card.number,
-          cost: card.cost,
-          inks: Array.isArray(card.inks) ? card.inks : [card.inks].filter(Boolean),
-          type: Array.isArray(card.types) ? card.types.join("/") : card.types,
-          classifications: card.classifications,
-          rarity: card.rarity,
-          image_url: card.image,
-          text: card.text,
-          // abilities/keywords (you normalize these already)
-          keywords: card.abilities,
-          abilities: card.abilities,
-          _abilitiesIndex: card._abilitiesIndex,
-          _source: card._source,
-          _raw: card._raw,
-        }))
-        .filter(c => c.image_url);
-      console.log(`[API] Lorcast returned ${mapped.length}/${total}`);
-      if (mapped.length > 0) return { cards: mapped, total };
-    }
-  } catch (e) {
-    console.warn("[API] Lorcast search failed, falling back to Lorcana-API:", e);
-  }
-
-  // Fallback disabled for now to avoid undefined URL issues.
-  // If Lorcast fails, return an empty result so the UI can handle it gracefully.
-  return { cards: [], total: 0 };
-}
-
-function buildLorcastURL(q) {
-  const query = (q && q.trim()) ? q.trim() : ALL_QUERY;
-  const params = new URLSearchParams({
-    q: query,
-    unique: "cards",
-  });
-  return `${LORCAST_BASE}/cards/search?${params.toString()}`;
-}
-
-async function fetchLorcast(q, _page = 1, _perPage = 250, signal) {
-  const res = await fetch(buildLorcastURL(q), { headers: { Accept: "application/json" }, mode: "cors", signal });
-  if (!res.ok) throw new Error(`Lorcast ${res.status}`);
-  const json = await res.json();
-  const list = Array.isArray(json?.results) ? json.results : [];
-  return { list, total: list.length, source: "lorcast" };
-}
-
-
-
-/* removed buildLorcanaApiURL for Lorcast-only */
-
-
-/* removed fetchLorcanaApi for Lorcast-only */
-
-
-async function fetchCardsPreferred(q, { page = 1, perPage = 250, signal } = {}) {
-  try {
-    return await fetchLorcast(q, page, perPage, signal);
-  } catch (e) {
-    console.warn("[fetchCardsPreferred] Lorcast failed:", e);
-    return { list: [], total: 0, source: "lorcast" };
-  }
-}
-
-// Comprehensive abilities normalization helper
-// This function extracts abilities from ALL possible sources in Lorcast data:
-// 1. Keywords array (e.g., ["Bodyguard", "Ward"])
-// 2. Abilities array (e.g., ["Support", "Rush"])
-// 3. Abilities string (e.g., "Shift 5, Bodyguard")
-// 4. Text scanning for known ability keywords
-// 5. Special handling for complex abilities like "Shift 5"
-function normalizeAbilities(card) {
-  // Define all known Lorcana ability keywords
-  const KNOWN_ABILITIES = [
-    "Bodyguard", "Evasive", "Resist", "Ward", "Shift", "Support", 
-    "Challenger", "Reckless", "Rush", "Singer", "Vanish", "Villain",
-    "Hero", "Princess", "Queen", "King", "Prince", "Dragon", "Fairy",
-    "Mermaid", "Pirate", "Royal", "Ally", "Enemy", "Friend", "Foe",
-    "Guard", "Scout", "Warrior", "Mage", "Archer", "Knight", "Paladin",
-    "Rogue", "Wizard", "Cleric", "Fighter", "Monk", "Ranger", "Sorcerer",
-    "Warlock", "Bard", "Druid", "Barbarian", "Artificer", "Blood Hunter"
-  ];
-
-  // Collect abilities from all possible sources
-  const abilities = new Set();
-
-  // 1. From Keywords array
-  if (Array.isArray(card.keywords)) {
-    card.keywords.forEach(k => {
-      if (k && typeof k === 'string' && k.trim()) {
-        abilities.add(k.trim());
-      }
-    });
-  }
-
-  // 2. From Abilities array
-  if (Array.isArray(card.Abilities)) {
-    card.Abilities.forEach(a => {
-      if (a && typeof a === 'string' && a.trim()) {
-        abilities.add(a.trim());
-      }
-    });
-  }
-
-  // 3. From Abilities string (comma-separated)
-  if (typeof card.Abilities === 'string' && card.Abilities.trim()) {
-    card.Abilities.split(',').forEach(a => {
-      if (a && a.trim()) {
-        abilities.add(a.trim());
-      }
-    });
-  }
-
-  // 4. From abilities array (lowercase)
-  if (Array.isArray(card.abilities)) {
-    card.abilities.forEach(a => {
-      if (a && typeof a === 'string' && a.trim()) {
-        abilities.add(a.trim());
-      }
-    });
-  }
-
-  // 5. From text fields - scan for ability keywords
-  const textFields = [
-    card.text,
-    card.Body_Text,
-    card.body_text,
-    card.oracle_text,
-    card.rules_text
-  ].filter(Boolean);
-
-  textFields.forEach(text => {
-    if (typeof text === 'string') {
-      // Split text into words and check for known abilities
-      const words = text.split(/[^A-Za-z]+/);
-      words.forEach(word => {
-        if (KNOWN_ABILITIES.includes(word)) {
-          abilities.add(word);
-        }
-      });
-    }
-  });
-
-  // 6. Special handling for Shift (often appears as "Shift 5" or similar)
-  if (card.text && typeof card.text === 'string') {
-    const shiftMatch = card.text.match(/Shift\s+\d+/i);
-    if (shiftMatch) {
-      abilities.add('Shift');
-    }
-  }
-
-  const result = Array.from(abilities);
-  
-  // Debug logging for abilities normalization
-  if (result.length > 0) {
-    console.log(`[normalizeAbilities] Found abilities for ${card.name}:`, result);
-  }
-  
-  return result;
-}
-
-function normalizeLorcast(c) {
-  console.log('[normalizeLorcast] Raw card data:', {
-    name: c.name,
-    set: c.set,
-    ink: c.ink,
-    inks: c.inks,
-    type: c.type,
-    rarity: c.rarity,
-    _fullSet: c.set,
-    _fullType: c.type,
-    Abilities: c.Abilities,
-    abilities: c.abilities,
-    keywords: c.keywords,
-    Body_Text: c.Body_Text,
-    body_text: c.body_text,
-    text: c.text
-  });
-  
-  const dig = c?.image_uris?.digital || {};
-  const image =
-    dig.large || dig.normal || dig.small ||
-    c?.image_uris?.large || c?.image_uris?.normal || c?.image_uris?.small || "";
-
-  const typeList = Array.isArray(c.type) ? c.type : (typeof c.type === "string" ? [c.type] : []);
-  
-  // Robust ink handling - try multiple sources
-  let inks = [];
-  if (Array.isArray(c.inks) && c.inks.length > 0) {
-    inks = c.inks;
-  } else if (Array.isArray(c.ink) && c.ink.length > 0) {
-    inks = c.ink;
-  } else if (c.ink) {
-    inks = [c.ink];
-  } else if (c.color) {
-    inks = [c.color];
-  } else if (c.colors) {
-    inks = Array.isArray(c.colors) ? c.colors : [c.colors];
-  }
-  
-  // Use Lorcast's set object directly (set.code is "1", "2", "D100", etc.)
-  const rawSet = c.set || {};
-  const setCode = String(rawSet.code ?? rawSet).toUpperCase(); // "1", "2", "D100"
-  const setName = String(rawSet.name ?? "");
-  const setNum = /^\d+$/.test(setCode) ? Number(setCode) : null; // 1, 2, 3… else null (e.g. "D100")
-  
-  // Extract abilities using the new helper
-  const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
-  
-      // Use the version field directly from the API for subtitle
-    const baseName = c.name;
-    const subname = c.version;
-    
-    // Debug: Log the extraction
-    if (subname) {
-      console.log(`[normalizeLorcast] Using version for "${c.name}": baseName="${baseName}", subname="${subname}"`);
-    }
-    
-    const result = {
-      id: c.id || c.collector_number || c.name,
-      name: c.name,
-      baseName,                    // <-- Base name (without subtitle)
-      subname,                     // <-- Subtitle from version field
-      // NORMALIZED set fields using Lorcast's actual model:
-      set: setCode || setName || (setNum != null ? String(setNum) : ""),
-      setCode: setCode,           // canonical key for filters/sort ("1", "2", "D100")
-      setName: setName,           // nice label ("The First Chapter")
-      setNum: setNum,            // numeric if possible, else null (1, 2, 3...)
-      number: c.collector_number,
-      types: typeList,
-      classifications: Array.isArray(c.classifications) ? c.classifications : [],
-      rarity: c.rarity,
-      cost: c.cost ?? c.ink_cost,
-      inks: inks,
-      text: c.oracle_text || c.text || c.body_text || c.Body_Text || c.rules_text || "",
-      keywords: abilities, // Use the pretty abilities list
-      abilities: abilities, // Use the pretty abilities list
-      _abilitiesIndex: _abilitiesIndex, // Add the normalized index for filtering
-      image,
-      _source: "lorcast",
-      _raw: c,
-      // Preserve inkable flag for proper detection - prioritize inkwell field
-      inkable: Boolean(c.inkable ?? c.inkwell ?? c.can_be_ink ?? c.Inkable ?? false),
-    };
-  
-  console.log('[normalizeLorcast] Normalized result:', {
-    name: result.name,
-    set: result.set,
-    setCode: result.setCode,
-    setNum: result.setNum,
-    inks: result.inks,
-    type: result.types,
-    text: result.text,
-    keywords: result.keywords
-  });
-  
-  return result;
-}
-
-function normalizeLorcanaApi(c) {
-  // Use the new normalized helpers
-  const setMeta = normalizeSetMeta(c);
-  const cardType = normalizedType(c);
-  
-  // Extract abilities using the new helper
-  const { pretty: abilities, index: _abilitiesIndex } = extractAbilities(c);
-  
-  return {
-    id: c._id || c.id || c.card_id || c.name,
-    name: c.name,
-    // NORMALIZED set fields you can rely on everywhere:
-    set: setMeta.code,           // e.g. "TFC"
-    setCode: setMeta.code,       // e.g. "TFC"
-    setName: setMeta.name,       // e.g. "The First Chapter"
-    setNum: setMeta.num,         // numeric series index if present
-    number: c.card_num || c.collector_number,
-    types: c.types || [],
-    rarity: c.rarity,
-    cost: c.ink_cost ?? c.cost,
-    inks: c.ink || c.inks || [],
-    text: c.Body_Text || c.body_text || c.text || "",
-    keywords: abilities, // Use the pretty abilities list
-    abilities: abilities, // Use the pretty abilities list
-    _abilitiesIndex: _abilitiesIndex, // Add the normalized abilities index
-    image: c.image || c.imageUrl || "",
-    _source: "lorcana-api",
-    _raw: c,
-  };
-}
-
-function normalizeCards(list, source) {
-  return source === "lorcast" ? list.map(normalizeLorcast) : list.map(normalizeLorcanaApi);
-}
-
-// -----------------------------------------------------------------------------
-// ONE definitive fetchAllCards that RETURNS AN ARRAY and uses DEFAULT_Q
-async function fetchAllCards({ signal } = {}) {
-  try {
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
-    const normalized = normalizeCards(list, source);
-    console.log(`[API] Loaded ${normalized.length}/${total} cards from ${source}`);
-    
-    // Safe debugging: Check if we're getting cards with subnames
-    try {
-      const cardsWithSubnames = normalized.filter(card => card.name && card.name.includes(' - '));
-      console.log(`[API] Cards with subnames found: ${cardsWithSubnames.length}`);
-      if (cardsWithSubnames.length > 0) {
-        console.log('[API] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
-      }
-    } catch (debugError) {
-      console.warn('[API] Subname detection debug failed:', debugError);
-    }
-    
-    const mapped = normalized.map(card => ({
-      id: card.id,
-      name: card.name,
-      // CRITICAL: Preserve baseName and subname for subtitle matching
-      baseName: card.baseName,
-      subname: card.subname,
-      // NORMALIZED set fields you can rely on everywhere:
-      set: card.set,           // e.g. "TFC"
-      setCode: card.setCode,   // e.g. "TFC"
-      setName: card.setName,   // e.g. "The First Chapter"
-      setNum: card.setNum,     // numeric series index if present
-      number: card.number,
-      cost: card.cost,
-      inks: Array.isArray(card.inks) ? card.inks : [card.inks].filter(Boolean),
-      type: Array.isArray(card.types) ? card.types.join("/") : card.types,
-      rarity: card.rarity,
-      image_url: card.image,
-      _source: card._source,
-      _raw: card._raw,
-      // Preserve additional fields that might be needed for filtering
-      text: card.text,
-      classifications: card.classifications,
-      keywords: card.keywords,
-      abilities: card.keywords, // Now contains comprehensive abilities from all sources
-      _abilitiesIndex: card._abilitiesIndex, // Preserve the normalized abilities index
-      franchise: card.franchise,
-      gamemode: card.gamemode,
-      inkable: card.inkable,
-      lore: card.lore,
-      willpower: card.willpower,
-      strength: card.strength
-    }));
-    
-    // Debug: Check if abilities are being extracted correctly
-    const sample = mapped.find(x => x.name && x._abilitiesIndex?.size);
-    if (sample) {
-      console.log("[DBG] Sample abilities", sample.name, sample._abilitiesIndex, sample.abilities);
-    } else {
-      console.log("[DBG] No cards with abilities index found");
-    }
-    
-    // Debug: Check if set fields are being normalized correctly
-    const setSample = mapped.find(x => x.name && x.set);
-    if (setSample) {
-      console.log("[DBG] Set fields sample", setSample.name, setSample.set, setSample.setName, setSample.setNum);
-    } else {
-      console.log("[DBG] No cards with set fields found");
-    }
-    
-    // Debug: Check if baseName and subname are being preserved
-    const subnameSample = mapped.find(x => x.name && x.subname);
-    if (subnameSample) {
-      console.log("[DBG] Subname sample", subnameSample.name, "baseName:", subnameSample.baseName, "subname:", subnameSample.subname);
-    } else {
-      console.log("[DBG] No cards with subname fields found");
-    }
-    
-    return mapped;
-  } catch (e) {
-    console.error("[API] Unified fetch failed:", e);
-    return [];
-  }
-}
-
-async function fetchAllCardsFallback({ signal } = {}) {
-  try {
-    console.log('[API] Fallback using unified fetch...');
-    const { list, total, source } = await fetchCardsPreferred(DEFAULT_Q, { page: 1, perPage: 2000, signal });
-    const normalized = normalizeCards(list, source);
-    console.log(`[API] Fallback loaded ${normalized.length}/${total} cards from ${source}`);
-    
-    const mapped = normalized.map(card => ({
-      id: card.id,
-      name: card.name,
-      // CRITICAL: Preserve baseName and subname for subtitle matching
-      baseName: card.baseName,
-      subname: card.subname,
-      // NORMALIZED set fields you can rely on everywhere:
-      set: card.set,           // e.g. "TFC"
-      setNum: card.setNum,     // numeric series index if present
-      setName: card.setName,   // e.g. "The First Chapter"
-      setCode: card.setCode,   // e.g. "TFC"
-      number: card.number,
-      cost: card.cost,
-      inks: Array.isArray(card.inks) ? card.inks : [card.inks].filter(Boolean),
-      type: Array.isArray(card.types) ? card.types.join("/") : card.types,
-      rarity: card.rarity,
-      image_url: card.image,
-      _source: card._source,
-      _raw: card._raw,
-      // Preserve additional fields that might be needed for filtering
-      text: card.text,
-      classifications: card.classifications,
-      keywords: card.keywords,
-      abilities: card.keywords, // Now contains comprehensive abilities from all sources
-      _abilitiesIndex: card._abilitiesIndex, // Preserve the normalized abilities index
-      franchise: card.franchise,
-      gamemode: card.gamemode,
-      inkable: card.inkable,
-      lore: card.lore,
-      willpower: card.willpower,
-      strength: card.strength
-    }));
-    
-    // Debug: Check if abilities are being extracted correctly
-    const sample = mapped.find(x => x.name && x._abilitiesIndex?.size);
-    if (sample) {
-      console.log("[DBG] Sample abilities", sample.name, sample._abilitiesIndex, sample.abilities);
-    } else {
-      console.log("[DBG] No cards with abilities index found");
-    }
-    
-    // Debug: Check if set fields are being normalized correctly
-    const setSample = mapped.find(x => x.name && x.set);
-    if (setSample) {
-      console.log("[DBG] Set fields sample", setSample.name, setSample.set, setSample.setName, setSample.setNum);
-    } else {
-      console.log("[DBG] No cards with set fields found");
-    }
-    
-    return mapped;
-  } catch (error) {
-    console.error('[API] Fallback failed:', error);
-    return [];
-  }
-}
-
-function removeDuplicateCards(cards) {
-  const seen = new Set();
-  const uniqueCards = [];
-  
-  for (const card of cards) {
-    if (!card || typeof card !== 'object') continue;
-    
-    // Create a unique identifier for the card
-    const cardId = card.id || `${card.set || 'unknown'}-${card.number || 'unknown'}-${card.name || 'unknown'}`;
-    
-    if (!seen.has(cardId)) {
-      seen.add(cardId);
-      uniqueCards.push(card);
-    }
-  }
-  
-  return uniqueCards;
-}
-
-// Simplified card processing - just return cards as-is
-function processAndNormalizeCards(cards) {
-  if (!Array.isArray(cards) || cards.length === 0) {
-    console.warn('[API] No cards to process');
-    return [];
-  }
-  
-  console.log(`[API] Processing ${cards.length} cards (no validation)`);
-  
-  // Just return the cards directly without complex validation
-  return cards;
-}
-
-
-function normalizeCard(raw) {
-  if (!raw || typeof raw !== 'object') {
-    console.warn('[normalizeCard] Invalid raw data:', raw);
-    return null;
-  }
-  
-  if (!raw.name && !raw.title) {
-    console.warn('[normalizeCard] Card missing name/title:', raw);
-    return null;
-  }
-  
-  // Handle both Lorcana-API.com and Lorcast formats
-  let imageUrl = null;
-  
-  // Try Lorcana-API.com format first
-  if (raw.Image || raw.image || raw.ImageUrl || raw.ImageURL || raw.Images) {
-    imageUrl = raw.Image || raw.image || raw.ImageUrl || raw.ImageURL || 
-               (raw.Images && (raw.Images.Full || raw.Images.full || raw.Images.Normal));
-  }
-  // Fallback to Lorcast format
-  else if (raw.image_uris && raw.image_uris.digital) {
-    const dig = raw.image_uris.digital;
-    imageUrl = dig.large || dig.normal || dig.small;
-  }
-  // Try other common fields
-  else if (raw.image_url || raw.image) {
-    imageUrl = raw.image_url || raw.image;
-  }
-  // Try Lorcast API Image field
-  else if (raw.Image) {
-    imageUrl = raw.Image;
-  }
-  
-  const displayName = raw.name || raw.Name || raw.title || raw.Title || "Unknown Card";
-  
-  // Extract baseName and subname from display name (split on hyphen/en dash/em dash)
-  const parts = displayName.split(/\s*[-–—]\s*/);
-  const baseName = parts[0]?.trim() || displayName;
-  const subname = parts[1]?.trim() || null;
-  
-  const setCode = raw.set?.code || raw.set || raw.set_code || raw.setCode || raw.setName || raw.Set_ID || "Unknown";
-  const collectorNo = raw.collector_number || raw.number || raw.no || raw.Card_Num || 0;
-  const cost = raw.cost ?? raw.ink_cost ?? raw.inkCost ?? raw.Cost ?? 0;
-  const inks = raw.ink ? [raw.ink] : (raw.Color ? raw.Color.split(',').map(c => c.trim()) : []);
-  const type = Array.isArray(raw.type) ? raw.type.join("/") : (raw.type || raw.Type || "Unknown");
-  const rarity = raw.rarity || raw.rarityLabel || raw.Rarity || "Unknown";
-  const text = raw.text || raw.rules_text || raw.abilityText || raw.rules || raw.abilities || raw.Body_Text || "";
-  
-  const id = raw.id || raw._id || raw.Unique_ID || `${setCode}-${collectorNo}-${displayName}`;
-  
-  return {
-    id,
-    name: displayName,        // Keep exact from API
-    baseName,                 // <-- New: extracted base name
-    subname,                  // <-- New: extracted subtitle
-    set: setCode,
-    setName: raw.set?.name || raw.Set_Name || undefined,
-    number: collectorNo,
-    cost,
-    inks,
-    type,
-    rarity,
-    text,
-    classifications: raw.classifications || raw.Classifications || raw.subtypes || [],
-    keywords: raw.keywords || raw.Abilities || raw.abilities || [],
-    // Store the image URL directly without processing
-    image_url: imageUrl, // This now handles both API formats
-    _raw: raw,
-    // Additional fields
-    franchise: raw.franchise || raw.Franchise || "",
-    gamemode: raw.gamemode || raw.Gamemode || "",
-    inkable: Boolean(raw.inkable ?? raw.can_be_ink ?? raw.Inkable ?? raw.inkwell ?? false),
-    lore: raw.lore || raw.Lore || 0,
-    willpower: raw.willpower || raw.Willpower || 0,
-    strength: raw.strength || raw.Strength || 0,
-    setNum: raw.setNum || raw.Set_Num || undefined,
-  };
-}
+// Lorcast card-API layer (fetch + normalization) extracted to ./lib/cardsApi.js (Phase 5.2)
 
 // DUPLICATE SECTION REMOVED - Local storage functions are now at the top of the file
 
@@ -2285,6 +1059,10 @@ function ToastProvider({ children }) {
 function useToasts() {
   return useContext(ToastContext);
 }
+
+// Exported so RouterApp.jsx can hoist a single ToastProvider above the whole
+// router (covering routes like /my-decks that don't mount AppInner).
+export { ToastProvider, useToasts };
 
 // -----------------------------------------------------------------------------
 // Enhanced Deck Management
@@ -2408,82 +1186,6 @@ function duplicateDeck(decks, deckId, newName = null) {
   const updatedDecks = { ...decks, [newDeck.id]: newDeck };
   saveAllDecks(updatedDecks);
   return updatedDecks;
-}
-
-// Export deck to various formats
-function exportDeck(deck, format = 'json') {
-  switch (format) {
-    case 'json':
-      return JSON.stringify(deck, null, 2);
-    case 'txt':
-      return generateTextExport(deck);
-    case 'simple-txt':
-      return generateSimpleTextExport(deck);
-    case 'csv':
-      return generateCSVExport(deck);
-    default:
-      return JSON.stringify(deck, null, 2);
-  }
-}
-
-// Generate text export
-function generateTextExport(deck) {
-  const lines = [
-    `${deck.name}`,
-    `Format: ${deck.format}`,
-    `Created: ${new Date(deck.createdAt).toLocaleDateString()}`,
-    `Updated: ${new Date(deck.updatedAt).toLocaleDateString()}`,
-    `Total Cards: ${deck.total}`,
-    '',
-    'Cards:',
-    ''
-  ];
-  
-  // Group by cost
-  const entries = Object.values(deck.entries).filter(e => e.count > 0);
-  const groupedByCost = groupBy(entries, (e) => getCost(e.card));
-  
-  Object.keys(groupedByCost)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .forEach(cost => {
-      lines.push(`Cost ${cost}:`);
-      groupedByCost[cost].forEach(entry => {
-        const card = entry.card;
-        lines.push(`  ${entry.count}x ${card.name} (${card.set} #${card.number})`);
-      });
-      lines.push('');
-    });
-  
-  return lines.join('\n');
-}
-
-// Generate simple text export (matches import format)
-function generateSimpleTextExport(deck) {
-  const lines = [];
-  
-  // Get all entries with count > 0, sorted by card name
-  const entries = Object.values(deck.entries)
-    .filter(e => e.count > 0)
-    .sort((a, b) => a.card.name.localeCompare(b.card.name));
-  
-  entries.forEach(entry => {
-    lines.push(`${entry.count} ${entry.card.name}`);
-  });
-  
-  return lines.join('\n');
-}
-
-// Generate CSV export
-function generateCSVExport(deck) {
-  const lines = ['Name,Set,Number,Cost,Type,Rarity,Count'];
-  
-  const entries = Object.values(deck.entries).filter(e => e.count > 0);
-  entries.forEach(entry => {
-    const card = entry.card;
-    lines.push(`"${card.name}","${card.set}","${card.number}","${getCost(card)}","${card.type}","${card.rarity}","${entry.count}"`);
-  });
-  
-  return lines.join('\n');
 }
 
 // Import deck from various formats
@@ -3204,10 +1906,15 @@ function deckReducer(state, action) {
       const existing = state.entries[key]?.count || 0;
       const nextCount = clamp(existing + count, 0, DECK_RULES.MAX_COPIES);
       const nextEntries = { ...state.entries };
-      nextEntries[key] = {
-        card,
-        count: nextCount,
-      };
+      if (nextCount <= 0) {
+        // Decremented to zero — remove the entry instead of keeping a ghost.
+        delete nextEntries[key];
+      } else {
+        nextEntries[key] = {
+          card,
+          count: nextCount,
+        };
+      }
       const newTotal =
         Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0) || 0;
       const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
@@ -3217,10 +1924,14 @@ function deckReducer(state, action) {
       const { card, count } = action;
       const key = deckKey(card);
       const nextEntries = { ...state.entries };
-      nextEntries[key] = {
-        card,
-        count: clamp(count, 0, DECK_RULES.MAX_COPIES)
-      };
+      const clamped = clamp(count, 0, DECK_RULES.MAX_COPIES);
+      if (clamped <= 0) {
+        // Count 0 means the card is out of the deck — drop the entry entirely.
+        // Keeping it produced ghost "0x" rows in saved decks (My Decks page).
+        delete nextEntries[key];
+      } else {
+        nextEntries[key] = { card, count: clamped };
+      }
       const newTotal = Object.values(nextEntries).reduce((a, b) => a + (b?.count || 0), 0);
       const next = { ...state, entries: nextEntries, total: newTotal, updatedAt: Date.now() };
       return next;
@@ -3524,11 +2235,11 @@ function filterReducer(state, action) {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
+function TopBar({ onResetDeck, onExport, onImport, onPrint, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-[#0a0d13]/70 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[#0a0d13]/70 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
       {/* Search bar - always visible */}
-      <div className="flex-1 max-w-xl">
+      <div className="flex-1 min-w-[160px] max-w-xl">
         <input
           className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 placeholder:text-gray-500"
           placeholder="Search cards by name, text, etc."
@@ -3537,7 +2248,7 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
 
         <button
           className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
@@ -3566,14 +2277,6 @@ function TopBar({ onResetDeck, onExport, onImport, onPrint, onDeckPresentation, 
           title="Import deck JSON"
         >
           Import
-        </button>
-        
-        <button
-          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-violet-200 hover:bg-violet-500/15 hover:border-violet-400/40 transition"
-          onClick={onTeamHub}
-          title="Team Hub"
-        >
-          Team Hub
         </button>
         
       </div>
@@ -4634,34 +3337,40 @@ function DrawSimulator({ deck }) {
             // Single simulation - show detailed turn-by-turn
             <div className="bg-gray-700 rounded-lg p-4">
               <h4 className="font-semibold mb-3 text-emerald-300">Detailed Simulation Result</h4>
-              <div className="space-y-2">
-                {simulationResults[0].map(turn => (
-                  <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm border-b border-gray-600 pb-2">
-                    <div className="text-center">
-                      <div className="font-medium">Turn {turn.turn}</div>
+              {/* 6-column turn table doesn't reflow to a single column sensibly
+                  (each column is a different stat for the same turn), so it
+                  scrolls horizontally in its own box on narrow viewports
+                  instead of squeezing or overflowing the page. */}
+              <div className="overflow-x-auto">
+                <div className="space-y-2 min-w-[480px]">
+                  {simulationResults[0].map(turn => (
+                    <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm border-b border-gray-600 pb-2">
+                      <div className="text-center">
+                        <div className="font-medium">Turn {turn.turn}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-gray-400">Hand</div>
+                        <div>{turn.handSize}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-gray-400">Playable</div>
+                        <div className="text-emerald-400">{turn.playableCards}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-gray-400">Uninkable</div>
+                        <div className="text-amber-400">{turn.uninkableCards}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-gray-400">Curve Hits</div>
+                        <div className="text-blue-400">{turn.curveHits}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-gray-400">Avg Cost</div>
+                        <div>{turn.averageCost}</div>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-gray-400">Hand</div>
-                      <div>{turn.handSize}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-400">Playable</div>
-                      <div className="text-emerald-400">{turn.playableCards}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-400">Uninkable</div>
-                      <div className="text-amber-400">{turn.uninkableCards}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-400">Curve Hits</div>
-                      <div className="text-blue-400">{turn.curveHits}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-400">Avg Cost</div>
-                      <div>{turn.averageCost}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -4670,25 +3379,29 @@ function DrawSimulator({ deck }) {
               <h4 className="font-semibold mb-3 text-emerald-300">
                 Average Results ({numSimulations} simulations)
               </h4>
-              <div className="space-y-2">
-                <div className="grid grid-cols-6 gap-2 text-xs text-gray-400 border-b border-gray-600 pb-1">
-                  <div className="text-center">Turn</div>
-                  <div className="text-center">Hand Size</div>
-                  <div className="text-center">Playable</div>
-                  <div className="text-center">Uninkable</div>
-                  <div className="text-center">Curve Hits</div>
-                  <div className="text-center">Avg Cost</div>
-                </div>
-                {averageResults.map(turn => (
-                  <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm">
-                    <div className="text-center font-medium">{turn.turn}</div>
-                    <div className="text-center">{turn.avgHandSize}</div>
-                    <div className="text-center text-emerald-400">{turn.avgPlayable}</div>
-                    <div className="text-center text-amber-400">{turn.avgUninkable}</div>
-                    <div className="text-center text-blue-400">{turn.avgCurveHits}</div>
-                    <div className="text-center">{turn.avgCost}</div>
+              {/* Same rationale as the detailed table above: scrolls in its
+                  own box on narrow viewports rather than breaking page layout. */}
+              <div className="overflow-x-auto">
+                <div className="space-y-2 min-w-[480px]">
+                  <div className="grid grid-cols-6 gap-2 text-xs text-gray-400 border-b border-gray-600 pb-1">
+                    <div className="text-center">Turn</div>
+                    <div className="text-center">Hand Size</div>
+                    <div className="text-center">Playable</div>
+                    <div className="text-center">Uninkable</div>
+                    <div className="text-center">Curve Hits</div>
+                    <div className="text-center">Avg Cost</div>
                   </div>
-                ))}
+                  {averageResults.map(turn => (
+                    <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm">
+                      <div className="text-center font-medium">{turn.turn}</div>
+                      <div className="text-center">{turn.avgHandSize}</div>
+                      <div className="text-center text-emerald-400">{turn.avgPlayable}</div>
+                      <div className="text-center text-amber-400">{turn.avgUninkable}</div>
+                      <div className="text-center text-blue-400">{turn.avgCurveHits}</div>
+                      <div className="text-center">{turn.avgCost}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -4706,51 +3419,75 @@ function DrawSimulator({ deck }) {
 
 // Card grid ------------------------------------------------------------------
 
+const PAGE_SIZE = 60;
+
 function CardGrid({ cards, onAdd, onInspect, deck }) {
-  // Filter out only completely invalid cards, be more lenient
   const validCards = cards.filter(card => card && typeof card === 'object');
-  if (validCards.length !== cards.length) {
-    console.warn(`[CardGrid] Filtered out ${cards.length - validCards.length} completely invalid cards`);
-  }
-  
-  // Get deck count for each card
+
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef(null);
+
+  // Reset to first page when the card list changes (filter / search)
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [cards]);
+
+  // Load next page when the sentinel scrolls into view
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setDisplayCount((n) => Math.min(n + PAGE_SIZE, validCards.length));
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [validCards.length]);
+
   const getDeckCount = (card) => {
     const key = deckKey(card);
     return deck?.entries?.[key]?.count || 0;
   };
-  
+
+  const visible = validCards.slice(0, displayCount);
+  const hasMore = displayCount < validCards.length;
+
   return (
     <div className="space-y-3 p-3">
-      {/* Show message if no valid cards */}
       {validCards.length === 0 && (
         <div className="text-center py-8 text-gray-400">
           <div className="text-lg mb-2">No valid cards found</div>
           <div className="text-sm">Please check your data source or try refreshing the page</div>
         </div>
       )}
-      
-      {/* Show all cards at once - no infinite scroll */}
+
       {validCards.length > 0 && (
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", gap: "12px" }}>
-          {validCards.map((c) => (
+          {visible.map((c) => (
             <div key={deckKey(c)}>
-              <CardTile 
-                card={c} 
-                onAdd={(card, count = 1) => onAdd(card, count)} 
-                onInspect={() => onInspect(c)}
+              <CardTile
+                card={c}
+                onAdd={onAdd}
+                onInspect={onInspect}
                 deckCount={getDeckCount(c)}
               />
             </div>
           ))}
         </div>
       )}
-      
-      {/* Card count indicator */}
-      {validCards.length > 0 && (
-        <div className="text-center py-4 text-gray-500">
-          Showing {validCards.length} cards
-        </div>
-      )}
+
+      {/* Sentinel — triggers next page when scrolled into view */}
+      <div ref={sentinelRef} className="py-2 text-center text-xs text-gray-600">
+        {hasMore
+          ? `Showing ${visible.length} of ${validCards.length} cards — scroll for more`
+          : validCards.length > 0
+            ? `All ${validCards.length} cards shown`
+            : null}
+      </div>
     </div>
   );
 }
@@ -4758,7 +3495,7 @@ function CardGrid({ cards, onAdd, onInspect, deck }) {
 // Enhanced image function that supports multiple image sources
 // getCardImg is imported from ./lib/cardUtils.js
 
-function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
+const CardTile = React.memo(function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
   if (!card || typeof card !== 'object' || !card.name) {
     console.warn('[CardTile] Invalid card object, showing fallback:', card);
     return (
@@ -4782,7 +3519,7 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
           alt={card.name}
           className="block w-full h-auto aspect-[5/7] object-cover"
           loading="lazy"
-          onClick={onInspect}
+          onClick={() => onInspect(card)}
         />
       ) : (
         <div className="w-full aspect-[5/7] bg-gray-800 flex items-center justify-center">
@@ -4826,58 +3563,48 @@ function CardTile({ card, onAdd, onInspect, deckCount = 0 }) {
       </div>
     </div>
   );
-}
+});
 
 // Deck Manager Component
 // -----------------------------------------------------------------------------
 
-function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onExportDeck, onImportDeck, onRefreshDecks }) {
+function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNewDeck, onDeleteDeck, onDuplicateDeck, onImportDeck, onRefreshDecks, onRenameDeck }) {
+  const { user } = useAuth();
   const [selectedDeckId, setSelectedDeckId] = useState(currentDeckId);
   const [showNewDeckForm, setShowNewDeckForm] = useState(false);
   const [newDeckName, setNewDeckName] = useState("");
   const [exportFormat, setExportFormat] = useState("json");
   const [importFormat, setImportFormat] = useState("json");
   const [importData, setImportData] = useState("");
+  const [renamingDeckId, setRenamingDeckId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
 
-  // Only fix selectedDeckId if it's invalid - don't override user selections
   useEffect(() => {
-    // If selectedDeckId is invalid (null, undefined, or points to a non-existent deck)
-    // AND there are decks available, then set a valid selectedDeckId.
     if (Object.keys(decks).length > 0 && (!selectedDeckId || !decks[selectedDeckId])) {
-      // Prioritize currentDeckId if it's valid, otherwise pick the first available deck
-      const fallbackDeckId = currentDeckId && decks[currentDeckId] ? currentDeckId : Object.keys(decks)[0];
-      console.log('[DeckManager] Fixing invalid selectedDeckId. Setting to fallback:', fallbackDeckId);
-      setSelectedDeckId(fallbackDeckId);
+      const fallback = currentDeckId && decks[currentDeckId] ? currentDeckId : Object.keys(decks)[0];
+      setSelectedDeckId(fallback);
     }
   }, [currentDeckId, decks, selectedDeckId]);
 
-  // Additional safety check: ensure selectedDeckId is always valid
   useEffect(() => {
     if (selectedDeckId && !decks[selectedDeckId] && Object.keys(decks).length > 0) {
-      console.log('[DeckManager] Safety check: selectedDeckId is invalid, fixing...');
-      const firstDeckId = Object.keys(decks)[0];
-      setSelectedDeckId(firstDeckId);
+      setSelectedDeckId(Object.keys(decks)[0]);
     }
   }, [selectedDeckId, decks]);
 
   if (!isOpen) return null;
 
-  const currentDeck = decks[currentDeckId];
   const selectedDeck = decks[selectedDeckId];
-  
-  // Debug logging
-  console.log('[DeckManager] Debug info:', {
-    currentDeckId,
-    selectedDeckId,
-    decksKeys: Object.keys(decks),
-    currentDeck: currentDeck?.name,
-    selectedDeck: selectedDeck?.name,
-    selectedDeckExists: !!selectedDeck
-  });
+  const sortedDecks = Object.values(decks).sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
+
+  function formatDate(ts) {
+    return ts ? new Date(ts).toLocaleDateString() : 'Not saved';
+  }
 
   const handleNewDeck = () => {
-    if (String(newDeckName).trim()) {
-      onNewDeck(String(newDeckName).trim());
+    const name = String(newDeckName).trim();
+    if (name) {
+      onNewDeck(name);
       setNewDeckName("");
       setShowNewDeckForm(false);
     }
@@ -4885,55 +3612,29 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
   const handleExport = () => {
     if (!selectedDeck) return;
-    
-    const exportData = exportDeck(selectedDeck, exportFormat);
-    const blob = new Blob([exportData], { type: 'text/plain' });
+    const data = exportDeck(selectedDeck, exportFormat);
+    const blob = new Blob([data], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
-    // Handle file extension for different formats
-    let fileExtension = exportFormat;
-    if (exportFormat === 'simple-txt') {
-      fileExtension = 'txt';
-    }
-    
-    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${fileExtension}`;
+    a.download = `${selectedDeck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${exportFormat === 'simple-txt' ? 'txt' : exportFormat}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
-    if (!importData.trim()) return;
-    
-    try {
-      const importedDeck = importDeck(importData, importFormat);
-      onImportDeck(importedDeck);
-      setImportData("");
-      onClose();
-    } catch (error) {
-      alert(`Import failed: ${error.message}`);
-    }
-  };
-  
   const handleImportWithWarnings = () => {
     if (!importData.trim()) return;
-    
     try {
       const importedDeck = importDeck(importData, importFormat);
-      
-      // Check if any cards were not found in the database
       const unknownCards = Object.values(importedDeck.entries)
         .filter(entry => entry.card.set === "Unknown")
         .map(entry => entry.card.name);
-      
       let message = `Successfully imported deck with ${importedDeck.total} cards.`;
       if (unknownCards.length > 0) {
         message += `\n\nNote: ${unknownCards.length} cards were not found in the database and may need to be loaded first:\n${unknownCards.join(', ')}`;
       }
-      
       alert(message);
       onImportDeck(importedDeck);
       setImportData("");
@@ -4943,47 +3644,57 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
     }
   };
 
+  const startRename = (deck) => {
+    setRenamingDeckId(deck.id);
+    setRenameValue(deck.name);
+  };
+
+  const commitRename = () => {
+    if (renamingDeckId && renameValue.trim()) {
+      onRenameDeck(renamingDeckId, renameValue.trim());
+    }
+    setRenamingDeckId(null);
+    setRenameValue("");
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-xl border border-white/10 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-xl font-semibold">Deck Manager</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-          >
-            ✕
-          </button>
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-gray-900 rounded-xl border border-white/10 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+          <h2 className="text-xl font-semibold">My Decks</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">✕</button>
         </div>
 
-        <div className="flex h-96">
-          {/* Left side - Deck list */}
-          <div className="w-1/3 border-r border-white/10 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Your Decks</h3>
+        {/* Auth nudge */}
+        {!user && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-violet-900/30 border-b border-violet-700/40 text-sm text-violet-200 flex-shrink-0">
+            <span>☁</span>
+            <span>Log in to sync your decks across devices and keep them backed up.</span>
+          </div>
+        )}
+
+        <div className="flex flex-1 min-h-0">
+          {/* Left — deck list */}
+          <div className="w-72 border-r border-white/10 flex flex-col flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+              <span className="text-sm font-medium text-gray-300">Your Decks ({sortedDecks.length})</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={async () => {
-                    console.log('[DeckManager] Manual refresh triggered');
-                    try {
-                      if (onRefreshDecks) {
-                        await onRefreshDecks();
-                        console.log('[DeckManager] Manual refresh completed');
-                      } else {
-                        console.warn('[DeckManager] No onRefreshDecks function provided');
-                      }
-                    } catch (error) {
-                      console.error('[DeckManager] Manual refresh failed:', error);
-                    }
-                  }}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
-                  title="Refresh decks from cloud"
-                >
-                  ↻ Refresh
-                </button>
+                {user && (
+                  <button
+                    onClick={async () => { if (onRefreshDecks) await onRefreshDecks(); }}
+                    className="px-2 py-1 bg-white/5 border border-white/10 hover:bg-white/10 rounded text-xs text-gray-300 transition-colors"
+                    title="Refresh from cloud"
+                  >
+                    ↻
+                  </button>
+                )}
                 <button
                   onClick={() => setShowNewDeckForm(true)}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs transition-colors"
                 >
                   + New
                 </button>
@@ -4991,214 +3702,207 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
             </div>
 
             {showNewDeckForm && (
-              <div className="mb-4 p-3 bg-gray-800 rounded border border-gray-600">
+              <div className="m-3 p-3 bg-gray-800 rounded border border-gray-600 flex-shrink-0">
                 <input
                   type="text"
                   placeholder="Deck name"
                   value={newDeckName}
                   onChange={(e) => setNewDeckName(e.target.value)}
-                  className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm mb-2"
-                  onKeyPress={(e) => e.key === 'Enter' && handleNewDeck()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleNewDeck()}
+                  className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm mb-2 outline-none focus:border-violet-500"
+                  autoFocus
                 />
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleNewDeck}
-                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs"
-                  >
-                    Create
-                  </button>
-                  <button
-                    onClick={() => setShowNewDeckForm(false)}
-                    className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={handleNewDeck} className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs">Create</button>
+                  <button onClick={() => { setShowNewDeckForm(false); setNewDeckName(""); }} className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs">Cancel</button>
                 </div>
               </div>
             )}
 
-            <div className="space-y-2">
-              {Object.keys(decks).length === 0 ? (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {sortedDecks.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <div className="text-4xl mb-3">📁</div>
-                  <div className="font-medium mb-2">No Saved Decks</div>
-                  <div className="text-sm">
-                    Create a deck and save it to see it here.
-                  </div>
+                  <div className="font-medium mb-1">No Saved Decks</div>
+                  <div className="text-sm">Create a deck and save it to see it here.</div>
                 </div>
-              ) : (
-                Object.values(decks).map((deck) => (
-                  <div
-                    key={deck.id}
-                    className={`p-3 rounded border cursor-pointer transition ${
-                      deck.id === selectedDeckId
-                        ? 'border-emerald-500 bg-emerald-900/20'
-                        : 'border-gray-600 hover:border-gray-500'
-                    }`}
-                    onClick={() => {
-                    console.log('[DeckManager] Deck clicked:', deck);
-                    console.log('[DeckManager] Setting selectedDeckId to:', deck.id);
-                    setSelectedDeckId(deck.id);
-                  }}
-                  >
-                    <div className="font-medium">{deck.name}</div>
-                    <div className="text-sm text-gray-400">
-                      {deck.total} cards • {new Date(deck.updatedAt).toLocaleDateString()}
-                    </div>
-                    {deck.id === currentDeckId && (
-                      <div className="text-xs text-emerald-400 mt-1">Current</div>
-                    )}
+              ) : sortedDecks.map((deck) => (
+                <div
+                  key={deck.id}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    deck.id === selectedDeckId
+                      ? 'border-emerald-500 bg-emerald-900/20'
+                      : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                  }`}
+                  onClick={() => setSelectedDeckId(deck.id)}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="font-medium text-sm truncate">{deck.name}</div>
+                    <span
+                      title={deck._dbId ? 'Synced to cloud' : 'Local only'}
+                      className={`text-xs flex-shrink-0 mt-0.5 ${deck._dbId ? 'text-emerald-400' : 'text-gray-500'}`}
+                    >
+                      {deck._dbId ? '☁' : '💾'}
+                    </span>
                   </div>
-                ))
-              )}
+                  <div className="text-xs text-gray-400 mt-1">
+                    {deck.total} cards • {formatDate(deck.updatedAt ?? deck.createdAt)}
+                  </div>
+                  {deck.id === currentDeckId && (
+                    <div className="text-xs text-emerald-400 mt-1 font-medium">Active</div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right side - Deck details and actions */}
-          <div className="flex-1 p-4 overflow-y-auto">
-            {Object.keys(decks).length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
+          {/* Right — deck detail */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {sortedDecks.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">
                 <div className="text-4xl mb-3">💾</div>
                 <div className="font-medium mb-2">Save Your First Deck</div>
-                <div className="text-sm mb-4">
-                  Create a deck, add some cards, and click Save to get started.
-                </div>
-                <button
-                  onClick={() => setShowNewDeckForm(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded"
-                >
+                <div className="text-sm mb-4">Create a deck, add some cards, and click Save to get started.</div>
+                <button onClick={() => setShowNewDeckForm(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded transition-colors">
                   Create New Deck
                 </button>
               </div>
             ) : selectedDeck ? (
-              <div>
-                <h3 className="font-semibold mb-4">{selectedDeck.name}</h3>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                  <div>
-                    <span className="text-gray-400">Cards:</span> {selectedDeck.total}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Created:</span> {new Date(selectedDeck.createdAt).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Updated:</span> {new Date(selectedDeck.updatedAt).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Format:</span> {selectedDeck.format}
-                  </div>
+              <div className="space-y-4">
+                {/* Name — click pencil to rename */}
+                <div className="flex items-center gap-2">
+                  {renamingDeckId === selectedDeck.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') { setRenamingDeckId(null); setRenameValue(""); }
+                      }}
+                      className="flex-1 text-lg font-semibold bg-gray-800 border border-violet-500 rounded px-2 py-0.5 outline-none"
+                    />
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold">{selectedDeck.name}</h3>
+                      <button
+                        onClick={() => startRename(selectedDeck)}
+                        className="text-gray-500 hover:text-gray-300 text-sm px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
+                        title="Rename deck"
+                      >
+                        ✎
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                <div className="space-y-3">
+                {/* Meta grid */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <div><span className="text-gray-400">Cards:</span> {selectedDeck.total}</div>
+                  <div><span className="text-gray-400">Format:</span> {selectedDeck.format}</div>
+                  <div><span className="text-gray-400">Created:</span> {formatDate(selectedDeck.createdAt)}</div>
+                  <div><span className="text-gray-400">Updated:</span> {formatDate(selectedDeck.updatedAt)}</div>
+                </div>
+
+                {/* Cloud status badge */}
+                <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded ${selectedDeck._dbId ? 'bg-emerald-900/20 text-emerald-300' : 'bg-white/5 text-gray-400'}`}>
+                  <span>{selectedDeck._dbId ? '☁ Synced to your profile' : '💾 Saved locally only'}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
                   <button
-                    onClick={() => {
-                      console.log('[DeckManager] Switch button clicked for deck:', selectedDeck);
-                      console.log('[DeckManager] Calling onSwitchDeck with:', selectedDeck);
-                      onSwitchDeck(selectedDeck);
-                    }}
-                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+                    onClick={() => onSwitchDeck(selectedDeck)}
+                    disabled={selectedDeck.id === currentDeckId}
+                    className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
                   >
-                    Switch to This Deck
+                    {selectedDeck.id === currentDeckId ? 'Currently Active' : 'Switch to This Deck'}
                   </button>
-                  
+
                   <button
                     onClick={() => onDuplicateDeck(selectedDeck.id)}
-                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded"
+                    className="w-full px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-sm transition-colors"
                   >
-                    Duplicate Deck
+                    Duplicate
                   </button>
+                </div>
 
-                  <div className="border-t border-white/10 pt-3">
-                    <h4 className="font-medium mb-2">Export</h4>
-                    <div className="flex gap-2 mb-2">
-                      <select
-                        value={exportFormat}
-                        onChange={(e) => setExportFormat(e.target.value)}
-                        className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
-                      >
-                        <option value="json">JSON</option>
-                        <option value="txt">Text (Detailed)</option>
-                        <option value="simple-txt">Text (Simple)</option>
-                        <option value="csv">CSV</option>
-                      </select>
-                      <button
-                        onClick={handleExport}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
-                      >
-                        Export
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-white/10 pt-3">
-                    <h4 className="font-medium mb-2">Import</h4>
-                    <div className="space-y-2">
-                      <select
-                        value={importFormat}
-                        onChange={(e) => setImportFormat(e.target.value)}
-                        className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
-                      >
-                        <option value="json">JSON</option>
-                        <option value="txt">Text</option>
-                        <option value="csv">CSV</option>
-                      </select>
-                      {importFormat === 'txt' && (
-                        <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
-                          <div className="font-medium mb-1">Text format support:</div>
-                          <div>• Simple: "4 Rafiki - Mystical Fighter"</div>
-                          <div>• Legacy: "2x Card Name (Set #123)"</div>
-                          <div>• Comments: Lines starting with # or // are ignored</div>
-                          <div>• Empty lines are automatically skipped</div>
-                        </div>
-                      )}
-                      <textarea
-                        placeholder="Paste deck data here..."
-                        value={importData}
-                        onChange={(e) => setImportData(e.target.value)}
-                        className="w-full h-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm resize-none"
-                      />
-                      <button
-                        onClick={handleImportWithWarnings}
-                        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm"
-                      >
-                        Import
-                      </button>
-                    </div>
-                  </div>
-
-                    <button
-                    onClick={() => {
-                      if (selectedDeck.id === currentDeckId) {
-                        if (confirm(`Are you sure you want to delete the current deck "${selectedDeck.name}"? This will switch you to a new empty deck.`)) {
-                          onDeleteDeck(selectedDeck.id);
-                        }
-                      } else {
-                        if (confirm(`Are you sure you want to delete "${selectedDeck.name}"? This action cannot be undone.`)) {
-                          onDeleteDeck(selectedDeck.id);
-                        }
-                      }
-                    }}
-                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded"
+                {/* Export */}
+                <div className="border-t border-white/10 pt-4">
+                  <h4 className="text-sm font-medium mb-2">Export</h4>
+                  <div className="flex gap-2">
+                    <select
+                      value={exportFormat}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                      className="flex-1 px-2 py-1.5 bg-gray-800 border border-white/10 rounded text-sm"
                     >
-                      Delete Deck
+                      <option value="json">JSON</option>
+                      <option value="txt">Text (Detailed)</option>
+                      <option value="simple-txt">Text (Simple)</option>
+                      <option value="csv">CSV</option>
+                    </select>
+                    <button onClick={handleExport} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-sm transition-colors">
+                      Export
                     </button>
+                  </div>
+                </div>
+
+                {/* Import */}
+                <div className="border-t border-white/10 pt-4">
+                  <h4 className="text-sm font-medium mb-2">Import</h4>
+                  <div className="space-y-2">
+                    <select
+                      value={importFormat}
+                      onChange={(e) => setImportFormat(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-gray-800 border border-white/10 rounded text-sm"
+                    >
+                      <option value="json">JSON</option>
+                      <option value="txt">Text</option>
+                      <option value="csv">CSV</option>
+                    </select>
+                    {importFormat === 'txt' && (
+                      <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                        <div className="font-medium mb-1">Supported formats:</div>
+                        <div>• "4 Rafiki - Mystical Fighter"</div>
+                        <div>• "2x Card Name (Set #123)"</div>
+                        <div>• Lines starting with # or // are ignored</div>
+                      </div>
+                    )}
+                    <textarea
+                      placeholder="Paste deck data here..."
+                      value={importData}
+                      onChange={(e) => setImportData(e.target.value)}
+                      className="w-full h-20 px-2 py-1.5 bg-gray-800 border border-white/10 rounded text-sm resize-none"
+                    />
+                    <button onClick={handleImportWithWarnings} className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm transition-colors">
+                      Import
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete */}
+                <div className="border-t border-white/10 pt-4">
+                  <button
+                    onClick={() => {
+                      const msg = selectedDeck.id === currentDeckId
+                        ? `Delete the active deck "${selectedDeck.name}"? You'll be switched to another deck.`
+                        : `Delete "${selectedDeck.name}"? This cannot be undone.`;
+                      if (confirm(msg)) onDeleteDeck(selectedDeck.id);
+                    }}
+                    className="w-full px-3 py-2 bg-red-600/70 hover:bg-red-600 rounded text-sm transition-colors"
+                  >
+                    Delete Deck
+                  </button>
                 </div>
               </div>
-            ) : Object.keys(decks).length > 0 ? (
-              <div className="text-center text-gray-400 py-8">
+            ) : (
+              <div className="text-center text-gray-400 py-10">
                 <div className="text-4xl mb-3">📋</div>
                 <div className="font-medium mb-2">Select a Deck</div>
-                <div className="text-sm">
-                  Choose a deck from the list to view details and manage it.
-                </div>
-                {selectedDeckId && !decks[selectedDeckId] && (
-                  <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded text-red-300 text-xs">
-                    Warning: Selected deck ID ({selectedDeckId}) not found in decks collection.
-                    This might indicate a synchronization issue.
-                  </div>
-                )}
+                <div className="text-sm">Choose a deck from the list to view details and manage it.</div>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
@@ -5887,7 +4591,7 @@ function PrintableSheet({ deck, onClose }) {
         </div>
         
         {/* Card Images Grid */}
-        <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
           {entries.map((e) => (
             <div key={deckKey(e.card)} className="relative">
               <div className="w-20 h-28 bg-gray-600 rounded-md overflow-hidden border border-gray-500">
@@ -5919,1801 +4623,35 @@ function PrintableSheet({ deck, onClose }) {
   );
 }
 
-// Deck Presentation Popup ----------------------------------------------------
-
-function DeckPresentationPopup({ deck, onClose, onSave, onGenerateImage }) {
-  const [deckName, setDeckName] = useState(deck.name || "Untitled Deck");
-  const [selectedHubId, setSelectedHubId] = useState('');
-  const [hubs, setHubs] = useState([]);
-  const [loadingHubs, setLoadingHubs] = useState(false);
-  const [savingToHub, setSavingToHub] = useState(false);
-  const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
-  
-  // Lorcanito export constants and functions
-  const GROUP_ORDER = ["Character", "Action", "Song", "Item", "Location"];
-
-  // Normalize card types to handle Songs and other subtypes consistently
-  function normalizedType(card) {
-    const rawType =
-      card.type ||
-      card._raw?.type ||
-      card._raw?.type_line ||
-      "";
-
-    const sub = (card.subtypes || card._raw?.subtypes || []).map(String);
-    const kws = (card.keywords || card._raw?.keywords || []).map(String);
-
-    const hay = `${rawType} ${sub.join(" ")} ${kws.join(" ")}`.toLowerCase();
-
-    // Many feeds mark Songs as Action + Song (subtype/keyword/type_line)
-    if (hay.includes("song")) return "Song";
-    if (hay.includes("character")) return "Character";
-    if (hay.includes("item")) return "Item";
-    if (hay.includes("location")) return "Location";
-    if (hay.includes("action")) return "Action";
-    return card.type || "Other";
-  }
-
-  function groupAndSortForText(entries) {
-    try {
-      console.log('[Lorcanito Export] groupAndSortForText called with:', entries);
-      
-      const buckets = new Map(GROUP_ORDER.map(t => [t, []]));
-      for (const e of entries) {
-        const t = normalizedType(e.card);
-        if (!buckets.has(t)) buckets.set(t, []);
-        buckets.get(t).push(e);
-      }
-      
-      console.log('[Lorcanito Export] Initial buckets:', Object.fromEntries(buckets));
-      
-      for (const [t, arr] of buckets) {
-        arr.sort((a, b) => (getCost(a.card) ?? 0) - (getCost(b.card) ?? 0) || a.card.name.localeCompare(b.card.name));
-      }
-      
-      const result = GROUP_ORDER
-        .filter(t => buckets.get(t)?.length)
-        .map(t => ({ section: t, entries: buckets.get(t) }));
-      
-      console.log('[Lorcanito Export] Final grouped result:', result);
-      return result;
-    } catch (error) {
-      console.error('[Lorcanito Export] Error in groupAndSortForText:', error);
-      throw error;
-    }
-  }
-
-  function displayNameForText(card) {
-    const variant = card.title || card.version || card._raw?.version || card._raw?.Version || card.subname || null;
-    return variant ? `${card.name} — ${variant}` : card.name;
-  }
-
-  // Optional: append set + number when available to disambiguate
-  function lineForText(e, withSet = true) {
-    const c = e.card;
-    const set = c.set || c._raw?.setCode || c._raw?.set;
-    const num = c.number || c._raw?.number || c._raw?.collector_number;
-    const base = `${e.count} ${displayNameForText(c)}`;
-    return withSet && set && num ? `${base} (${set} #${num})` : base;
-  }
-
-  function makeLorcanitoTextExport({ name, inks, entries }) {
-    try {
-      console.log('[Lorcanito Export] makeLorcanitoTextExport called with:', { name, inks, entries });
-      
-      const groups = groupAndSortForText(entries);
-      console.log('[Lorcanito Export] Grouped entries:', groups);
-      
-      const lines = [];
-      if (name) lines.push(`# ${name}`);
-      if (inks?.length) lines.push(`# Inks: ${inks.join(" / ")}`);
-      lines.push(`# Total: ${entries.reduce((s, x) => s + (x.count || 0), 0)}`, "");
-
-      for (const { section, entries: list } of groups) {
-        lines.push(`# ${section}s`);
-        for (const e of list) {
-          const line = lineForText(e, /*withSet*/ true);
-          lines.push(line);
-          console.log(`[Lorcanito Export] Added line: ${line}`);
-        }
-        lines.push("");
-      }
-      
-      const result = lines.join("\n").trim() + "\n";
-      console.log('[Lorcanito Export] Final result:', result);
-      return result;
-    } catch (error) {
-      console.error('[Lorcanito Export] Error in makeLorcanitoTextExport:', error);
-      throw error;
-    }
-  }
-
-  // Fetch user's hubs
-  useEffect(() => {
-    const fetchHubs = async () => {
-      try {
-        setLoadingHubs(true);
-        const response = await fetch('/api/hubs');
-        if (response.ok) {
-          const data = await response.json();
-          setHubs(data);
-        }
-      } catch (error) {
-        console.error('Error fetching hubs:', error);
-      } finally {
-        setLoadingHubs(false);
-      }
-    };
-
-    fetchHubs();
-  }, []);
-
-  // Save deck to team hub
-  const handleSaveToHub = async () => {
-    if (!selectedHubId || !deckName.trim()) return;
-
-    try {
-      setSavingToHub(true);
-      
-      // Save to the selected hub by creating a new deck (this will also save locally via saveDeckToCloud)
-      const response = await fetch('/api/decks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title: deckName.trim(),
-          data: deck
-        })
-      });
-
-      if (response.ok) {
-        // Success - could show a toast here
-        console.log('Deck saved to hub successfully');
-        onClose();
-      } else {
-        const errorData = await response.json();
-        console.error('Failed to save deck to hub:', errorData.error);
-        // Could show error toast here
-      }
-    } catch (error) {
-      console.error('Error saving deck to hub:', error);
-      // Could show error toast here
-    } finally {
-      setSavingToHub(false);
-    }
-  };
-
-  // Generate Dreamborn-style clipboard format
-  function generateDreambornFormat(deck) {
-    const entries = Object.values(deck.entries || {}).filter(e => e.count > 0);
-    
-    // Sort by cost, then by name
-    const sortedEntries = entries.sort((a, b) => {
-      const costA = getCost(a.card) ?? 0;
-      const costB = getCost(b.card) ?? 0;
-      if (costA !== costB) return costA - costB;
-      return a.card.name.localeCompare(b.card.name);
-    });
-    
-    // Generate lines in Dreamborn format: "4 Nick Wilde - Soggy Fox"
-    return sortedEntries.map(entry => {
-      const card = entry.card;
-      const variant = card.title || card.version || card._raw?.version || card._raw?.Version || card.subname || null;
-      const displayName = variant ? `${card.name} - ${variant}` : card.name;
-      return `${entry.count} ${displayName}`;
-    }).join('\n');
-  }
-
-  // Hook up to a button
-  async function onExportLorcanito(deck) {
-    console.log('[Lorcanito Export] BUTTON CLICKED! Function called with deck:', deck);
-    try {
-      console.log('[Lorcanito Export] Starting export for deck:', deck);
-      console.log('[Lorcanito Export] Deck entries:', deck.entries);
-      
-      // Convert deck.entries object to array format and filter out zero-count cards
-      const deckEntries = Object.values(deck.entries || {}).filter(e => e.count > 0);
-      console.log('[Lorcanito Export] Filtered deck entries:', deckEntries);
-      
-      if (deckEntries.length === 0) {
-        alert("No cards in deck to export!");
-        return;
-      }
-      
-      // Extract ink colors from the deck (handle multiple data structures)
-      const inkColors = new Set();
-      for (const { card } of deckEntries) {
-        // Check multiple possible ink field locations
-        const inks = card.inks || card._raw?.inks || card._raw?.Inks || [];
-        if (Array.isArray(inks)) {
-          inks.forEach(ink => inkColors.add(ink));
-        } else if (typeof inks === 'string') {
-          // Handle comma-separated ink strings
-          inks.split(',').map(ink => ink.trim()).forEach(ink => inkColors.add(ink));
-        }
-      }
-      console.log('[Lorcanito Export] Extracted ink colors:', Array.from(inkColors));
-      
-      const text = makeLorcanitoTextExport({
-        name: deck.name || "Untitled Deck",
-        inks: inkColors.size > 0 ? Array.from(inkColors) : undefined,
-        entries: deckEntries
-      });
-      
-      console.log('[Lorcanito Export] Generated text:', text);
-      console.log('[Lorcanito Export] Text length:', text.length);
-      
-      // Try modern clipboard API first
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        console.log('[Lorcanito Export] Using modern clipboard API');
-        await navigator.clipboard.writeText(text);
-        console.log('[Lorcanito Export] Clipboard write successful');
-      } else {
-        // Fallback to older method
-        console.log('[Lorcanito Export] Using fallback clipboard method');
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        if (!successful) {
-          throw new Error('Fallback clipboard method failed');
-        }
-        console.log('[Lorcanito Export] Fallback clipboard successful');
-      }
-      
-      alert("Deck list copied to clipboard! Paste it into Lorcanito's import box or any other Lorcana tool.");
-      console.log('[Lorcanito Export] Export completed successfully');
-    } catch (error) {
-      console.error('[Lorcanito Export] Error copying deck list:', error);
-      console.error('[Lorcanito Export] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      
-      // Show more specific error message
-      if (error.name === 'NotAllowedError') {
-        alert('Clipboard permission denied. Please allow clipboard access and try again.');
-      } else if (error.name === 'NotSupportedError') {
-        alert('Clipboard not supported in this browser. The text will be shown below for manual copying.');
-        // Show the text in a prompt for manual copying
-        prompt('Copy this deck list manually:', text);
-      } else {
-        alert(`Error copying deck list: ${error.message}. Please try again.`);
-      }
-    }
-  }
-
-  // Copy Dreamborn format to clipboard
-  async function onCopyDreamborn(deck) {
-    try {
-      const text = generateDreambornFormat(deck);
-      
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        // Fallback to older method
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        if (!successful) {
-          throw new Error('Fallback clipboard method failed');
-        }
-      }
-      
-      alert("Deck list copied to clipboard in Dreamborn format!");
-    } catch (error) {
-      console.error('Error copying Dreamborn format:', error);
-      alert(`Error copying deck list: ${error.message}. Please try again.`);
-    }
-  }
-  
-  // Calculate deck statistics
-  const totalCards = entries.reduce((sum, e) => sum + e.count, 0);
-  const totalInkable = entries.reduce((sum, e) => {
-    const isInkable = Boolean(e.card.inkable ?? e.card._raw?.inkwell ?? e.card._raw?.inkable ?? e.card._raw?.can_be_ink ?? e.card._raw?.Inkable ?? false);
-    return sum + (isInkable ? e.count : 0);
-  }, 0);
-  const totalUninkable = totalCards - totalInkable;
-  
-  // Calculate cost curve
-  const costCurve = {};
-  entries.forEach(e => {
-    const cost = getCost(e.card);
-    const normalizedCost = cost >= 10 ? 10 : cost;
-    costCurve[normalizedCost] = (costCurve[normalizedCost] || 0) + e.count;
-  });
-  
-  // Calculate type distribution
-  const typeDistribution = {};
-  entries.forEach(e => {
-    const types = Array.isArray(e.card.types) ? e.card.types : [e.card.type];
-    types.forEach(type => {
-      if (type) {
-        const cleanType = type.split(' - ')[0]; // Handle "Action - Song" -> "Action"
-        typeDistribution[cleanType] = (typeDistribution[cleanType] || 0) + e.count;
-      }
-    });
-  });
-  
-  // Calculate ink color distribution with dual-ink tracking
-  const inkDistribution = {};
-  const dualInkCards = [];
-  
-  // Debug: log the first card to see what properties it has
-  if (entries.length > 0) {
-    console.log('[Ink Distribution Debug] First card structure:', {
-      name: entries[0].card.name,
-      card: entries[0].card,
-      raw: entries[0].card._raw
-    });
-    
-    // Also log a few more cards to check for dual-ink patterns
-    console.log('[Ink Distribution Debug] Checking for dual-ink cards...');
-    entries.slice(0, 5).forEach((e, i) => {
-      console.log(`[Ink Distribution Debug] Card ${i + 1}: ${e.card.name}`);
-      if (e.card._raw) {
-        const raw = e.card._raw;
-        console.log(`  - raw.ink: ${raw.ink}`);
-        console.log(`  - raw.Ink: ${raw.Ink}`);
-        console.log(`  - raw.inkColor: ${raw.inkColor}`);
-        console.log(`  - raw.Ink_Color: ${raw.Ink_Color}`);
-        console.log(`  - raw.color: ${raw.color}`);
-        console.log(`  - raw.Color: ${raw.Color}`);
-        console.log(`  - raw.colors: ${JSON.stringify(raw.colors)}`);
-        console.log(`  - raw.Colors: ${JSON.stringify(raw.Colors)}`);
-        console.log(`  - raw.inks: ${JSON.stringify(raw.inks)}`);
-        console.log(`  - raw.inkColors: ${JSON.stringify(raw.inkColors)}`);
-        
-        // Check for any other properties that might contain ink info
-        const inkRelatedProps = Object.keys(raw).filter(key => 
-          key.toLowerCase().includes('ink') || 
-          key.toLowerCase().includes('color') ||
-          key.toLowerCase().includes('colour')
-        );
-        if (inkRelatedProps.length > 0) {
-          console.log(`  - Other ink-related properties:`, inkRelatedProps);
-          inkRelatedProps.forEach(prop => {
-            console.log(`    ${prop}: ${JSON.stringify(raw[prop])}`);
-          });
-        }
-      }
-    });
-  }
-  
-  entries.forEach(e => {
-    const inks = getInks(e.card);
-    console.log(`[Ink Distribution Debug] ${e.card.name}: getInks returned:`, inks);
-    
-    if (inks.length > 0) {
-      // Track dual-ink cards for special presentation
-      if (inks.length > 1) {
-        dualInkCards.push({
-          name: e.card.name,
-          inks: inks,
-          count: e.count
-        });
-        // Add to dual-ink category instead of both individual colors
-        inkDistribution['Dual-Ink'] = (inkDistribution['Dual-Ink'] || 0) + e.count;
-      } else {
-        // Single ink card: add to its ink color
-        inks.forEach(ink => {
-          if (ink) {
-            inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
-          }
-        });
-      }
-    } else {
-      // Enhanced fallback: try to detect ink colors from card properties
-      console.log(`[Ink Distribution Debug] No inks found for ${e.card.name}, trying fallback detection`);
-      
-      // Try to get ink color from various card properties
-      let detectedInks = [];
-      
-      // Check if card has ink-related properties
-      if (e.card._raw) {
-        const raw = e.card._raw;
-        
-        // Debug: log the entire raw object for cards with null ink
-        if (raw.ink === null) {
-          console.log(`[Dual-Ink Debug] ${e.card.name} has null ink, examining full structure:`, raw);
-        }
-        
-        // Try different possible ink color properties
-        if (raw.ink && raw.ink !== null) detectedInks.push(raw.ink);
-        if (raw.Ink && raw.Ink !== null) detectedInks.push(raw.Ink);
-        if (raw.inkColor && raw.inkColor !== null) detectedInks.push(raw.inkColor);
-        if (raw.Ink_Color && raw.Ink_Color !== null) detectedInks.push(raw.Ink_Color);
-        if (raw.color && raw.color !== null) detectedInks.push(raw.color);
-        if (raw.Color && raw.Color !== null) detectedInks.push(raw.Color);
-        
-        // Check for dual-ink specific properties
-        if (raw.inks && Array.isArray(raw.inks)) {
-          detectedInks.push(...raw.inks.filter(ink => ink && ink !== null));
-        }
-        if (raw.inkColors && Array.isArray(raw.inkColors)) {
-          detectedInks.push(...raw.inkColors.filter(ink => ink && ink !== null));
-        }
-        
-        // Check for comma-separated ink strings
-        if (raw.colors) {
-          if (Array.isArray(raw.colors)) {
-            detectedInks.push(...raw.colors.filter(ink => ink && ink !== null));
-          } else if (typeof raw.colors === 'string') {
-            detectedInks.push(...raw.colors.split(',').map(c => c.trim()).filter(ink => ink && ink !== null));
-          }
-        }
-        if (raw.Colors) {
-          if (Array.isArray(raw.Colors)) {
-            detectedInks.push(...raw.Colors.filter(ink => ink && ink !== null));
-          } else if (typeof raw.Colors === 'string') {
-            detectedInks.push(...raw.Colors.split(',').map(c => c.trim()).filter(ink => ink && ink !== null));
-          }
-        }
-        
-        // Special case: check if card has multiple ink-related fields
-        const allInkFields = [raw.ink, raw.Ink, raw.inkColor, raw.Ink_Color, raw.color, raw.Color];
-        const validInks = allInkFields.filter(ink => ink && ink !== null && ink !== 'null');
-        if (validInks.length > 1) {
-          console.log(`[Dual-Ink Debug] ${e.card.name} has multiple ink fields:`, validInks);
-          detectedInks.push(...validInks);
-        }
-      }
-      
-      // Remove duplicates and normalize ink names
-      detectedInks = [...new Set(detectedInks)].filter(ink => ink && ink !== 'undefined');
-      
-      if (detectedInks.length > 0) {
-        console.log(`[Ink Distribution Debug] Fallback detected inks for ${e.card.name}:`, detectedInks);
-        
-        if (detectedInks.length > 1) {
-          // Dual-ink card: add to dual-ink category
-          dualInkCards.push({
-            name: e.card.name,
-            inks: detectedInks,
-            count: e.count
-          });
-          inkDistribution['Dual-Ink'] = (inkDistribution['Dual-Ink'] || 0) + e.count;
-        } else {
-          // Single ink card: add to its ink color
-          detectedInks.forEach(ink => {
-            inkDistribution[ink] = (inkDistribution[ink] || 0) + e.count;
-          });
-        }
-      } else {
-        console.log(`[Ink Distribution Debug] No inks detected for ${e.card.name}, skipping`);
-      }
-    }
-  });
-  
-  // Debug: log dual-ink cards found
-  console.log('[Ink Distribution Debug] Dual-ink cards found:', dualInkCards);
-  console.log('[Ink Distribution Debug] Final inkDistribution:', inkDistribution);
-  
-  // Calculate average cost
-  const totalCost = entries.reduce((sum, e) => sum + (getCost(e.card) * e.count), 0);
-  const averageCost = totalCost / totalCards;
-  
-  // Find most expensive and cheapest cards
-  const sortedByCost = entries.sort((a, b) => getCost(b.card) - getCost(a.card));
-  const mostExpensive = sortedByCost[0];
-  const cheapest = sortedByCost[sortedByCost.length - 1];
-  
-  
-  // Helper function to draw fallback card content
-  function drawFallbackCard(ctx, x, y, width, height, card) {
-    // Card background - darker to indicate missing image
-    ctx.fillStyle = '#1a202c';
-    ctx.fillRect(x, y, width, height);
-    
-    // Card border
-    ctx.strokeStyle = '#4a5568';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, width, height);
-    
-    // Card name
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    
-    // Wrap text if too long
-    const maxWidth = width - 10;
-    const words = (card.name || 'Unknown').split(' ');
-    let line = '';
-    let lineY = y + 20;
-    
-    for (let i = 0; i < words.length; i++) {
-      const testLine = line + words[i] + ' ';
-      const metrics = ctx.measureText(testLine);
-      
-      if (metrics.width > maxWidth && i > 0) {
-        ctx.fillText(line, x + width / 2, lineY);
-        line = words[i] + ' ';
-        lineY += 15;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line, x + width / 2, lineY);
-    
-    // Card cost (more prominent)
-    const cost = getCost(card);
-    if (cost !== undefined) {
-      ctx.font = 'bold 14px Arial, sans-serif';
-      ctx.fillStyle = '#10b981';
-      ctx.fillText(`Cost: ${cost}`, x + width / 2, lineY + 25);
-    }
-    
-    // Card details
-    ctx.font = '10px Arial, sans-serif';
-    ctx.fillStyle = '#a0aec0';
-    
-    if (card.set) {
-      ctx.fillText(`Set: ${card.set}`, x + width / 2, lineY + 40);
-    }
-    
-    if (card.number) {
-      ctx.fillText(`#${card.number}`, x + width / 2, lineY + 55);
-    }
-  }
-  
-  return (
-    <Modal open={true} onClose={onClose} title="Deck Presentation" size="full">
-      <div className="space-y-6">
-        {/* Header with Deck Name Edit */}
-        <div className="text-center">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Deck Name:
-            </label>
-            <input
-              type="text"
-              value={deckName}
-              onChange={(e) => setDeckName(e.target.value)}
-              className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none text-center text-2xl font-bold"
-              placeholder="Enter deck name..."
-            />
-          </div>
-          <p className="text-gray-400 mt-2">A Lorcana Deck</p>
-          {deck.updatedAt && (
-            <p className="text-xs text-gray-500 mt-1">
-              Last saved: {new Date(deck.updatedAt).toLocaleString()}
-            </p>
-          )}
-        </div>
-        
-        {/* Card Images Grid - Organized by Type and Cost */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4 text-center">Deck Cards</h3>
-          
-          {/* Character Cards */}
-          {(() => {
-            const characterCards = entries.filter(e => normalizedType(e.card) === 'Character').sort((a, b) => getCost(a.card) - getCost(b.card));
-            if (characterCards.length > 0) {
-              return (
-                <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-blue-400">Character Cards</h4>
-                  <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
-                    {characterCards.map((e) => (
-                      <div key={deckKey(e.card)} className="relative w-[160px]">
-                        <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-black/40">
-                          <img 
-                            src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
-                            alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="absolute -top-2.5 -right-2.5 z-10">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
-                            <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
-                          </div>
-                        </div>
-                        <div className="mt-2 text-center">
-                          {/* Smart display name with variant/subtitle */}
-                          {(() => {
-                            // Prefer the variant/subtitle if present
-                            const variant =
-                              e.card.title ||
-                              e.card.version ||
-                              e.card._raw?.version ||
-                              e.card._raw?.Version ||
-                              e.card.subname ||
-                              null;
-
-                            const displayName = variant ? `${e.card.name} — ${variant}` : e.card.name;
-
-                            return (
-                              <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
-                                title={displayName}         // full hover tooltip
-                                aria-label={displayName}
-                              >
-                                {displayName}
-                              </div>
-                            );
-                          })()}
-                          
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-          
-          {/* Action Cards */}
-          {(() => {
-            const actionCards = entries.filter(e => normalizedType(e.card) === 'Action').sort((a, b) => getCost(a.card) - getCost(b.card));
-            if (actionCards.length > 0) {
-              return (
-                <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-green-400">Action Cards</h4>
-                  <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
-                    {actionCards.map((e) => (
-                      <div key={deckKey(e.card)} className="relative w-[160px]">
-                        <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-black/40">
-                          <img 
-                            src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
-                            alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="absolute -top-2.5 -right-2.5 z-10">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
-                            <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
-                          </div>
-                        </div>
-                        <div className="mt-2 text-center">
-                          {/* Smart display name with variant/subtitle */}
-                          {(() => {
-                            // Prefer the variant/subtitle if present
-                            const variant =
-                              e.card.title ||
-                              e.card.version ||
-                              e.card._raw?.version ||
-                              e.card._raw?.Version ||
-                              e.card.subname ||
-                              null;
-
-                            const displayName = variant ? `${e.card.name} — ${variant}` : e.card.name;
-
-                            return (
-                              <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
-                                title={displayName}         // full hover tooltip
-                                aria-label={displayName}
-                              >
-                                {displayName}
-                              </div>
-                            );
-                          })()}
-                          
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-          
-          {/* Song Cards */}
-          {(() => {
-            const songCards = entries.filter(e => normalizedType(e.card) === 'Song').sort((a, b) => getCost(a.card) - getCost(b.card));
-            if (songCards.length > 0) {
-              return (
-                <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-purple-400">Song Cards</h4>
-                  <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
-                    {songCards.map((e) => (
-                      <div key={deckKey(e.card)} className="relative w-[160px]">
-                        <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-black/40">
-                          <img 
-                            src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
-                            alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="absolute -top-2.5 -right-2.5 z-10">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
-                            <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
-                          </div>
-                        </div>
-                        <div className="mt-2 text-center">
-                          {/* Smart display name with variant/subtitle */}
-                          {(() => {
-                            // Prefer the variant/subtitle if present
-                            const variant =
-                              e.card.title ||
-                              e.card.version ||
-                              e.card._raw?.version ||
-                              e.card._raw?.Version ||
-                              e.card.subname ||
-                              null;
-
-                            const displayName = variant ? `${e.card.name} — ${variant}` : e.card.name;
-
-                            return (
-                              <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
-                                title={displayName}         // full hover tooltip
-                                aria-label={displayName}
-                              >
-                                {displayName}
-                              </div>
-                            );
-                          })()}
-                          
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-          
-          {/* Item Cards */}
-          {(() => {
-            const itemCards = entries.filter(e => normalizedType(e.card) === 'Item').sort((a, b) => getCost(a.card) - getCost(b.card));
-            if (itemCards.length > 0) {
-              return (
-                <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-yellow-400">Item Cards</h4>
-                  <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
-                    {itemCards.map((e) => (
-                      <div key={deckKey(e.card)} className="relative w-[160px]">
-                        <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-black/40">
-                          <img 
-                            src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
-                            alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="absolute -top-2.5 -right-2.5 z-10">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
-                            <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
-                          </div>
-                        </div>
-                        <div className="mt-2 text-center">
-                          {/* Smart display name with variant/subtitle */}
-                          {(() => {
-                            // Prefer the variant/subtitle if present
-                            const variant =
-                              e.card.title ||
-                              e.card.version ||
-                              e.card._raw?.version ||
-                              e.card._raw?.Version ||
-                              e.card.subname ||
-                              null;
-
-                            const displayName = variant ? `${e.card.name} — ${variant}` : e.card.name;
-
-                            return (
-                              <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
-                                title={displayName}         // full hover tooltip
-                                aria-label={displayName}
-                              >
-                                {displayName}
-                              </div>
-                            );
-                          })()}
-                          
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-          
-          {/* Location Cards */}
-          {(() => {
-            const locationCards = entries.filter(e => normalizedType(e.card) === 'Location').sort((a, b) => getCost(a.card) - getCost(b.card));
-            if (locationCards.length > 0) {
-              return (
-                <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-red-400">Location Cards</h4>
-                  <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
-                    {locationCards.map((e) => (
-                      <div key={deckKey(e.card)} className="relative w-[160px]">
-                        <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-black/40">
-                          <img 
-                            src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
-                            alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="absolute -top-2.5 -right-2.5 z-10">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                              {e.count}
-                            </div>
-                            <div className="absolute -bottom-1 right-0.5 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-black/80" />
-                          </div>
-                        </div>
-                        <div className="mt-2 text-center">
-                          {/* Smart display name with variant/subtitle */}
-                          {(() => {
-                            // Prefer the variant/subtitle if present
-                            const variant =
-                              e.card.title ||
-                              e.card.version ||
-                              e.card._raw?.version ||
-                              e.card._raw?.Version ||
-                              e.card.subname ||
-                              null;
-
-                            const displayName = variant ? `${e.card.name} — ${variant}` : e.card.name;
-
-                            return (
-                              <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
-                                title={displayName}         // full hover tooltip
-                                aria-label={displayName}
-                              >
-                                {displayName}
-                              </div>
-                            );
-                          })()}
-                          
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-        </div>
-        
-        {/* Basic Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-blue-400">{totalCards}</div>
-            <div className="text-sm text-gray-400">Total Cards</div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-green-400">{totalInkable}</div>
-            <div className="text-sm text-gray-400">Inkable</div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-red-400">{totalUninkable}</div>
-            <div className="text-sm text-gray-400">Uninkable</div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-400">{averageCost.toFixed(1)}</div>
-            <div className="text-sm text-gray-400">Avg Cost</div>
-          </div>
-        </div>
-        
-        {/* Deck Health Indicators */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-lg font-semibold mb-2">Deck Size</div>
-            <div className={`text-2xl font-bold ${totalCards >= 60 && totalCards <= 60 ? 'text-green-400' : totalCards >= 55 && totalCards <= 65 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {totalCards}/60
-            </div>
-            <div className="text-xs text-gray-400">
-              {totalCards === 60 ? 'Perfect!' : totalCards >= 55 && totalCards <= 65 ? 'Close' : 'Needs adjustment'}
-            </div>
-          </div>
-          
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-lg font-semibold mb-2">Inkable Ratio</div>
-            <div className={`text-2xl font-bold ${(totalInkable / totalCards) >= 0.7 ? 'text-green-400' : (totalInkable / totalCards) >= 0.6 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {((totalInkable / totalCards) * 100).toFixed(0)}%
-            </div>
-            <div className="text-xs text-gray-400">
-              {(totalInkable / totalCards) >= 0.7 ? 'Good' : (totalInkable / totalCards) >= 0.6 ? 'Acceptable' : 'Low'}
-            </div>
-          </div>
-          
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-lg font-semibold mb-2">Cost Balance</div>
-            <div className={`text-2xl font-bold ${averageCost >= 2.5 && averageCost <= 4.5 ? 'text-green-400' : averageCost >= 2.0 && averageCost <= 5.0 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {averageCost.toFixed(1)}
-            </div>
-            <div className="text-xs text-gray-400">
-              {averageCost >= 2.5 && averageCost <= 4.5 ? 'Balanced' : averageCost >= 2.0 && averageCost <= 5.0 ? 'Moderate' : 'Extreme'}
-            </div>
-          </div>
-        </div>
-        
-        {/* Cost Curve Chart */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4 text-center">Cost Curve</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart 
-              data={Array.from({ length: 11 }, (_, i) => ({
-                cost: i === 10 ? '10+' : String(i),
-                count: costCurve[i] || 0
-              }))}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="cost" 
-                stroke="#9CA3AF"
-                fontSize={12}
-              />
-              <YAxis 
-                stroke="#9CA3AF"
-                fontSize={12}
-                allowDecimals={false}
-              />
-              <Tooltip 
-                formatter={(value, name) => [value, 'Cards']}
-                labelFormatter={(label) => `Cost ${label}`}
-                contentStyle={{
-                  backgroundColor: '#1F2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  color: '#F9FAFB'
-                }}
-              />
-              <Bar 
-                dataKey="count" 
-                fill="#3B82F6"
-                radius={[4, 4, 0, 0]}
-                className="hover:fill-blue-400 transition-colors"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        
-        {/* Type Distribution Pie Chart */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-4 text-center">Card Types</h3>
-            <div className="space-y-2">
-              {Object.entries(typeDistribution).map(([type, count]) => {
-                const percentage = ((count / totalCards) * 100).toFixed(1);
-                const colors = {
-                  'Character': 'bg-red-500',
-                  'Action': 'bg-blue-500',
-                  'Item': 'bg-green-500',
-                  'Location': 'bg-purple-500',
-                  'Song': 'bg-yellow-500'
-                };
-                return (
-                  <div key={type} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${colors[type] || 'bg-gray-500'}`} />
-                      <span className="text-sm">{type}</span>
-                    </div>
-                    <div className="text-sm font-semibold">{count} ({percentage}%)</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          
-          {/* Ink Color Distribution */}
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
-
-            {Object.keys(inkDistribution).length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={Object.entries(inkDistribution).map(([ink, count]) => ({
-                      name: ink,
-                      value: count
-                    }))}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={80}
-                  >
-                    {Object.entries(inkDistribution).map(([ink, count], index) => {
-                      const colors = {
-                        'Amber': '#f59e0b',
-                        'Amethyst': '#8b5cf6',
-                        'Emerald': '#10b981',
-                        'Ruby': '#ef4444',
-                        'Sapphire': '#3b82f6',
-                        'Steel': '#6b7280',
-                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
-                      };
-                      return (
-                        <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
-                      );
-                    })}
-                  </Pie>
-                  <Tooltip formatter={(value, name) => [value, name]} />
-                  
-                  {/* Custom Legend with Percentages */}
-                  <div className="mt-3 flex justify-center gap-4">
-                    {Object.entries(inkDistribution).map(([ink, count], index) => {
-                      // Calculate percentage based on actual deck size, not inflated ink distribution
-                      const percentage = ((count / totalCards) * 100).toFixed(0);
-                      const colors = {
-                        'Amber': '#f59e0b',
-                        'Amethyst': '#8b5cf6',
-                        'Emerald': '#10b981',
-                        'Ruby': '#ef4444',
-                        'Sapphire': '#3b82f6',
-                        'Steel': '#6b7280',
-                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
-                      };
-                      return (
-                        <div key={index} className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded"
-                            style={{ backgroundColor: colors[ink] || '#6b7280' }}
-                          />
-                          <span className="text-sm text-gray-300">{ink}</span>
-                          <span className="text-sm font-semibold text-gray-100">{percentage}%</span>
-                          <span className="text-xs text-gray-400">({count})</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </PieChart>
-                
-
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-center text-gray-400 py-8">
-                <p>No ink color data available</p>
-                <p className="text-sm mt-2">Debug: inkDistribution = {JSON.stringify(inkDistribution)}</p>
-                <p className="text-sm mt-2">Total cards: {totalCards}</p>
-                <p className="text-sm mt-2">Entries length: {entries?.length || 0}</p>
-              </div>
-            )}
-          </div>
-        </div>
-        
-
-        
-        {/* Additional Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Cost Analysis - Hidden per user request */}
-          {/* <div className="bg-gray-800 rounded-lg p-4">
-            <h4 className="font-semibold mb-2 text-center">Cost Analysis</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Most Expensive:</span>
-                <span className="font-semibold">{mostExpensive?.card.name} (Cost {getCost(mostExpensive?.card)})</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Cheapest:</span>
-                <span className="font-semibold">{cheapest?.card.name} (Cost {getCost(cheapest?.card)})</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Cost:</span>
-                <span className="font-semibold">{totalCost}</span>
-              </div>
-            </div>
-          </div> */}
-          
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h4 className="font-semibold mb-2 text-center">Deck Composition</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Inkable Ratio:</span>
-                <span className="font-semibold">{((totalInkable / totalCards) * 100).toFixed(1)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Uninkable Ratio:</span>
-                <span className="font-semibold">{((totalUninkable / totalCards) * 100).toFixed(1)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Unique Cards:</span>
-                <span className="font-semibold">{entries.length}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* NEW COMPETITIVE ANALYSIS IN DECK MODAL */}
-        <div className="bg-gray-800 rounded-lg p-6 mt-6">
-          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">🎯 Competitive Analysis</h3>
-          
-          {(() => {
-            // Calculate data for competitive analysis in modal
-            const cards = entries.flatMap(e => Array(e.count).fill(e.card));
-            
-            // Meta curve templates for comparison
-            const metaCurves = {
-              "Aggro": { "1": 8, "2": 12, "3": 8, "4": 6, "5": 4, "6": 2, "7+": 0 },
-              "Midrange": { "1": 4, "2": 8, "3": 10, "4": 8, "5": 6, "6": 4, "7+": 0 },
-              "Control": { "1": 2, "2": 6, "3": 8, "4": 8, "5": 6, "6": 6, "7+": 4 },
-              "Ramp": { "1": 2, "2": 4, "3": 6, "4": 6, "5": 8, "6": 8, "7+": 6 }
-            };
-
-            // Curve with inkable/uninkable breakdown + meta comparison
-            const curveData = (() => {
-              const buckets = {};
-              const deckSize = cards.length;
-              
-              // Initialize buckets
-              const order = ["0","1","2","3","4","5","6","7+"];
-              order.forEach(key => {
-                buckets[key] = { cost: key, inkable: 0, uninkable: 0, total: 0 };
-              });
-              
-              // Fill with deck data
-              cards.forEach(c => {
-                const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
-                const key = cost >= 7 ? "7+" : String(cost);
-                buckets[key].total++;
-                const isInkable = Boolean(c.inkable ?? c._raw?.inkwell ?? c._raw?.inkable ?? false);
-                (isInkable ? buckets[key].inkable++ : buckets[key].uninkable++);
-              });
-              
-              // Add meta comparison (scaled to deck size)
-              return order.map(k => {
-                const bucket = buckets[k];
-                const result = { ...bucket };
-                
-                // Add meta curves (scaled to percentage of 60-card deck)
-                Object.entries(metaCurves).forEach(([archetype, curve]) => {
-                  const metaCount = curve[k] || 0;
-                  result[`meta_${archetype.toLowerCase()}`] = deckSize > 0 ? (metaCount / 60) * deckSize : 0;
-                });
-                
-                return result;
-              }).filter(k => k.total > 0 || Object.keys(metaCurves).some(arch => k[`meta_${arch.toLowerCase()}`] > 0));
-            })();
-
-            // Draw consistency analysis
-            const drawConsistency = (() => {
-              let drawCount = 0, searchCount = 0, rawDrawPieces = 0;
-              const detectedCards = { draw: [], search: [], combined: [] };
-              
-              const textOf = c => (c?.text || c?.rulesText || c?.Body_Text || "").toString();
-              const RX_DRAW = /draw|draws|draw a card|draw two|card advantage|gain\s+a\s+card|gain\s+cards|add.*to.*hand|put.*(?:a\s+card|cards?).*into\s+your\s+hand/i;
-              const RX_SEARCH = /search|look at|reveal|scry|find|choose.*card.*hand|choose.*put.*hand|select.*card.*hand|put.*on top|put.*on bottom|shuffle|arrange/i;
-              
-              cards.forEach(c => {
-                const t = textOf(c);
-                if (RX_DRAW.test(t)) { 
-                  drawCount++; 
-                  rawDrawPieces++; 
-                  detectedCards.draw.push(c.name);
-                  detectedCards.combined.push(c.name);
-                }
-                if (RX_SEARCH.test(t)) { 
-                  searchCount++; 
-                  rawDrawPieces++; 
-                  detectedCards.search.push(c.name);
-                  if (!detectedCards.combined.includes(c.name)) {
-                    detectedCards.combined.push(c.name);
-                  }
-                }
-              });
-              const density = (rawDrawPieces / Math.max(cards.length, 1)) * 100;
-              return { 
-                drawCount, 
-                searchCount, 
-                density: Number(density.toFixed(1)),
-                detectedCards 
-              };
-            })();
-
-            // Synergies detection
-            const synergies = [];
-            // Add basic synergy detection here...
-
-            return (
-              <div>
-                {/* Enhanced Cost Curve with Meta Comparison */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🏗️ Enhanced Cost Curve</h4>
-                  <EnhancedCurveChart data={curveData} />
-                </div>
-
-
-
-                {/* Draw Probability Calculator */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Draw Probability Calculator</h4>
-                  <DrawProbabilityTool deck={entries} />
-                </div>
-
-                {/* Turn-by-Turn Draw Simulator */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎲 Turn-by-Turn Draw Simulator</h4>
-                  <DrawSimulator deck={entries} />
-                </div>
-
-                {/* Consistency & Role Analysis */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Draw Consistency */}
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <h4 className="text-lg font-semibold mb-3 text-emerald-300">Consistency</h4>
-                    <div className="space-y-3 text-sm">
-                      <HoverableStatLine 
-                        label="Draw pieces" 
-                        value={drawConsistency.drawCount} 
-                        cards={drawConsistency.detectedCards.draw}
-                      />
-                      <HoverableStatLine 
-                        label="Search/Dig pieces" 
-                        value={drawConsistency.searchCount} 
-                        cards={drawConsistency.detectedCards.search}
-                      />
-                      <HoverableStatLine 
-                        label="Card advantage density" 
-                        value={`${drawConsistency.density}% of deck`} 
-                        cards={drawConsistency.detectedCards.combined}
-                      />
-                      <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
-                    </div>
-                  </div>
-
-                  {/* Synergies - Hidden per user request */}
-                  {/* <div className="bg-gray-700 rounded-lg p-4">
-                    <h4 className="text-lg font-semibold mb-3 text-emerald-300">Synergies</h4>
-                    {synergies.length > 0 ? (
-                      <div className="space-y-2">
-                        <ul className="space-y-1 text-sm">
-                          {synergies.map((s, i) => (
-                            <li key={i} className="text-emerald-200 text-xs">• {s}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400">No obvious synergies detected.</p>
-                    )}
-                  </div> */}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-
-
-        {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
-        {false && <div className="bg-gray-800 rounded-lg p-6">
-          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">OLD Competitive Analysis</h3>
-          
-          {/* Comp Dashboard Data Calculations */}
-          {(() => {
-            // Debug: Log deck structure
-            console.log('[Comp Dashboard] Deck object:', deck);
-            console.log('[Comp Dashboard] Deck entries:', deck?.entries);
-            console.log('[Comp Dashboard] Deck entries keys:', Object.keys(deck?.entries || {}));
-            
-            // Create cards array from deck entries
-            const cards = Object.values(deck?.entries || {})
-              .filter(e => e.count > 0)
-              .flatMap(e => Array(e.count).fill(e.card));
-
-            console.log('[Comp Dashboard] Cards array created:', cards.length, 'cards');
-            console.log('[Comp Dashboard] Sample card:', cards[0]);
-            console.log('[Comp Dashboard] Sample card properties:', cards[0] ? Object.keys(cards[0]) : 'No cards');
-            if (cards[0]) {
-              console.log('[Comp Dashboard] Sample card text fields:', {
-                text: cards[0].text,
-                rulesText: cards[0].rulesText,
-                _raw: cards[0]._raw,
-                lore: cards[0].lore,
-                cost: cards[0].cost
-              });
-              console.log('[Comp Dashboard] Sample card full structure:', cards[0]);
-              
-              // Check for any fields that might contain lore values
-              const allCardFields = Object.keys(cards[0]);
-              const loreRelatedFields = allCardFields.filter(field => 
-                field.toLowerCase().includes('lore') || 
-                field.toLowerCase().includes('quest') ||
-                field.toLowerCase().includes('win')
-              );
-              console.log('[Comp Dashboard] Lore-related fields found:', loreRelatedFields);
-              
-              // Check raw fields too
-              if (cards[0]._raw) {
-                const allRawFields = Object.keys(cards[0]._raw);
-                const rawLoreRelatedFields = allRawFields.filter(field => 
-                  field.toLowerCase().includes('lore') || 
-                  field.toLowerCase().includes('quest') ||
-                  field.toLowerCase().includes('win')
-                );
-                console.log('[Comp Dashboard] Raw lore-related fields found:', rawLoreRelatedFields);
-              }
-            }
-
-            // --- Curve (stacked inkable/uninkable) ---
-            const curveData = (() => {
-              const buckets = {};
-              cards.forEach(c => {
-                const cost = Math.min(Math.max(Number(c.cost ?? 0), 0), 8);
-                const key = cost >= 7 ? "7+" : String(cost);
-                if (!buckets[key]) buckets[key] = { cost: key, inkable: 0, uninkable: 0 };
-                // Check inkable status using the same logic as elsewhere in the component
-                const isInkable = Boolean(c.inkable ?? c._raw?.inkwell ?? c._raw?.inkable ?? c._raw?.can_be_ink ?? c._raw?.Inkable ?? false);
-                if (isInkable) {
-                  buckets[key].inkable++;
-                } else {
-                  buckets[key].uninkable++;
-                }
-              });
-              const order = ["0","1","2","3","4","5","6","7+"];
-              return order.filter(k => buckets[k]).map(k => buckets[k]);
-            })();
-
-            // --- Ink pie ---
-            const inkPieData = (() => {
-              const counts = new Map();
-              cards.forEach(c => {
-                // Use the same ink detection logic as elsewhere
-                const inks = c.inks || c._raw?.inks || [];
-                if (Array.isArray(inks)) {
-                  inks.forEach(i => {
-                    if (i) counts.set(i, (counts.get(i)||0)+1);
-                  });
-                }
-              });
-              return [...counts.entries()].map(([name, value]) => ({ name, value }));
-            })();
-
-            // --- Draw / consistency ---
-            const drawConsistency = (() => {
-              let drawCount=0, searchCount=0, rawDrawPieces=0;
-              const detectedCards = { draw: [], search: [], combined: [] };
-              
-              cards.forEach(c => {
-                // Get card text from various possible fields
-                const cardText = (c.text || c.rulesText || c._raw?.text || c._raw?.rulesText || c._raw?.Body_Text || "").toString().toLowerCase();
-                console.log('[Comp Dashboard] Card text for', c.name, ':', cardText);
-                
-                if (RX_DRAW.test(cardText)) { 
-                  drawCount++; 
-                  rawDrawPieces++; 
-                  detectedCards.draw.push(c.name);
-                  detectedCards.combined.push(c.name);
-                  console.log('[Comp Dashboard] Draw card detected:', c.name);
-                }
-                if (RX_SEARCH.test(cardText)) { 
-                  searchCount++; 
-                  rawDrawPieces++; 
-                  detectedCards.search.push(c.name);
-                  if (!detectedCards.combined.includes(c.name)) {
-                    detectedCards.combined.push(c.name);
-                  }
-                  console.log('[Comp Dashboard] Search card detected:', c.name);
-                }
-              });
-              
-              const density = (rawDrawPieces / Math.max(cards.length,1))*100;
-              console.log('[Comp Dashboard] Draw consistency:', { 
-                drawCount, 
-                searchCount, 
-                density, 
-                totalCards: cards.length,
-                detectedDrawCards: detectedCards.draw,
-                detectedSearchCards: detectedCards.search
-              });
-              return { 
-                drawCount, 
-                searchCount, 
-                density: Number(density.toFixed(1)),
-                detectedCards 
-              };
-            })();
-
-            // --- Average lore per card ---
-            const avgLorePerCard = (() => {
-              const totalLore = cards.reduce((a,c) => {
-                // Check multiple possible lore fields
-                const lore = Number(c.lore || c._raw?.Lore || c._raw?.lore || c._raw?.loreValue || 0);
-                console.log('[Comp Dashboard] Card lore for', c.name, ':', {
-                  c_lore: c.lore,
-                  raw_Lore: c._raw?.Lore,
-                  raw_lore: c._raw?.lore,
-                  raw_loreValue: c._raw?.loreValue,
-                  final: lore
-                });
-                
-                // Also check if there are any other lore-related fields
-                const allFields = Object.keys(c).filter(key => key.toLowerCase().includes('lore'));
-                const allRawFields = Object.keys(c._raw || {}).filter(key => key.toLowerCase().includes('lore'));
-                if (allFields.length > 0 || allRawFields.length > 0) {
-                  console.log('[Comp Dashboard] Additional lore fields for', c.name, ':', {
-                    cardFields: allFields,
-                    rawFields: allRawFields
-                  });
-                }
-                
-                return a + lore;
-              }, 0);
-              const result = Number((totalLore / Math.max(cards.length,1)).toFixed(2));
-              console.log('[Comp Dashboard] Lore calculation:', { totalLore, cardsLength: cards.length, result });
-              return result;
-            })();
-
-            // --- Roles breakdown - Multi-role support ---
-            const compDashboardRoleData = (() => {
-              const counts = {};
-              const roleAssignments = {};
-              
-              cards.forEach(c => {
-                const roles = rolesForCard(c);
-                roles.forEach(role => {
-                  counts[role] = (counts[role] || 0) + 1;
-                  
-                  // Track which cards go into which roles
-                  if (!roleAssignments[role]) roleAssignments[role] = [];
-                  roleAssignments[role].push(c.name);
-                });
-              });
-              
-              return ROLE_ORDER.map(role => ({
-                role,
-                value: counts[role] || 0,
-                cards: roleAssignments[role] || []
-              }));
-            })();
-            
-            // Make compDashboardRoleData available as 'roleData' for chart (now includes cards)
-            const roleData = compDashboardRoleData;
-
-            // --- Synergies list ---
-            const synergies = (() => detectSynergies(cards))();
-
-            return (
-              <div className="space-y-6">
-                {/* Curve & Cost */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-3 text-center">Curve (Inkable vs Uninkable)</h4>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={curveData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="cost" stroke="#9CA3AF" />
-                      <YAxis allowDecimals={false} stroke="#9CA3AF" />
-                      <Tooltip 
-                        formatter={(value, name) => [value, name === 'inkable' ? 'Inkable' : 'Uninkable']}
-                        contentStyle={{
-                          backgroundColor: '#1F2937',
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                          color: '#F9FAFB'
-                        }}
-                      />
-                      <Legend />
-                      <Bar dataKey="inkable" stackId="a" fill="#10b981" />
-                      <Bar dataKey="uninkable" stackId="a" fill="#f59e0b" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Draw / Consistency */}
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <h4 className="text-lg font-semibold mb-3 text-center">Consistency</h4>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <HoverableStatBox 
-                      value={drawConsistency.drawCount}
-                      label="Draw pieces"
-                      color="text-blue-400"
-                      cards={drawConsistency.detectedCards?.draw || []}
-                    />
-                    <HoverableStatBox 
-                      value={drawConsistency.searchCount}
-                      label="Search/Dig pieces"
-                      color="text-green-400"
-                      cards={drawConsistency.detectedCards?.search || []}
-                    />
-                    <HoverableStatBox 
-                      value={`${drawConsistency.density}%`}
-                      label="Card advantage density"
-                      color="text-purple-400"
-                      cards={drawConsistency.detectedCards?.combined || []}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-3 text-center">Heuristic: scans rules text for draw/search verbs</p>
-                </div>
-
-                {/* Lore Efficiency */}
-                <div className="bg-gray-700 rounded-lg p-4 text-center">
-                  <h4 className="text-lg font-semibold mb-2">Lore Efficiency</h4>
-                  <div className="text-3xl font-bold text-emerald-400">{avgLorePerCard}</div>
-                  <div className="text-sm text-gray-400">Average Lore per Card</div>
-                </div>
-
-                {/* Roles & Synergies */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-3 text-center">Card Roles</h4>
-                  {console.log('[Card Roles Chart] MAIN roleData with cards:', roleData)}
-                  {console.log('[Card Roles Chart] First item cards check:', roleData[0]?.cards?.length || 'NO CARDS')}
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={roleData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="role" interval={0} angle={-10} textAnchor="end" height={60} stroke="#9CA3AF" />
-                      <YAxis allowDecimals={false} stroke="#9CA3AF" />
-                      <Tooltip 
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            const cards = data.cards || [];
-                            
-                            // Debug: Check if we can find the cards in roleData by matching the role
-                            const roleMatch = roleData.find(item => item.role === data.role);
-                            const fallbackCards = roleMatch?.cards || [];
-                            const finalCards = cards.length > 0 ? cards : fallbackCards;
-                            
-                            console.log('[Card Roles Tooltip] DEBUG DETAILS:');
-                            console.log('  - roleData from outer scope:', roleData);
-                            console.log('  - data.role:', data.role);
-                            console.log('  - roleMatch found:', roleMatch);
-                            console.log('  - roleMatch?.cards:', roleMatch?.cards);
-                            
-                            console.log('[Card Roles Tooltip]', { 
-                              label, 
-                              cards, 
-                              data, 
-                              roleMatch, 
-                              fallbackCards, 
-                              finalCards 
-                            });
-                            
-                            // Group and count cards
-                            const counts = {};
-                            finalCards.forEach(cardName => {
-                              counts[cardName] = (counts[cardName] || 0) + 1;
-                            });
-                            const groupedCards = Object.entries(counts)
-                              .sort((a, b) => a[0].localeCompare(b[0]))
-                              .map(([name, count]) => (count > 1 ? `${count} - ${name}` : name));
-
-                            return (
-                              <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3 max-w-sm">
-                                <p className="text-white font-semibold mb-1">{label}: {payload[0].value} cards</p>
-                                {finalCards.length > 0 ? (
-                                  <>
-                                    <div className="text-gray-300 text-sm">Cards:</div>
-                                    <div className="space-y-0.5 max-h-48 overflow-y-auto">
-                                      {groupedCards.map((card, index) => (
-                                        <p key={index} className="text-gray-400 text-xs">{card}</p>
-                                      ))}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="text-red-400 text-sm">No cards found in this role</div>
-                                )}
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-
-                  {/* Synergies - Hidden per user request */}
-                  {/* {synergies.length > 0 ? (
-                    <div className="mt-4 bg-gray-700 rounded-lg p-4">
-                      <h5 className="font-semibold mb-2 text-center">Detected Synergies</h5>
-                      <ul className="list-disc ml-6 text-sm space-y-1">
-                        {synergies.map(s => <li key={s} className="text-gray-300">{s}</li>)}
-                      </ul>
-                    </div>
-                  ) : (
-                    <div className="mt-4 bg-gray-700 rounded-lg p-4 text-center">
-                      <p className="text-sm text-gray-400">No obvious synergies detected</p>
-                    </div>
-                  )} */}
-                </div>
-
-                {/* Meta Tools (stub) */}
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <h4 className="text-lg font-semibold mb-3 text-center">Meta Tools</h4>
-                  <p className="text-sm text-gray-300 mb-4 text-center">
-                    Tag your deck against common archetypes and add matchup notes
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs uppercase text-gray-400 mb-1">Archetype tags</label>
-                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase text-gray-400 mb-1">Tech slots (notes)</label>
-                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., +2 Banish; +1 Evasive hate" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <label className="block text-xs uppercase text-gray-400 mb-1">Matchup notes</label>
-                    <textarea rows={3} className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>}
-        
-        {/* Tournament Results Import & Management */}
-        <div className="bg-gray-800 rounded-lg p-6 mt-6">
-          <TournamentResultsSection 
-            deckId={deck.id || 'temp-deck'} 
-            deckName={deckName || deck.name}
-          />
-        </div>
-        
-        {/* Action Buttons - Improved Layout */}
-        <div className="bg-gray-900/95 backdrop-blur-sm border-t border-white/10 mt-6 pt-6 pb-4">
-          {/* Primary Actions Row */}
-          <div className="flex justify-center gap-3 mb-4">
-            {/* Download Image Button */}
-            <button
-              onClick={(event) => onGenerateImage(event)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Download deck as image (PNG)"
-            >
-              🖼️ Download Image
-            </button>
-
-            {/* Print Button */}
-            <button
-              onClick={() => {
-                window.print();
-                onClose();
-              }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Print deck presentation"
-            >
-              🖨️ Print
-            </button>
-
-            {/* Save Button */}
-            <button
-              onClick={() => {
-                if (onSave && deckName.trim()) {
-                  onSave(deckName.trim());
-                }
-              }}
-              disabled={!deckName.trim()}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Save deck to storage"
-            >
-              💾 Save Deck
-            </button>
-          </div>
-
-          {/* Copy Actions Row */}
-          <div className="flex justify-center gap-3 mb-4">
-            {/* Copy Dreamborn Format Button */}
-            <button
-              onClick={() => onCopyDreamborn(deck)}
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Copy decklist in Dreamborn format (e.g., '4 Nick Wilde - Soggy Fox')"
-            >
-              📋 Copy to Clipboard
-            </button>
-
-            {/* Copy for Lorcanito Button */}
-            <button
-              onClick={() => onExportLorcanito(deck)}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Copy decklist in Lorcanito format"
-            >
-              📋 Copy for Lorcanito
-            </button>
-
-            {/* Copy Stats Button */}
-            <button
-              onClick={() => {
-                // Copy deck stats to clipboard
-                const stats = `Deck: ${deck.name}
-Total Cards: ${totalCards}
-Inkable: ${totalInkable} (${((totalInkable / totalCards) * 100).toFixed(1)}%)
-Uninkable: ${totalUninkable} (${((totalUninkable / totalCards) * 100).toFixed(1)}%)
-Average Cost: ${averageCost.toFixed(1)}
-Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)})
-Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
-                navigator.clipboard.writeText(stats);
-              }}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Copy deck statistics to clipboard"
-            >
-              📊 Copy Stats
-            </button>
-          </div>
-
-          {/* Team Hub Section */}
-          <div className="flex justify-center">
-            <div className="flex items-center gap-3 bg-gray-800 p-4 rounded-lg max-w-md w-full">
-              <label className="text-gray-300 font-medium whitespace-nowrap text-sm">
-                Add to Team Hub:
-              </label>
-              <select
-                value={selectedHubId}
-                onChange={(e) => setSelectedHubId(e.target.value)}
-                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-emerald-400 focus:outline-none text-sm"
-                disabled={loadingHubs}
-              >
-                <option value="">Select a team hub...</option>
-                {hubs.map(hub => (
-                  <option key={hub.id} value={hub.id}>
-                    {hub.name} ({hub.members.length + 1} members)
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleSaveToHub}
-                disabled={!selectedHubId || !deckName.trim() || savingToHub}
-                className="px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
-                title="Save deck to selected team hub"
-              >
-                {savingToHub ? '🔄' : '👥'} {savingToHub ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-          
-          {/* Print Header */}
-          <div className="hidden print:block text-center border-t pt-4 mt-4">
-            <p className="text-sm text-gray-400">
-              Generated by Lorcana Deck Builder • {new Date().toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-      </Modal>
-    );
-  }
+// Normalize card types to handle Songs and other subtypes consistently.
+// Shared at module scope so every component (DeckPresentationPopup, AppInner's
+// generateDeckImage, etc.) sees the same definition instead of relying on a
+// per-component closure that isn't in scope elsewhere.
+function normalizedType(card) {
+  const rawType =
+    card.type ||
+    card._raw?.type ||
+    card._raw?.type_line ||
+    "";
+
+  const sub = (card.subtypes || card._raw?.subtypes || []).map(String);
+  const kws = (card.keywords || card._raw?.keywords || []).map(String);
+
+  const hay = `${rawType} ${sub.join(" ")} ${kws.join(" ")}`.toLowerCase();
+
+  // Many feeds mark Songs as Action + Song (subtype/keyword/type_line)
+  if (hay.includes("song")) return "Song";
+  if (hay.includes("character")) return "Character";
+  if (hay.includes("item")) return "Item";
+  if (hay.includes("location")) return "Location";
+  if (hay.includes("action")) return "Action";
+  return card.type || "Other";
+}
+
+// DeckPresentationPopup was replaced by the shared src/components/DeckPresentationView.jsx
+// (rendered from a docked panel in the Deck Lab and inline on the My Decks page).
+// The helpers below (TournamentResultsSection and friends) are still defined here and
+// re-exported at the bottom of this section so that component can reuse them.
 
 // --- useDeckResults Hook ---
 function useDeckResults(deckId, refreshKey = 0) {
@@ -8168,7 +5106,7 @@ function TournamentResultsSection({ deckId, deckName }) {
                             <div className="flex gap-1">
                               <button
                                 onClick={saveEdit}
-                                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                                className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded"
                               >
                                 ✓
                               </button>
@@ -8183,7 +5121,7 @@ function TournamentResultsSection({ deckId, deckName }) {
                             <div className="flex gap-1">
                               <button
                                 onClick={() => startEdit(record)}
-                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                                className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded"
                               >
                                 ✏️
                               </button>
@@ -8253,6 +5191,33 @@ function TournamentResultsSection({ deckId, deckName }) {
   );
 }
 
+// Shared re-exports for src/components/DeckPresentationView.jsx --------------
+// These all used to be reachable only as in-file closures/module-scope
+// functions available to DeckPresentationPopup. Now that the presentation UI
+// lives in its own component file, export the pieces it still needs so both
+// files keep a single source of truth instead of duplicating this logic.
+export {
+  Modal,
+  Section,
+  Pill,
+  WinRateBar,
+  useDeckResults,
+  TournamentResultsSection,
+  getCost,
+  getInks,
+  deckKey,
+  normalizedType,
+  FALLBACK_IMG,
+  EnhancedCurveChart,
+  DrawProbabilityTool,
+  DrawSimulator,
+  HoverableStatLine,
+  HoverableStatBox,
+  rolesForCard,
+  ROLE_ORDER,
+  detectSynergies,
+};
+
 // Root App -------------------------------------------------------------------
 
 function AppInner() {
@@ -8260,429 +5225,22 @@ function AppInner() {
   const { addToast } = useToasts();
   const { user, loading: authLoading } = useAuth();
   
-  // Function to generate deck image
-  async function generateDeckImage(event) {
-    // Get the button element to show loading state
-    const button = event?.target;
-    const originalText = button?.textContent;
-    const originalDisabled = button?.disabled;
-    
+  // Deck presentation image download. The heavy canvas/layout logic lives in
+  // src/lib/deckImage.js as a pure function; this wrapper just owns the
+  // loading state and error toast for the Deck Lab's own "Present" panel.
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  async function generateDeckImage() {
+    setIsGeneratingImage(true);
     try {
-      
-      if (button) {
-        button.disabled = true;
-        button.textContent = '🔄 Generating...';
-      }
-      // Create canvas for deck image
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Layout constants - tune these for the exact look you want
-      const posterW = 1400;       // Fixed width like your clean mock
-      const columns = 8;          // 8 across for more compact layout
-      const gap = 16;             // Space between cards
-      const margin = 32;          // Outer edge margin
-      const headerH = 120;        // Title band height
-      const cardAR = 63/88;       // Lorcana card aspect ratio
-      
-      // Calculate card size from width/columns (no dead space)
-      const cardWidth = Math.floor((posterW - margin * 2 - gap * (columns - 1)) / columns);
-      const cardHeight = Math.floor(cardWidth / cardAR);
-      const cardsPerRow = columns;
-      
-      // Get deck entries
-      const entries = Object.values(deck.entries || {}).filter(e => e.count > 0);
-      
-      // Simple grouping for deck image generation
-      const groupedEntries = [
-        { entries: entries.filter(e => normalizedType(e.card) === 'Character') },
-        { entries: entries.filter(e => normalizedType(e.card) === 'Action') },
-        { entries: entries.filter(e => normalizedType(e.card) === 'Song') },
-        { entries: entries.filter(e => normalizedType(e.card) === 'Item') },
-        { entries: entries.filter(e => normalizedType(e.card) === 'Location') },
-        { entries: entries.filter(e => !['Character', 'Action', 'Song', 'Item', 'Location'].includes(normalizedType(e.card))) }
-      ];
-      
-      // Flatten all entries into one continuous list, maintaining order
-      const allEntries = [];
-      try {
-        for (const { entries: list } of groupedEntries) {
-          // Sort each group by cost, then by name for consistent ordering
-          const sortedList = [...list].sort((a, b) => {
-            const costA = getCost(a.card) ?? 0;
-            const costB = getCost(b.card) ?? 0;
-            if (costA !== costB) {
-              return costA - costB; // Sort by cost first
-            }
-            // If costs are equal, sort by name
-            return a.card.name.localeCompare(b.card.name);
-          });
-          allEntries.push(...sortedList);
-        }
-        
-        // Debug: log the entries we're working with
-        console.log(`[Deck Image] Total entries to draw:`, allEntries.length);
-      } catch (sortError) {
-        console.error(`[Deck Image] Error sorting entries:`, sortError);
-        // Fallback: just use the original entries without sorting
-        for (const { entries: list } of groupedEntries) {
-          allEntries.push(...list);
-        }
-      }
-      
-      // Calculate exact grid dimensions (no dead space)
-      const totalRows = Math.ceil(allEntries.length / cardsPerRow);
-      const gridHeight = totalRows * cardHeight + (totalRows - 1) * gap;
-      
-      // Compute exact poster height (no hard-coded values)
-      const posterH = headerH + margin + gridHeight + margin;
-      
-      // Set canvas dimensions exactly
-      canvas.width = posterW;
-      canvas.height = posterH;
-      
-      // Debug logging for dimensions
-      console.log(`[Deck Image] Layout calculation:`, {
-        posterW,
-        posterH,
-        columns,
-        cardWidth,
-        cardHeight,
-        gap,
-        margin,
-        headerH,
-        totalRows,
-        totalCards: allEntries.length
-      });
-      
-      // Background
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Title and username on same row, centered
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 56px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(deck.name || 'Untitled Deck', canvas.width / 2, margin);
-      
-      // Username on same row, centered below title
-      ctx.font = '500 32px Inter, system-ui, sans-serif';
-      ctx.fillStyle = '#cdd2e0';
-      const username = user?.email || deck.createdBy || deck.username || 'Unknown User';
-      ctx.fillText(`by ${username}`, canvas.width / 2, margin + 70);
-      
-      // Draw cards in grid - one continuous grid without section breaks
-      let currentRow = 0;
-      let currentCol = 0;
-      const yOffset = headerH + margin;
-      
-      // Draw all cards in one continuous grid
-      for (const entry of allEntries) {
-        const x = margin + currentCol * (cardWidth + gap);
-        const y = yOffset + currentRow * (cardHeight + gap);
-        
-        // Draw card background
-        ctx.fillStyle = '#2d3748';
-        ctx.fillRect(x, y, cardWidth, cardHeight);
-        ctx.strokeStyle = '#718096';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, cardWidth, cardHeight);
-        
-        // Draw card image if available - try multiple image sources
-        const card = entry.card;
-        let imageDrawn = false;
-        
-        // Try multiple image sources in order of preference
-        const imageSources = [
-          card.image_url,
-          card.image,
-          card._imageFromAPI,
-          card._raw?.image_uris?.digital?.large,
-          card._raw?.image_uris?.digital?.normal,
-          card._raw?.image_uris?.large,
-          card._raw?.image_uris?.normal,
-          // Try to generate Lorcast URLs if we have set/number
-          card.set && card.number ? `https://cards.lorcast.io/card/digital/large/crd_${card.set}_${card.number.toString().padStart(3, '0')}.avif` : null,
-          card.set && card.number ? `https://api.lorcast.com/v0/cards/${card.set}/${card.number}/image` : null
-        ].filter(Boolean);
-        
-        // Debug: log what image sources we have
-        console.log(`[Deck Image] Card: ${card.name}, Image sources:`, imageSources);
-        
-        for (const imageSrc of imageSources) {
-          if (imageSrc && !imageDrawn) {
-            try {
-              console.log(`[Deck Image] Trying image source: ${imageSrc}`);
-              
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              
-              // Try to use proxy for CORS issues
-              let finalImageSrc = imageSrc;
-              if (imageSrc.includes('cards.lorcast.io') || imageSrc.includes('api.lorcast.com')) {
-                try {
-                  // Use the existing proxy function if available
-                  if (typeof proxyImageUrl === 'function') {
-                    finalImageSrc = proxyImageUrl(imageSrc);
-                    console.log(`[Deck Image] Using proxy URL: ${finalImageSrc}`);
-                  } else {
-                    // Fallback proxy
-                    finalImageSrc = `https://images.weserv.nl/?url=${encodeURIComponent(imageSrc)}&output=jpg`;
-                    console.log(`[Deck Image] Using fallback proxy: ${finalImageSrc}`);
-                  }
-                } catch (proxyError) {
-                  console.warn(`[Deck Image] Proxy failed, using original: ${imageSrc}`);
-                }
-              }
-              
-              await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 5000);
-                img.onload = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Successfully loaded image: ${finalImageSrc}`);
-                  resolve();
-                };
-                img.onerror = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Failed to load image: ${finalImageSrc}`);
-                  reject(new Error('Image failed to load'));
-                };
-                img.src = finalImageSrc;
-              });
-              
-              // Draw image maintaining aspect ratio
-              const imgAspect = img.width / img.height;
-              const cardAspect = cardWidth / cardHeight;
-              
-              let drawWidth = cardWidth;
-              let drawHeight = cardHeight;
-              let drawX = x;
-              let drawY = y;
-              
-              if (imgAspect > cardAspect) {
-                drawHeight = cardWidth / imgAspect;
-                drawY = y + (cardHeight - drawHeight) / 2;
-              } else {
-                drawWidth = cardHeight * imgAspect;
-                drawX = x + (cardWidth - drawWidth) / 2;
-              }
-              
-              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-              imageDrawn = true;
-              console.log(`[Deck Image] Successfully drew image for ${card.name}`);
-              break; // Successfully drew image, stop trying other sources
-              
-            } catch (error) {
-              console.warn(`[Deck Image] Failed to load image from ${imageSrc}:`, error);
-              continue; // Try next image source
-            }
-          }
-        }
-        
-        // If no image was drawn, try one more approach with existing functions
-        if (!imageDrawn) {
-          try {
-            // Try to use the existing image loading functions from the codebase
-            if (typeof getWorkingImageUrl === 'function') {
-              const workingUrl = await getWorkingImageUrl(card);
-              if (workingUrl) {
-                console.log(`[Deck Image] Trying getWorkingImageUrl: ${workingUrl}`);
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                await new Promise((resolve, reject) => {
-                  const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
-                  img.onload = resolve;
-                  img.onerror = reject;
-                  img.src = workingUrl;
-                });
-                
-                // Draw the image
-                const imgAspect = img.width / img.height;
-                const cardAspect = cardWidth / cardHeight;
-                
-                let drawWidth = cardWidth;
-                let drawHeight = cardHeight;
-                let drawX = x;
-                let drawY = y;
-                
-                if (imgAspect > cardAspect) {
-                  drawHeight = cardWidth / imgAspect;
-                  drawY = y + (cardHeight - drawHeight) / 2;
-                } else {
-                  drawWidth = cardHeight * imgAspect;
-                  drawX = x + (cardWidth - drawWidth) / 2;
-                }
-                
-                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                imageDrawn = true;
-                console.log(`[Deck Image] Successfully drew image using getWorkingImageUrl for ${card.name}`);
-              }
-            }
-          } catch (error) {
-            console.warn(`[Deck Image] getWorkingImageUrl failed for ${card.name}:`, error);
-          }
-        }
-        
-        // If still no image was drawn, try one more time with a simpler approach
-        if (!imageDrawn) {
-          try {
-            // Try to load image directly from the card data
-            const simpleImageSrc = card.image_url || card.image || card._imageFromAPI;
-            if (simpleImageSrc) {
-              console.log(`[Deck Image] Final attempt with simple image source: ${simpleImageSrc}`);
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              
-              await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000);
-                img.onload = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Successfully loaded image on final attempt: ${simpleImageSrc}`);
-                  resolve();
-                };
-                img.onerror = () => {
-                  clearTimeout(timeout);
-                  console.log(`[Deck Image] Final image attempt failed: ${simpleImageSrc}`);
-                  reject(new Error('Image failed to load'));
-                };
-                img.src = simpleImageSrc;
-              });
-              
-              // Draw the image
-              const imgAspect = img.width / img.height;
-              const cardAspect = cardWidth / cardHeight;
-              
-              let drawWidth = cardWidth;
-              let drawHeight = cardHeight;
-              let drawX = x;
-              let drawY = y;
-              
-              if (imgAspect > cardAspect) {
-                drawHeight = cardWidth / imgAspect;
-                drawY = y + (cardHeight - drawHeight) / 2;
-              } else {
-                drawWidth = cardHeight * imgAspect;
-                drawX = x + (cardWidth - drawWidth) / 2;
-              }
-              
-              ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-              imageDrawn = true;
-              console.log(`[Deck Image] Successfully drew image on final attempt for ${card.name}`);
-            }
-          } catch (error) {
-            console.warn(`[Deck Image] Final image attempt failed for ${card.name}:`, error);
-          }
-        }
-        
-        // If still no image was drawn, use fallback
-        if (!imageDrawn) {
-          // Draw fallback card content
-          ctx.fillStyle = '#1a202c';
-          ctx.fillRect(x, y, cardWidth, cardHeight);
-          
-          // Card border
-          ctx.strokeStyle = '#4a5568';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, cardWidth, cardHeight);
-          
-          // Card name
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 12px Arial, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const nameLines = card.name.split(' ').reduce((lines, word) => {
-            const testLine = lines[lines.length - 1] + (lines[lines.length - 1] ? ' ' : '') + word;
-            ctx.font = 'bold 12px Arial, sans-serif';
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > cardWidth - 8) {
-              lines.push(word);
-            } else {
-              lines[lines.length - 1] = testLine;
-            }
-            return lines;
-          }, ['']);
-          
-          const lineHeight = 14;
-          const startY = y + cardHeight / 2 - (nameLines.length - 1) * lineHeight / 2;
-          nameLines.forEach((line, i) => {
-            ctx.fillText(line, x + cardWidth / 2, startY + i * lineHeight);
-          });
-        }
-        
-        // Draw count indicator - Rounded bubble positioned exactly on card corner
-        if (entry.count > 1) {
-          const bubbleSize = 20;
-          const bubbleX = x + cardWidth - bubbleSize;
-          const bubbleY = y;
-          const bubbleRadius = bubbleSize / 2;
-          
-          // Draw rounded rectangle (bubble) with fallback for older browsers
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            // Modern browsers support roundRect
-            ctx.roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, bubbleRadius);
-          } else {
-            // Fallback for older browsers - draw a circle
-            ctx.arc(bubbleX + bubbleRadius, bubbleY + bubbleRadius, bubbleRadius, 0, 2 * Math.PI);
-          }
-          ctx.fillStyle = '#10b981'; // emerald-600
-          ctx.fill();
-          
-          // Draw border
-          ctx.strokeStyle = '#047857'; // emerald-700
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Draw count text
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 12px Arial, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(entry.count.toString(), bubbleX + bubbleRadius, bubbleY + bubbleRadius);
-        }
-        
-        // Move to next position
-        currentCol++;
-        if (currentCol >= cardsPerRow) {
-          currentCol = 0;
-          currentRow++;
-        }
-      }
-      
-      // Convert to blob and download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${deck.name || 'deck'}_${new Date().toISOString().split('T')[0]}.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-        
-        // Restore button state
-        if (button) {
-          button.disabled = originalDisabled;
-          button.textContent = originalText;
-        }
-      }, 'image/png');
-      
+      await generateDeckImagePNG(deck, allCards, { username: user?.email });
     } catch (error) {
       console.error('Failed to generate deck image:', error);
-      alert('Failed to generate deck image. Please try again.');
-      
-      // Restore button state on error
-      if (button) {
-        button.disabled = originalDisabled;
-        button.textContent = originalText;
-      }
+      addToast('Failed to generate deck image. Please try again.', 'error');
+    } finally {
+      setIsGeneratingImage(false);
     }
   }
-  
+
   // Debug: Track component lifecycle
   console.log('[App] ===== COMPONENT LIFECYCLE DEBUG =====');
   console.log('[App] Component function starting...');
@@ -8715,95 +5273,20 @@ function AppInner() {
     setAllCards(cards);
   }, []);
   
-  // Debug: Check state immediately after initialization
-  console.log('[App] State variables initialized:');
-  console.log('[App] - allCards:', allCards?.length || 0);
-  console.log('[App] - shownCards:', shownCards?.length || 0);
-  console.log('[App] - loading:', loading);
-  
-  // FIXED: IMMEDIATE DETECTION - Accept hyphenated titles, don't force reload unnecessarily
-  console.log('[App] 🔍 IMMEDIATE CHECK: Checking for simplified cards...');
-  if (allCards && allCards.length > 0) {
-    const cardsWithSubnames = allCards.filter(hasSubtitleLike);
-    console.log('[App] 🔍 IMMEDIATE CHECK: Cards with subnames/subtitles found:', cardsWithSubnames.length);
-    
-    if (cardsWithSubnames.length === 0) {
-      console.log('[App] 🚨 IMMEDIATE CHECK: SIMPLIFIED CARDS DETECTED! Need to reload...');
-      // This will trigger our useEffect to reload
-    } else {
-      console.log('[App] ✅ IMMEDIATE CHECK: Cards already have subnames/subtitles, no reload needed');
-    }
-  }
-  
-  // Debug: Check what's actually in allCards
-  if (allCards && allCards.length > 0) {
-    console.log('[App] allCards already has data! Sample:', allCards.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
-    const cardsWithSubnames = allCards.filter(card => hasSubtitleLike(card));
-    console.log('[App] Cards with subnames found:', cardsWithSubnames.length);
-    if (cardsWithSubnames.length > 0) {
-      console.log('[App] Sample subname cards:', cardsWithSubnames.slice(0, 5).map(c => c.name));
-    } else {
-      console.log('[App] NO CARDS WITH SUBNAMES FOUND in loaded data!');
-    }
-    
-    // Debug: Check if this is cached data
-    console.log('[App] ===== INVESTIGATING CARD SOURCE =====');
-    console.log('[App] Checking if cards are from localStorage or other cache...');
-    
-            // Check if there's a localStorage cache
-        try {
-          const cachedCards = localStorage.getItem('lorcana-cards-cache');
-          if (cachedCards) {
-            console.log('[App] Found cached cards in localStorage!');
-            const parsed = JSON.parse(cachedCards);
-            console.log('[App] Cached cards count:', parsed.length);
-            if (parsed.length > 0) {
-              const cachedWithSubnames = parsed.filter(card => hasSubtitleLike(card));
-              console.log('[App] Cached cards with subnames/subtitles:', cachedWithSubnames.length);
-              if (cachedWithSubnames.length > 0) {
-                console.log('[App] Sample cached subname/subtitle cards:', cachedWithSubnames.slice(0, 3).map(c => c.name));
-              }
-            }
-          } else {
-            console.log('[App] No cached cards found in localStorage');
-          }
-        } catch (error) {
-          console.log('[App] Error checking localStorage cache:', error);
-        }
-    
-    // Check if there's a sessionStorage cache
-    try {
-      const sessionCards = sessionStorage.getItem('lorcana-cards-session');
-      if (sessionCards) {
-        console.log('[App] Found cards in sessionStorage!');
-        const parsed = JSON.parse(sessionCards);
-        console.log('[App] Session cards count:', parsed.length);
-      } else {
-        console.log('[App] No cards found in sessionStorage');
-      }
-    } catch (error) {
-      console.log('[App] Error checking sessionStorage:', error);
-    }
-    
-    // Check if there are any global variables
-    if (window.lorcanaCards) {
-      console.log('[App] Found global lorcanaCards variable!');
-      console.log('[App] Global cards count:', window.lorcanaCards.length);
-    }
-    
-    if (window.allCards) {
-      console.log('[App] Found global allCards variable!');
-      console.log('[App] Global allCards count:', window.allCards.length);
-    }
-    
-    console.log('[App] ===== END INVESTIGATION =====');
-  }
-  
+  // (Removed a large per-render debug block that filtered the full card catalog
+  //  twice and parsed localStorage/sessionStorage on every render — see audit.)
+
   const [inspectCard, setInspectCard] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
-  const [deckPresentationOpen, setDeckPresentationOpen] = useState(false);
+  // Mobile-only (below lg): a persistent two-tab bottom bar replaces the
+  // "Present -> full-screen overlay" pattern. "cards" shows the existing
+  // search/filter/grid UI (the default), "deck" shows a small header +
+  // segmented control (Cards / Info) backed by DeckPresentationView's
+  // mobileSection prop. Desktop ignores this entirely.
+  const [mobileTab, setMobileTab] = useState('cards');
+  const [mobileDeckSection, setMobileDeckSection] = useState('cards');
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
   const [saveConfirmationOpen, setSaveConfirmationOpen] = useState(false);
   const [focusCardName, setFocusCardName] = useState('');
@@ -8812,6 +5295,13 @@ function AppInner() {
   const [decks, setDecks] = useState({});
   const [currentDeckId, setCurrentDeckId] = useState(null);
   const [showDeckManager, setShowDeckManager] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('decks') === 'open') {
+      setShowDeckManager(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
   const [showTeamHub, setShowTeamHub] = useState(false);
 
   // Add batch image loader
@@ -9322,9 +5812,11 @@ async function saveDeckToCloud(deckData) {
       }
     } else {
       console.warn('[saveDeckToCloud] Failed to save to cloud, but local save succeeded');
+      addToast("Saved locally, but couldn't sync to the cloud. Your changes are on this device only.", "error", 5000);
     }
   } catch (error) {
     console.warn('[saveDeckToCloud] Cloud save failed, but local save succeeded:', error);
+    addToast("Saved locally, but couldn't sync to the cloud. Your changes are on this device only.", "error", 5000);
   }
 }
 
@@ -9502,10 +5994,6 @@ async function syncDecksWithCloud() {
   }
 }
 
-function handleDeckPresentation() {
-  setDeckPresentationOpen(true);
-}
-
 // Enhanced deck management functions
 function handleNewDeck(name = "Untitled Deck") {
   const newDeck = createNewDeck(name);
@@ -9517,18 +6005,8 @@ function handleNewDeck(name = "Untitled Deck") {
 }
 
 function handleSwitchDeck(deckToSwitch) {
-  console.log('[handleSwitchDeck] Switching to deck:', deckToSwitch);
-  console.log('[handleSwitchDeck] Current decks state:', decks);
-  console.log('[handleSwitchDeck] Deck to switch exists in decks:', decks[deckToSwitch.id]);
-  console.log('[handleSwitchDeck] Current deck before switch:', deck);
-  console.log('[handleSwitchDeck] Current currentDeckId before switch:', currentDeckId);
-  
   setCurrentDeckId(deckToSwitch.id);
   deckDispatch({ type: "SWITCH_DECK", deck: deckToSwitch });
-  
-  console.log('[handleSwitchDeck] After switch - new currentDeckId:', deckToSwitch.id);
-  console.log('[handleSwitchDeck] Switch operation completed');
-  
   addToast(`Switched to deck: "${deckToSwitch.name}"`, "success");
 }
 
@@ -9595,6 +6073,14 @@ async function handleDeleteDeck(deckId) {
     console.error('[handleDeleteDeck] Error deleting deck:', error);
     addToast(`Failed to delete deck: "${deckToDelete.name}"`, "error");
   }
+}
+
+function handleRenameDeck(deckId, newName) {
+  const updatedDecks = updateDeckMetadata(decks, deckId, { name: newName });
+  setDecks(updatedDecks);
+  const updatedDeck = updatedDecks[deckId];
+  if (updatedDeck) saveDeckToCloud(updatedDeck);
+  addToast(`Renamed deck to "${newName}"`, "success");
 }
 
 function handleDuplicateDeck(deckId) {
@@ -9838,11 +6324,14 @@ useEffect(() => {
 
 
   console.log('[App] Rendering with ImageCacheProvider wrapper');
-  
+
   return (
-    <ToastProvider>
       <ImageCacheProvider>
-        <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-950 to-black text-gray-100">
+        <div className="flex flex-col min-h-screen overflow-x-clip bg-gradient-to-b from-gray-950 to-black text-gray-100">
+          {/* Card search/filter toolbar — below lg this belongs to the mobile
+              "Cards" tab; hidden entirely on the "Deck" tab so switching tabs
+              is a clean swap instead of just hiding the grid under a toolbar. */}
+          <div className={`${mobileTab === 'cards' ? 'block' : 'hidden'} lg:block`}>
           {/* Top Bar */}
           <TopBar
             key={`topbar-${filters?._resetTimestamp ?? "init"}`}
@@ -9850,7 +6339,6 @@ useEffect(() => {
             onExport={handleExport}
             onImport={handleImport}
             onPrint={handlePrint}
-            onDeckPresentation={handleDeckPresentation}
             onSaveDeck={handleSaveDeck}
             onToggleFilters={() => filterDispatch({ type: "TOGGLE_PANEL" })}
             searchText={filters?.text || ""}
@@ -9862,7 +6350,7 @@ useEffect(() => {
           />
 
           {/* Essential Quick Filters */}
-          <div className="px-4 py-2.5 bg-[#0c0f17]/80 border-b border-white/10 sticky top-16 z-30 backdrop-blur">
+          <div className="px-4 py-2.5 bg-[#0c0f17]/80 border-b border-white/10 sticky top-0 sm:top-16 z-30 backdrop-blur">
   <div className="flex flex-wrap items-center gap-4">
     <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Filter</div>
 
@@ -9980,8 +6468,10 @@ useEffect(() => {
   </div>
 </div>
 
-{/* Floating Filter Button */}
-<div className="fixed bottom-6 right-6 z-50">
+{/* Floating Filter Button — desktop only. Below lg this duplicates the
+    "Filters" button already in the toolbar, and its fixed position collides
+    with the mobile Cards/Deck bottom tab bar. */}
+<div className="hidden lg:block fixed bottom-6 right-6 z-50">
   <button
     onClick={() => filterDispatch({ type: "TOGGLE_PANEL" })}
     className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 rounded-full shadow-lg border-2 border-emerald-500 text-white font-bold text-lg transition-all hover:scale-110"
@@ -10110,11 +6600,14 @@ useEffect(() => {
     </div>
   </div>
 )}
+          </div>
 
 {/* Main content area with sticky deck panel */}
 <div key={`main-content-${filters?._resetTimestamp ?? "init"}`} className="flex relative">
-  {/* Card grid - takes remaining space */}
-  <div className="flex-1 lg:pr-4 pb-20 lg:pb-0">
+  {/* Card grid - takes remaining space. Below lg, this is the "Cards" tab of
+      the mobile bottom tab bar (see the tab bar + "Deck" tab content further
+      down); on lg+ it's always shown alongside the docked deck panels. */}
+  <div className={`flex-1 lg:pr-4 pb-24 lg:pb-0 ${mobileTab === 'cards' ? 'block' : 'hidden'} lg:block`}>
     {loading ? (
       <div className="p-6 text-center text-gray-400">
         <div className="flex items-center justify-center gap-3">
@@ -10127,7 +6620,7 @@ useEffect(() => {
       <CardGrid
         cards={shownCards}
         onAdd={handleAdd}
-        onInspect={(c) => setInspectCard(c)}
+        onInspect={setInspectCard}
         deck={deck}
       />
     ) : (
@@ -10153,9 +6646,10 @@ useEffect(() => {
     )}
   </div>
 
-  {/* Sticky Deck Panel - Fixed width, sticky to bottom of viewport */}
+  {/* Sticky Deck Panel - own fixed-height scroll region below the header, so
+      scrolling the card grid on the left no longer scrolls this list too. */}
   <div className="hidden lg:block w-96 flex-shrink-0">
-    <div className="sticky bottom-0 border-l border-white/10 bg-gray-950/95 backdrop-blur-sm">
+    <div className="sticky top-16 border-l border-white/10 bg-gray-950/95 backdrop-blur-sm h-[calc(100vh-4rem)] overflow-y-auto">
       <DeckPanel
         deck={deck}
         onSetCount={handleSetCount}
@@ -10175,29 +6669,92 @@ useEffect(() => {
       </div>
     </div>
   </div>
+
 </div>
 
-{/* Mobile Deck Panel - Sticky to bottom on small screens */}
-<div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-950/95 backdrop-blur-sm border-t border-white/10">
-  <div className="max-h-96 overflow-y-auto">
-    <DeckPanel
-      deck={deck}
-      onSetCount={handleSetCount}
-      onRemove={handleRemove}
-      onExport={() => setExportOpen(true)}
-      onImport={() => setImportOpen(true)}
-      onSaveDeck={() => handleSaveDeck()}
-    />
-    <DeckStatistics
-      entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}
-      focusCardName={focusCardName || ""}
-    />
-    <div className={`p-3 ${deckValid ? "text-emerald-300" : "text-red-300"}`}>
-      {deckValid
-        ? "Deck is valid."
-        : `Deck must be between ${DECK_RULES.MIN_SIZE} and ${DECK_RULES.MAX_SIZE} cards.`}
+{/* Mobile "Deck" tab — dreamborn-style persistent tab switch, not a modal/
+    overlay. Shown only when the bottom tab bar's "Deck" tab is active; the
+    "Cards" tab is the card-grid column above (already mobile-optimized).
+    Header (name/count/ink) + a Cards/Info segmented control, backed by
+    DeckPresentationView's mobileSection prop so the cards-by-type grid and
+    the stats/tips/action-buttons aren't duplicated here. */}
+{mobileTab === 'deck' && (
+  <div className="lg:hidden fixed inset-0 top-16 bottom-14 z-30 bg-gray-950 flex flex-col overflow-hidden">
+    <div className="px-4 py-3 border-b border-white/10 shrink-0 bg-gray-950/95 backdrop-blur-sm">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-semibold text-gray-200 truncate">
+          {deck?.name || "Untitled Deck"}
+        </span>
+        <span className="text-xs text-gray-400 whitespace-nowrap">
+          {Object.values(deck?.entries || {}).filter((e) => e.count > 0).reduce((sum, e) => sum + e.count, 0)}/{DECK_RULES.MAX_SIZE} cards
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
+        <button
+          type="button"
+          onClick={() => setMobileDeckSection('cards')}
+          className={`py-1.5 rounded-md text-sm font-medium transition ${
+            mobileDeckSection === 'cards'
+              ? "bg-gradient-to-b from-violet-500 to-indigo-500 text-white shadow-[0_2px_10px_-2px_rgba(139,108,255,0.7)]"
+              : "text-gray-300 hover:bg-white/5"
+          }`}
+        >
+          Cards
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileDeckSection('info')}
+          className={`py-1.5 rounded-md text-sm font-medium transition ${
+            mobileDeckSection === 'info'
+              ? "bg-gradient-to-b from-violet-500 to-indigo-500 text-white shadow-[0_2px_10px_-2px_rgba(139,108,255,0.7)]"
+              : "text-gray-300 hover:bg-white/5"
+          }`}
+        >
+          Info
+        </button>
+      </div>
+    </div>
+    <div className="flex-1 overflow-y-auto p-3">
+      <DeckPresentationView
+        deck={deck}
+        allCards={allCards}
+        onSave={handleSaveDeck}
+        onGenerateImage={generateDeckImage}
+        toast={addToast}
+        mobileSection={mobileDeckSection}
+        onAdjustCount={(card, delta) => handleAdd(card, delta)}
+      />
     </div>
   </div>
+)}
+
+{/* Mobile bottom tab bar — persistent "Cards" / "Deck" switch (dreamborn-
+    style) replacing the old "Present" button + full-screen overlay pattern.
+    "Deck" shows a live card-count badge. Desktop is unaffected (lg:hidden). */}
+<div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-gray-950/95 backdrop-blur-sm border-t border-white/10 grid grid-cols-2">
+  <button
+    type="button"
+    onClick={() => setMobileTab('cards')}
+    className={`flex items-center justify-center gap-2 text-sm font-semibold transition ${
+      mobileTab === 'cards' ? "text-white bg-white/5" : "text-gray-400"
+    }`}
+  >
+    Cards
+  </button>
+  <button
+    type="button"
+    onClick={() => setMobileTab('deck')}
+    className={`flex items-center justify-center gap-2 text-sm font-semibold transition border-l border-white/10 ${
+      mobileTab === 'deck' ? "text-white bg-white/5" : "text-gray-400"
+    }`}
+  >
+    Deck
+    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full tabular-nums ${
+      deckValid ? "text-emerald-300 bg-emerald-500/15 border border-emerald-400/30" : "text-gray-300 bg-white/10 border border-white/10"
+    }`}>
+      {Object.values(deck?.entries || {}).filter((e) => e.count > 0).reduce((sum, e) => sum + e.count, 0)}
+    </span>
+  </button>
 </div>
 
         {/* Modals */}
@@ -10232,15 +6789,9 @@ useEffect(() => {
   />
 )}
 
-{deckPresentationOpen && (
-            <DeckPresentationPopup
-            key={`deck-presentation-${filters?._resetTimestamp ?? "init"}`}
-            deck={deck}
-            onClose={() => setDeckPresentationOpen(false)}
-            onSave={(deckName) => handleSaveDeck(deckName)}
-            onGenerateImage={generateDeckImage}
-          />
-)}
+{/* Deck Presentation now renders as a docked panel next to the card grid
+    (see the "Docked Deck Presentation panel" block above) instead of a
+    blocking modal, so there's no popup to mount here anymore. */}
 
 {/* Save Confirmation Modal */}
 {saveConfirmationOpen && (
@@ -10262,7 +6813,7 @@ useEffect(() => {
       <div className="pt-4">
         <button
           onClick={() => setSaveConfirmationOpen(false)}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
+          className="px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-lg font-semibold transition-colors"
         >
           Continue
         </button>
@@ -10287,6 +6838,7 @@ useEffect(() => {
   }}
   onImportDeck={handleImportDeck}
   onRefreshDecks={handleRefreshDecks}
+  onRenameDeck={handleRenameDeck}
 />
 
 {/* Team Hub */}
@@ -10311,7 +6863,6 @@ useEffect(() => {
         </>
       </div>
     </ImageCacheProvider>
-  </ToastProvider>
 );
 } // End AppInner function
 
@@ -10331,17 +6882,7 @@ function applyFilters(cards, filters) {
   // Only apply text filter if there's actual search text
   if (filters.text && filters.text.trim()) {
     const q = filters.text.toLowerCase().trim();
-    console.log('[Search Debug] Searching for:', q);
-    console.log('[Search Debug] Sample card data for search:', list.slice(0, 3).map(c => ({
-      name: c.name,
-      text: c.text,
-      type: c.type,
-      rarity: c.rarity,
-      set: c.set,
-      _rawType: c._raw?.type,
-      _rawRarity: c._raw?.rarity
-    })));
-    
+
     list = list.filter((c) => {
       // Search in multiple fields based on Lorcast structure
       const searchableFields = [
@@ -10357,18 +6898,10 @@ function applyFilters(cards, filters) {
         c._raw?.set?.name
       ].filter(Boolean); // Remove undefined/null values
       
-      const matches = searchableFields.some(field => 
+      return searchableFields.some(field =>
         String(field).toLowerCase().includes(q)
       );
-      
-      if (matches) {
-        console.log(`[Search Debug] Card "${c.name}" matches search "${q}"`);
-      }
-      
-      return matches;
     });
-    
-    console.log('[Search Debug] After text filtering, cards remaining:', list.length);
   }
 
   if (filters.inks && filters.inks.size) {
@@ -10378,13 +6911,8 @@ function applyFilters(cards, filters) {
       filters.inks = new Set(filters.inks || []);
     }
     
-    console.log('[Filter Debug] Ink filter active:', Array.from(filters.inks));
-    console.log('[Filter Debug] Using improved dual-ink filtering logic');
-    
     // Use the new improved ink filtering logic
     list = list.filter(card => matchesInkFilter(card, filters.inks));
-    
-    console.log('[Filter Debug] After ink filtering, cards remaining:', list.length);
   }
 
   if (filters.rarities && filters.rarities.size) {
@@ -10801,15 +7329,11 @@ function applyFilters(cards, filters) {
 
   list.sort((a, b) => {
     const dir = filters.sortDir === "desc" ? -1 : 1;
-    console.log('[Sort Debug] Sorting with:', filters.sortBy, 'direction:', filters.sortDir);
-    
+
     switch (filters.sortBy) {
               case "set-ink-number": {
-          console.log('[Sort Debug] set-ink-number sort for cards:', a.name, 'vs', b.name);
-          
           // Use the consistent comparison function (set → ink → card number)
           const result = cardComparator(a, b);
-          console.log('[Sort Debug] Consistent comparison result:', result);
           return result * dir;
         }
       case "cost":
@@ -10820,11 +7344,8 @@ function applyFilters(cards, filters) {
         return sa.localeCompare(sb) * dir;
       }
       case "ink-set-number": {
-        console.log('[Sort Debug] ink-set-number sort for cards:', a.name, 'vs', b.name);
-        
         // Use the consistent comparison function (ink → set → card number)
         const result = cardComparator(a, b);
-        console.log('[Sort Debug] Consistent comparison result:', result);
         return result * dir;
       }
       case "rarity":

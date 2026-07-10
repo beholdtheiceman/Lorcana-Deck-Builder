@@ -7,6 +7,7 @@ export default withAuth(async (req, res, sess) => {
     const decks = await prisma.deck.findMany({
       where: { userId: sess.uid },
       orderBy: { updatedAt: "desc" },
+      take: 500, // cap payload; a user is not expected to exceed this
     });
     return res.json({ decks });
   }

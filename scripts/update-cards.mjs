@@ -53,9 +53,28 @@ export function transformCard(c) {
 export function buildMap(dataset) {
   const cards = Array.isArray(dataset) ? dataset : dataset.cards || [];
   const map = {};
+  // Ravensburger reuses a mainline expansion card's setCode+number for that
+  // set's promo/reprint cards too (they're distinguished only by
+  // fullIdentifier, e.g. "43/204" vs "43/P3"). Some other code in this repo
+  // already depends on *which* card wins a given plain id in that case (e.g.
+  // "1-1" is documented/tested elsewhere as the Mickey Mouse promo, not the
+  // mainline card sharing that number) — so plain-id ownership keeps today's
+  // behavior: last one seen in the source wins, same as a bare overwrite.
+  // The displaced card is kept too, under a synthetic id derived from its
+  // own unique upstream id, so it's never silently dropped from the oracle —
+  // in particular so its name stays searchable via getByName().
+  const ownerUpstreamId = new Map(); // plain id -> upstream id of current occupant
   for (const c of cards) {
     const pair = transformCard(c);
-    if (pair) map[pair[0]] = pair[1];
+    if (!pair) continue;
+    const [id, value] = pair;
+
+    if (id in map) {
+      const prevUpstreamId = ownerUpstreamId.get(id);
+      map[`${id}~${prevUpstreamId}`] = map[id];
+    }
+    map[id] = value;
+    ownerUpstreamId.set(id, c.id);
   }
   return map;
 }
