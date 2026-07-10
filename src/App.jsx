@@ -2620,7 +2620,7 @@ function parseTextImport(text) {
     console.log(`[parseTextImport] Processing line ${index + 1}: "${line}"`);
     
     // Try to parse the line - just count and full card name
-    const match = line.match(/^(\d+)\s+(.+)$/);
+    const match = line.match(/^(\d+)[xX]?\s+(.+)$/);
     if (!match) {
       console.warn(`[parseTextImport] Unrecognized format on line ${index + 1}: "${line}"`);
       skippedLines++;
@@ -2731,9 +2731,9 @@ function parseTextImport(text) {
         console.warn(`[parseTextImport] Error processing ambiguous card ${bestMatch.name}:`, error);
         // Create placeholder
         const placeholderCard = {
-          name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`,
-          set: cardSet || 'Multiple',
-          number: cardNumber || 'Multiple',
+          name: cardName,
+          set: 'Multiple',
+          number: 'Multiple',
           cost: 0,
           inks: [],
           type: "Unknown",
@@ -2745,9 +2745,9 @@ function parseTextImport(text) {
           _raw: {},
           _candidates: foundCard.candidates,
           _needsResolution: true,
-          setCode: cardSet || 'Multiple',
-          setName: cardSet ? `Set ${cardSet}` : 'Multiple Sets',
-          setNum: cardNumber || 'Multiple',
+          setCode: 'Multiple',
+          setName: 'Multiple Sets',
+          setNum: 'Multiple',
           inkable: false,
           lore: 0,
           willpower: 0,
@@ -2759,17 +2759,17 @@ function parseTextImport(text) {
         const placeholderKey = deckKey(placeholderCard);
         deck.entries[placeholderKey] = { card: placeholderCard, count: countNum };
         validCards++;
-        notFoundCards.push({ name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`, count: countNum, reason: 'ambiguous-needs-resolution' });
+        notFoundCards.push({ name: cardName, count: countNum, reason: 'ambiguous-needs-resolution' });
       }
       
     } else {
       // No card found, create placeholder
-      console.log(`[parseTextImport] No card found for: "${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}"`);
-      
+      console.log(`[parseTextImport] No card found for: "${cardName}"`);
+
       const placeholderCard = {
-        name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`,
-        set: cardSet || "Unknown",
-        number: cardNumber || "?",
+        name: cardName,
+        set: "Unknown",
+        number: "?",
         cost: 0,
         inks: [],
         type: "Unknown",
@@ -2779,9 +2779,9 @@ function parseTextImport(text) {
         keywords: [],
         image_url: null,
         _raw: {},
-        setCode: cardSet || "Unknown",
-        setName: cardSet ? `Set ${cardSet}` : "Unknown",
-        setNum: cardNumber || "?",
+        setCode: "Unknown",
+        setName: "Unknown",
+        setNum: "?",
         inkable: false,
         lore: 0,
         willpower: 0,
@@ -2793,7 +2793,7 @@ function parseTextImport(text) {
       const key = deckKey(placeholderCard);
       deck.entries[key] = { card: placeholderCard, count: countNum };
       validCards++;
-      notFoundCards.push({ name: `${cardName}${cardSubtitle ? ` - ${cardSubtitle}` : ''}`, count: countNum, reason: 'not-found' });
+      notFoundCards.push({ name: cardName, count: countNum, reason: 'not-found' });
     }
     
     // REMOVED: Duplicate processing blocks that were causing double processing
@@ -2835,7 +2835,7 @@ function parseTextImport(text) {
         isString: typeof rawUrl === 'string',
         isObject: typeof rawUrl === 'object',
         length: rawUrl?.length,
-        keys: typeof rawUrl === 'object' ? Object.keys(rawUrl) : 'N/A'
+        keys: rawUrl && typeof rawUrl === 'object' ? Object.keys(rawUrl) : 'N/A'
       });
       
       // GUARD: Ensure rawUrl is a string before calling proxyImageUrl
@@ -2863,6 +2863,71 @@ function parseTextImport(text) {
   }
   
   return deck;
+}
+
+// Normalize any imported deck JSON into the app's full deck shape (id, name,
+// entries map, recomputed total). Accepts this app's export/saved formats plus
+// common list shapes from other builders ({name, count} arrays or name→count maps).
+function normalizeImportedDeck(parsed, fallbackName = "Imported Deck") {
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Deck JSON must be an object or array');
+  }
+
+  const fromNameCounts = (pairs, deckName) => {
+    const lines = pairs
+      .filter(p => p && p.name && Number(p.count) > 0)
+      .map(p => `${Number(p.count)} ${p.name}`);
+    if (lines.length === 0) throw new Error('No cards found in deck JSON');
+    const deck = parseTextImport(lines.join('\n'));
+    return { ...createNewDeck(deckName), entries: deck.entries, total: deck.total };
+  };
+
+  const itemToPair = (item) => {
+    if (!item || typeof item !== 'object') return null;
+    const itemName = item.name || item.cardName || item.card?.name || item.title;
+    const count = Number(item.count ?? item.quantity ?? item.qty ?? item.amount ?? item.copies ?? 1);
+    return itemName ? { name: itemName, count } : null;
+  };
+
+  // Bare array of {name, count}-style items
+  if (Array.isArray(parsed)) {
+    return fromNameCounts(parsed.map(itemToPair).filter(Boolean), fallbackName);
+  }
+
+  const name = typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : fallbackName;
+
+  // This app's deck shape: entries as a map (export format) or array (saved-deck format)
+  if (parsed.entries && typeof parsed.entries === 'object') {
+    const rawEntries = Array.isArray(parsed.entries) ? parsed.entries : Object.values(parsed.entries);
+    const entries = {};
+    let total = 0;
+    for (const entry of rawEntries) {
+      const count = Number(entry?.count);
+      if (!entry?.card || !(count > 0)) continue;
+      entries[deckKey(entry.card)] = { card: entry.card, count };
+      total += count;
+    }
+    if (total === 0) throw new Error('No cards found in deck JSON');
+    return { ...createNewDeck(name), entries, total };
+  }
+
+  // { cards: [...] } or { cards: { "Card Name": 3 } }
+  if (parsed.cards) {
+    if (Array.isArray(parsed.cards)) {
+      return fromNameCounts(parsed.cards.map(itemToPair).filter(Boolean), name);
+    }
+    if (typeof parsed.cards === 'object') {
+      return fromNameCounts(Object.entries(parsed.cards).map(([n, c]) => ({ name: n, count: c })), name);
+    }
+  }
+
+  // Plain { "Card Name": count } map
+  const values = Object.values(parsed);
+  if (values.length > 0 && values.every(v => typeof v === 'number')) {
+    return fromNameCounts(Object.entries(parsed).map(([n, c]) => ({ name: n, count: c })), name);
+  }
+
+  throw new Error('Unrecognized deck JSON format. Paste a deck exported from this app, or a list of cards with name and count.');
 }
 
 
@@ -5143,7 +5208,7 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
 // Deck panel -----------------------------------------------------------------
 
-function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPresentation, onSaveDeck }) {
+function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onSaveDeck }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
     () => groupBy(entries, (e) => getCost(e.card)),
@@ -5213,13 +5278,6 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onDeckPrese
               title="Save deck to storage"
             >
               Save
-            </button>
-            <button
-              className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition text-sm"
-              onClick={onDeckPresentation}
-              title="View deck presentation with stats and charts"
-            >
-              Present
             </button>
           </div>
         </div>
@@ -5660,24 +5718,13 @@ function ImportModal({ open, onClose, onImport }) {
   }, [open]);
   
   const handleLoadSavedDeck = (savedDeck) => {
-    // Convert saved deck format back to app format
-    const convertedDeck = {
-      name: savedDeck.name,
-      entries: {},
-      total: 0
-    };
-    
-    savedDeck.entries.forEach(entry => {
-      const cardKey = `${entry.card.name}-${entry.card.set}-${entry.card.number}`;
-      convertedDeck.entries[cardKey] = {
-        card: entry.card,
-        count: entry.count
-      };
-      convertedDeck.total += entry.count;
-    });
-    
-    onImport(convertedDeck);
-    onClose();
+    try {
+      onImport(normalizeImportedDeck(savedDeck, savedDeck.name || "Saved Deck"));
+      onClose();
+    } catch (error) {
+      console.error('[ImportModal] Failed to load saved deck:', error);
+      alert(`Failed to load saved deck: ${error.message}`);
+    }
   };
   
   const handleDeleteSavedDeck = (deckId) => {
@@ -5785,40 +5832,35 @@ function ImportModal({ open, onClose, onImport }) {
                 
                 try {
                   let importedDeck;
-                  
+
                   if (importFormat === 'json') {
-                    importedDeck = JSON.parse(text);
-                  } else if (importFormat === 'txt') {
-                    // Use the global parseTextImport function
-                    if (typeof window.parseTextImport === 'function') {
-                      importedDeck = window.parseTextImport(text);
-                      
-                      // Check for cards that weren't found and show user feedback
-                      const notFoundCards = Object.values(importedDeck.entries)
-                        .filter(entry => entry.card.set === "Unknown")
-                        .map(entry => entry.card.name);
-                      
-                      if (notFoundCards.length > 0) {
-                        const message = `Import successful! ${importedDeck.total} cards imported.\n\nNote: ${notFoundCards.length} cards were not found in the database:\n${notFoundCards.join(', ')}\n\nThese may need to be loaded first or check spelling.`;
-                        alert(message);
-                      } else {
-                        alert(`Import successful! ${importedDeck.total} cards imported.`);
-                      }
-                    } else {
-                      throw new Error('Text import function not available');
+                    let parsed;
+                    try {
+                      parsed = JSON.parse(text);
+                    } catch (e) {
+                      throw new Error(`Invalid JSON: ${e.message}`);
                     }
+                    importedDeck = normalizeImportedDeck(parsed);
+                  } else if (importFormat === 'txt') {
+                    importedDeck = normalizeImportedDeck(parseTextImport(text));
                   } else {
                     throw new Error(`Unsupported format: ${importFormat}`);
                   }
-                  
+
+                  // Warn about cards that weren't found in the database
+                  const notFoundCards = Object.values(importedDeck.entries)
+                    .filter(entry => entry.card.set === "Unknown")
+                    .map(entry => entry.card.name);
+
+                  if (notFoundCards.length > 0) {
+                    alert(`Imported ${importedDeck.total} cards.\n\nNote: ${notFoundCards.length} cards were not found in the database:\n${notFoundCards.join(', ')}\n\nCheck spelling or wait for the card database to finish loading, then re-import.`);
+                  }
+
                   onImport(importedDeck);
                   onClose();
                 } catch (error) {
-                  if (importFormat === 'json') {
-                    alert("Invalid JSON");
-                  } else {
-                    alert(`Import failed: ${error.message}`);
-                  }
+                  console.error('[ImportModal] Import failed:', error);
+                  alert(`Import failed: ${error.message}`);
                 }
               }}
             >
@@ -9117,18 +9159,19 @@ useEffect(() => {
     }
   };
   
-  // Also expose the current card list for debugging
-  window.getCurrentCards = () => shownCards || [];
-  
+  // Expose the full card database so import lookups aren't limited to the
+  // currently filtered view
+  window.getCurrentCards = () => (allCards && allCards.length > 0 ? allCards : shownCards) || [];
+
   // Expose the text import function globally
   window.parseTextImport = parseTextImport;
-  
+
   return () => {
     delete window.checkCardFields;
     delete window.getCurrentCards;
     delete window.parseTextImport;
   };
-}, [shownCards]);
+}, [shownCards, allCards]);
 
 const deckValid = deck.total >= DECK_RULES.MIN_SIZE && deck.total <= DECK_RULES.MAX_SIZE;
 
@@ -10119,7 +10162,6 @@ useEffect(() => {
         onRemove={handleRemove}
         onExport={() => setExportOpen(true)}
         onImport={() => setImportOpen(true)}
-        onDeckPresentation={handleDeckPresentation}
         onSaveDeck={() => handleSaveDeck()}
       />
       <DeckStatistics
@@ -10144,7 +10186,6 @@ useEffect(() => {
       onRemove={handleRemove}
       onExport={() => setExportOpen(true)}
       onImport={() => setImportOpen(true)}
-      onDeckPresentation={handleDeckPresentation}
       onSaveDeck={() => handleSaveDeck()}
     />
     <DeckStatistics
