@@ -20,6 +20,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import JoinPage from './pages/JoinPage'
 import MyDecksPage from './pages/MyDecksPage'
 import AskAiPage from './pages/AskAiPage'
+import LandingPage from './pages/LandingPage'
 import { useAuth } from './contexts/AuthContext'
 
 function TopNav() {
@@ -147,12 +148,7 @@ function RequireAuth({ children }) {
   }
 
   if (!user) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-gray-300 text-lg mb-2">You need to be logged in to access Team Hub.</p>
-        <p className="text-gray-500 text-sm">Use the Login button in the top right to sign in or create an account.</p>
-      </div>
-    )
+    return <LandingPage />
   }
 
   return children
