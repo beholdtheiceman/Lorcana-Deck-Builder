@@ -4549,30 +4549,30 @@ useEffect(() => {
       </div>
     </div>
 
-    {/* Ink colors */}
+    {/* Ink colors — hexagon toggles (comp pool filters); lit = active */}
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-300">Inks:</span>
-      <div className="flex gap-1">
-        {["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"].map((ink) => (
-          <button
-            key={ink}
-            onClick={() => {
-              if (!(filters?.inks instanceof Set)) {
-                console.warn("inks is not a Set, resetting filters");
-                filterDispatch({ type: "RESET" });
-                return;
-              }
-              filterDispatch({ type: "TOGGLE_INK", ink });
-            }}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              (filters?.inks instanceof Set && filters.inks.has(ink))
-                ? "bg-gradient-to-b from-violet-500 to-indigo-500 text-white shadow-[0_2px_10px_-2px_rgba(139,108,255,0.7)]"
-                : "bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
-            }`}
-          >
-            {ink}
-          </button>
-        ))}
+      <span className="text-sm" style={{ color: 'var(--muted)' }}>Inks:</span>
+      <div className="flex gap-1.5">
+        {["Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"].map((ink) => {
+          const on = filters?.inks instanceof Set && filters.inks.has(ink);
+          return (
+            <button
+              key={ink}
+              title={ink}
+              aria-pressed={on}
+              onClick={() => {
+                if (!(filters?.inks instanceof Set)) {
+                  console.warn("inks is not a Set, resetting filters");
+                  filterDispatch({ type: "RESET" });
+                  return;
+                }
+                filterDispatch({ type: "TOGGLE_INK", ink });
+              }}
+              className="relative transition-opacity hover:opacity-80"
+              style={{ width: 22, height: 25, clipPath: 'var(--hex)', background: `var(--${ink.toLowerCase()})`, opacity: on ? 1 : 0.28 }}
+            />
+          );
+        })}
       </div>
     </div>
 
