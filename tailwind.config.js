@@ -8,30 +8,36 @@ export default {
   ],
   theme: {
     extend: {
+      // Color/radius/font values are consumed from src/tokens.css (P3.3 —
+      // single source of truth); only non-token extras are hardcoded here.
       colors: {
         ink: {
-          amber:    '#f4b223',
-          amethyst: '#9b59d0',
-          emerald:  '#2ecc71',
-          ruby:     '#e74c5e',
-          sapphire: '#3aa0e0',
-          steel:    '#9aa7b8',
+          amber:    'var(--amber)',
+          amethyst: 'var(--amethyst)',
+          emerald:  'var(--emerald)',
+          ruby:     'var(--ruby)',
+          sapphire: 'var(--sapphire)',
+          steel:    'var(--steel)',
         },
         bg: {
-          base:    '#0e1116',
-          raised:  '#161b24',
-          overlay: '#1d2430',
+          base:    'var(--canvas)',
+          raised:  'var(--panel)',
+          overlay: 'var(--panel-2)',
         },
-        line:  '#2a3340',
+        line:  'var(--line-2)',
         brand: { DEFAULT: '#8b5cf6', fg: '#0e1116' },
-        good:  '#2ecc71',
+        good:  'var(--emerald)',
         warn:  '#f4c542',
-        bad:   '#e74c5e',
+        bad:   'var(--ruby)',
+      },
+      fontFamily: {
+        display: 'var(--serif)',
+        sans:    'var(--sans)',
       },
       borderRadius: {
-        sm: '8px',
-        md: '12px',
-        lg: '16px',
+        sm: 'var(--r-sm)',
+        md: 'var(--r-md)',
+        lg: 'var(--r-lg)',
         xl: '20px',
       },
       boxShadow: {

@@ -1,0 +1,48 @@
+/* ============================================================================
+   Uninkable design tokens — SINGLE SOURCE OF TRUTH (P3.3).
+   Values come verbatim from the three approved comps (deck detail, Team Hub,
+   Deck Lab). Tailwind consumes these via var() in tailwind.config.js; the
+   legacy stylesheets (index.css, styles.css) reference them and define no
+   color tokens of their own.
+   ========================================================================== */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces — quiet warm-neutral dark, no purple wash */
+  --canvas:   #101114;
+  --panel:    #17181c;
+  --panel-2:  #1d1f24;
+  --line:     rgba(255, 255, 255, .07);
+  --line-2:   rgba(255, 255, 255, .13);
+
+  /* Text — slightly warm white, parchment-adjacent */
+  --text:     #e9e7e2;
+  --muted:    #9a978f;
+  --faint:    #6b6963;
+
+  /* The six inks — the only saturated colors allowed on screen */
+  --amber:    #f4b223;
+  --amethyst: #9b59d0;
+  --emerald:  #2ecc71;
+  --ruby:     #e74c5e;
+  --sapphire: #3aa0e0;
+  --steel:    #9aa7b8;
+
+  /* Default accent pair (surfaces that know a deck's inks override these) */
+  --ink-a: var(--ruby);
+  --ink-b: var(--sapphire);
+
+  /* Type */
+  --serif: "Fraunces", "Palatino Linotype", Constantia, Georgia, serif;
+  --sans:  "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+
+  /* Radii + the hex clip used for ink glyphs */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --hex: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
+
+  /* Legacy aliases (pre-token stylesheets) — do not use in new code */
+  --bg:     var(--canvas);
+  --border: var(--line-2);
+}
