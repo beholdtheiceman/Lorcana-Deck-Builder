@@ -61,6 +61,7 @@ export async function callModel(client, userInstruction) {
   const resp = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
+    thinking: { type: "disabled" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userInstruction }],
   });
@@ -167,6 +168,7 @@ export async function autoGeneratePrimer({ deckArchetype, vsArchetype, deckList,
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: PRIMER_MAX_TOKENS,
+      thinking: { type: "disabled" },
       system: PRIMER_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });

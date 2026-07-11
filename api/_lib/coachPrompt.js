@@ -22,10 +22,13 @@
 // the persona, modes, keyword reference, and tone below stay identical.
 
 // Model copied from the Console agent config.
-// NOTE: claude-sonnet-5 (like Opus 4.7/4.8) REJECTS the `temperature` sampling
-// parameter with a 400 ("`temperature` is deprecated for this model"). All
-// messages.create() calls in this app must omit temperature/top_p/top_k — steer
-// with prompting instead. Do not reintroduce a temperature on any Sonnet-5 call.
+// TWO Sonnet-5 gotchas the app's messages.create() calls must respect:
+//   1. It REJECTS `temperature`/`top_p`/`top_k` with a 400 ("`temperature` is
+//      deprecated for this model") — omit them; steer with prompting instead.
+//   2. Adaptive thinking is ON by default (Sonnet 4.6 ran thinking-off by
+//      omission). Left on, it eats the max_tokens budget and truncates output,
+//      breaking the strict-JSON review/primer contracts. Every call therefore
+//      passes `thinking: { type: "disabled" }`. Don't reintroduce either param.
 export const COACH_MODEL = "claude-sonnet-5";
 
 // System prompt copied verbatim from the Console agent config (v2).
