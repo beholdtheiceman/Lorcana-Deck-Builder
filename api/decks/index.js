@@ -35,15 +35,27 @@ export default withAuth(async (req, res, sess) => {
     }
 
     if (id) {
-      // updateMany scopes by userId so a user can only modify their own deck.
-      const result = await prisma.deck.updateMany({
+      // Snapshot the CURRENT state into an immutable DeckVersion before
+      // overwriting, so each save appends to the deck's history. Scoped by
+      // userId; done in one transaction so a snapshot never lands without the
+      // update (or vice versa).
+      const existing = await prisma.deck.findFirst({
         where: { id, userId: sess.uid },
-        data: { title, data },
+        select: { id: true, title: true, data: true },
       });
-      if (result.count === 0) {
+      if (!existing) {
         return res.status(404).json({ error: "Deck not found" });
       }
-      const deck = await prisma.deck.findUnique({ where: { id } });
+
+      const [, deck] = await prisma.$transaction([
+        prisma.deckVersion.create({
+          data: { deckId: existing.id, title: existing.title, data: existing.data ?? {} },
+        }),
+        prisma.deck.update({
+          where: { id: existing.id },
+          data: { title, data },
+        }),
+      ]);
       return res.json({ deck });
     }
 

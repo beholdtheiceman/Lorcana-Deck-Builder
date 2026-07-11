@@ -58,8 +58,24 @@ model Deck {
   updatedAt DateTime @updatedAt
   comments  Comment[]
   playtestGames PlaytestGame[]
+  versions  DeckVersion[]
 
   @@index([userId])
+}
+
+// Immutable snapshot of a deck's prior state. One row is written on each save
+// (before the deck is overwritten), so a deck is an append-only history you can
+// diff or roll back to — the source of truth for "what did I run last week".
+model DeckVersion {
+  id        String   @id @default(uuid())
+  deckId    String
+  title     String
+  data      Json
+  createdAt DateTime @default(now())
+
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([deckId])
 }
 
 model Hub {
