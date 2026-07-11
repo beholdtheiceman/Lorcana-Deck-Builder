@@ -777,11 +777,11 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
                             {onAdjustCount ? (
-                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                              <div className="flex items-center gap-0.5 bg-black/85 rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)] pl-0.5 pr-1 py-0.5" style={{ color: 'var(--text)' }}>
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, -1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-[color:var(--line-2)] transition"
                                   aria-label={`Remove one ${e.card.name}`}
                                 >
                                   −
@@ -790,14 +790,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, 1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:brightness-110 transition" style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                                   aria-label={`Add one ${e.card.name}`}
                                 >
                                   +
                                 </button>
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                              <div className="w-8 h-8 rounded-full bg-black/85 flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)]" style={{ color: 'var(--text)' }}>
                                 {e.count}
                               </div>
                             )}
@@ -820,7 +820,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
                             return (
                               <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
+                                className="text-sm font-semibold line-clamp-2 leading-tight px-1" style={{ color: 'var(--text)' }}
                                 title={displayName}         // full hover tooltip
                                 aria-label={displayName}
                               >
@@ -867,11 +867,11 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
                             {onAdjustCount ? (
-                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                              <div className="flex items-center gap-0.5 bg-black/85 rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)] pl-0.5 pr-1 py-0.5" style={{ color: 'var(--text)' }}>
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, -1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-[color:var(--line-2)] transition"
                                   aria-label={`Remove one ${e.card.name}`}
                                 >
                                   −
@@ -880,14 +880,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, 1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:brightness-110 transition" style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                                   aria-label={`Add one ${e.card.name}`}
                                 >
                                   +
                                 </button>
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                              <div className="w-8 h-8 rounded-full bg-black/85 flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)]" style={{ color: 'var(--text)' }}>
                                 {e.count}
                               </div>
                             )}
@@ -910,7 +910,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
                             return (
                               <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
+                                className="text-sm font-semibold line-clamp-2 leading-tight px-1" style={{ color: 'var(--text)' }}
                                 title={displayName}         // full hover tooltip
                                 aria-label={displayName}
                               >
@@ -957,11 +957,11 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
                             {onAdjustCount ? (
-                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                              <div className="flex items-center gap-0.5 bg-black/85 rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)] pl-0.5 pr-1 py-0.5" style={{ color: 'var(--text)' }}>
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, -1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-[color:var(--line-2)] transition"
                                   aria-label={`Remove one ${e.card.name}`}
                                 >
                                   −
@@ -970,14 +970,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, 1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:brightness-110 transition" style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                                   aria-label={`Add one ${e.card.name}`}
                                 >
                                   +
                                 </button>
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                              <div className="w-8 h-8 rounded-full bg-black/85 flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)]" style={{ color: 'var(--text)' }}>
                                 {e.count}
                               </div>
                             )}
@@ -1000,7 +1000,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
                             return (
                               <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
+                                className="text-sm font-semibold line-clamp-2 leading-tight px-1" style={{ color: 'var(--text)' }}
                                 title={displayName}         // full hover tooltip
                                 aria-label={displayName}
                               >
@@ -1047,11 +1047,11 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
                             {onAdjustCount ? (
-                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                              <div className="flex items-center gap-0.5 bg-black/85 rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)] pl-0.5 pr-1 py-0.5" style={{ color: 'var(--text)' }}>
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, -1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-[color:var(--line-2)] transition"
                                   aria-label={`Remove one ${e.card.name}`}
                                 >
                                   −
@@ -1060,14 +1060,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, 1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:brightness-110 transition" style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                                   aria-label={`Add one ${e.card.name}`}
                                 >
                                   +
                                 </button>
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                              <div className="w-8 h-8 rounded-full bg-black/85 flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)]" style={{ color: 'var(--text)' }}>
                                 {e.count}
                               </div>
                             )}
@@ -1090,7 +1090,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
                             return (
                               <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
+                                className="text-sm font-semibold line-clamp-2 leading-tight px-1" style={{ color: 'var(--text)' }}
                                 title={displayName}         // full hover tooltip
                                 aria-label={displayName}
                               >
@@ -1137,11 +1137,11 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         <div className="absolute -top-2.5 -right-2.5 z-10">
                           <div className="relative">
                             {onAdjustCount ? (
-                              <div className="flex items-center gap-0.5 bg-black/85 text-white rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pl-0.5 pr-1 py-0.5">
+                              <div className="flex items-center gap-0.5 bg-black/85 rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)] pl-0.5 pr-1 py-0.5" style={{ color: 'var(--text)' }}>
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, -1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/15 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-[color:var(--line-2)] transition"
                                   aria-label={`Remove one ${e.card.name}`}
                                 >
                                   −
@@ -1150,14 +1150,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                                 <button
                                   type="button"
                                   onClick={() => onAdjustCount(e.card, 1)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 transition"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:brightness-110 transition" style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                                   aria-label={`Add one ${e.card.name}`}
                                 >
                                   +
                                 </button>
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-black/85 text-white flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                              <div className="w-8 h-8 rounded-full bg-black/85 flex items-center justify-center text-sm font-bold tracking-tight shadow-[0_4px_8px_rgba(0,0,0,0.6)] ring-1 ring-[color:var(--line-2)]" style={{ color: 'var(--text)' }}>
                                 {e.count}
                               </div>
                             )}
@@ -1180,7 +1180,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
                             return (
                               <div
-                                className="text-sm font-semibold text-white line-clamp-2 leading-tight px-1"
+                                className="text-sm font-semibold line-clamp-2 leading-tight px-1" style={{ color: 'var(--text)' }}
                                 title={displayName}         // full hover tooltip
                                 aria-label={displayName}
                               >
@@ -1493,30 +1493,30 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             return (
               <div>
                 {/* Enhanced Cost Curve with Meta Comparison */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🏗️ Enhanced Cost Curve</h4>
+                <div className="rounded-lg p-4 mb-6 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+                  <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--emerald)' }}>🏗️ Enhanced Cost Curve</h4>
                   <EnhancedCurveChart data={curveData} />
                 </div>
 
 
 
                 {/* Draw Probability Calculator */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎯 Draw Probability Calculator</h4>
+                <div className="rounded-lg p-4 mb-6 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+                  <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--emerald)' }}>🎯 Draw Probability Calculator</h4>
                   <DrawProbabilityTool deck={entries} />
                 </div>
 
                 {/* Turn-by-Turn Draw Simulator */}
-                <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-emerald-300">🎲 Turn-by-Turn Draw Simulator</h4>
+                <div className="rounded-lg p-4 mb-6 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+                  <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--emerald)' }}>🎲 Turn-by-Turn Draw Simulator</h4>
                   <DrawSimulator deck={entries} />
                 </div>
 
                 {/* Consistency & Role Analysis */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Draw Consistency */}
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <h4 className="text-lg font-semibold mb-3 text-emerald-300">Consistency</h4>
+                  <div className="rounded-lg p-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+                    <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--emerald)' }}>Consistency</h4>
                     <div className="space-y-3 text-sm">
                       <HoverableStatLine 
                         label="Draw pieces" 
@@ -1533,23 +1533,23 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                         value={`${drawConsistency.density}% of deck`} 
                         cards={drawConsistency.detectedCards.combined}
                       />
-                      <p className="text-xs text-gray-400 mt-2">Heuristic: scans rules text for draw/search verbs.</p>
+                      <p className="text-xs mt-2" style={{ color: 'var(--faint)' }}>Heuristic: scans rules text for draw/search verbs.</p>
                     </div>
                   </div>
 
                   {/* Synergies - Hidden per user request */}
-                  {/* <div className="bg-gray-700 rounded-lg p-4">
-                    <h4 className="text-lg font-semibold mb-3 text-emerald-300">Synergies</h4>
+                  {/* <div className="rounded-lg p-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+                    <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--emerald)' }}>Synergies</h4>
                     {synergies.length > 0 ? (
                       <div className="space-y-2">
                         <ul className="space-y-1 text-sm">
                           {synergies.map((s, i) => (
-                            <li key={i} className="text-emerald-200 text-xs">• {s}</li>
+                            <li key={i} className="text-xs" style={{ color: 'var(--emerald)' }}>• {s}</li>
                           ))}
                         </ul>
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-400">No obvious synergies detected.</p>
+                      <p className="text-sm" style={{ color: 'var(--faint)' }}>No obvious synergies detected.</p>
                     )}
                   </div> */}
                 </div>
@@ -1561,8 +1561,8 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
 
         {/* OLD Comp Dashboard - TEMPORARILY DISABLED TO SHOW NEW FEATURES */}
-        {false && <div className="bg-gray-800 rounded-lg p-6">
-          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">OLD Competitive Analysis</h3>
+        {false && <div className="rounded-lg p-6 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+          <h3 className="text-2xl font-bold text-center mb-6" style={{ color: 'var(--emerald)' }}>OLD Competitive Analysis</h3>
           
           {/* Comp Dashboard Data Calculations */}
           {(() => {
@@ -1775,7 +1775,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                 </div>
 
                 {/* Draw / Consistency */}
-                <div className="bg-gray-700 rounded-lg p-4">
+                <div className="rounded-lg p-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
                   <h4 className="text-lg font-semibold mb-3 text-center">Consistency</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                     <HoverableStatBox
@@ -1797,14 +1797,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                       cards={drawConsistency.detectedCards?.combined || []}
                     />
                   </div>
-                  <p className="text-xs text-gray-400 mt-3 text-center">Heuristic: scans rules text for draw/search verbs</p>
+                  <p className="text-xs text-[color:var(--faint)] mt-3 text-center">Heuristic: scans rules text for draw/search verbs</p>
                 </div>
 
                 {/* Lore Efficiency */}
-                <div className="bg-gray-700 rounded-lg p-4 text-center">
+                <div className="bg-[color:var(--panel-2)] border border-[color:var(--line)] rounded-lg p-4 text-center">
                   <h4 className="text-lg font-semibold mb-2">Lore Efficiency</h4>
-                  <div className="text-3xl font-bold text-emerald-400">{avgLorePerCard}</div>
-                  <div className="text-sm text-gray-400">Average Lore per Card</div>
+                  <div className="text-3xl font-bold text-[color:var(--emerald)]">{avgLorePerCard}</div>
+                  <div className="text-sm text-[color:var(--muted)]">Average Lore per Card</div>
                 </div>
 
                 {/* Roles & Synergies */}
@@ -1853,19 +1853,19 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                               .map(([name, count]) => (count > 1 ? `${count} - ${name}` : name));
 
                             return (
-                              <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3 max-w-sm">
-                                <p className="text-white font-semibold mb-1">{label}: {payload[0].value} cards</p>
+                              <div className="bg-[color:var(--panel-2)] border border-[color:var(--line-2)] rounded-lg shadow-lg p-3 max-w-sm">
+                                <p className="text-[color:var(--text)] font-semibold mb-1">{label}: {payload[0].value} cards</p>
                                 {finalCards.length > 0 ? (
                                   <>
-                                    <div className="text-gray-300 text-sm">Cards:</div>
+                                    <div className="text-[color:var(--muted)] text-sm">Cards:</div>
                                     <div className="space-y-0.5 max-h-48 overflow-y-auto">
                                       {groupedCards.map((card, index) => (
-                                        <p key={index} className="text-gray-400 text-xs">{card}</p>
+                                        <p key={index} className="text-[color:var(--muted)] text-xs">{card}</p>
                                       ))}
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="text-red-400 text-sm">No cards found in this role</div>
+                                  <div className="text-[color:var(--ruby)] text-sm">No cards found in this role</div>
                                 )}
                               </div>
                             );
@@ -1879,38 +1879,38 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
                   {/* Synergies - Hidden per user request */}
                   {/* {synergies.length > 0 ? (
-                    <div className="mt-4 bg-gray-700 rounded-lg p-4">
+                    <div className="mt-4 bg-[color:var(--panel-2)] border border-[color:var(--line)] rounded-lg p-4">
                       <h5 className="font-semibold mb-2 text-center">Detected Synergies</h5>
                       <ul className="list-disc ml-6 text-sm space-y-1">
-                        {synergies.map(s => <li key={s} className="text-gray-300">{s}</li>)}
+                        {synergies.map(s => <li key={s} className="text-[color:var(--muted)]">{s}</li>)}
                       </ul>
                     </div>
                   ) : (
-                    <div className="mt-4 bg-gray-700 rounded-lg p-4 text-center">
-                      <p className="text-sm text-gray-400">No obvious synergies detected</p>
+                    <div className="mt-4 bg-[color:var(--panel-2)] border border-[color:var(--line)] rounded-lg p-4 text-center">
+                      <p className="text-sm text-[color:var(--muted)]">No obvious synergies detected</p>
                     </div>
                   )} */}
                 </div>
 
                 {/* Meta Tools (stub) */}
-                <div className="bg-gray-700 rounded-lg p-4">
+                <div className="rounded-lg p-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
                   <h4 className="text-lg font-semibold mb-3 text-center">Meta Tools</h4>
-                  <p className="text-sm text-gray-300 mb-4 text-center">
+                  <p className="text-sm text-[color:var(--muted)] mb-4 text-center">
                     Tag your deck against common archetypes and add matchup notes
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs uppercase text-gray-400 mb-1">Archetype tags</label>
-                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
+                      <label className="block text-xs uppercase text-[color:var(--faint)] mb-1">Archetype tags</label>
+                      <input className="w-full bg-[color:var(--panel-2)] rounded px-3 py-2 text-sm text-[color:var(--text)] border border-[color:var(--line-2)]" placeholder="e.g., Amber/Amethyst Control, Ruby/Emerald Aggro" />
                     </div>
                     <div>
-                      <label className="block text-xs uppercase text-gray-400 mb-1">Tech slots (notes)</label>
-                      <input className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="e.g., +2 Banish; +1 Evasive hate" />
+                      <label className="block text-xs uppercase text-[color:var(--faint)] mb-1">Tech slots (notes)</label>
+                      <input className="w-full bg-[color:var(--panel-2)] rounded px-3 py-2 text-sm text-[color:var(--text)] border border-[color:var(--line-2)]" placeholder="e.g., +2 Banish; +1 Evasive hate" />
                     </div>
                   </div>
                   <div className="mt-4">
-                    <label className="block text-xs uppercase text-gray-400 mb-1">Matchup notes</label>
-                    <textarea rows={3} className="w-full bg-gray-800 rounded px-3 py-2 text-sm border border-gray-600" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
+                    <label className="block text-xs uppercase text-[color:var(--faint)] mb-1">Matchup notes</label>
+                    <textarea rows={3} className="w-full bg-[color:var(--panel-2)] rounded px-3 py-2 text-sm text-[color:var(--text)] border border-[color:var(--line-2)]" placeholder="Vs. Amethyst/Sapphire: keep hand w/ draw + 2s; Songs overperform." />
                   </div>
                 </div>
               </div>
@@ -1927,14 +1927,14 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
         </div>
         
         {/* Action Buttons - Improved Layout */}
-        <div className="bg-gray-900/95 backdrop-blur-sm border-t border-white/10 mt-6 pt-6 pb-4">
+        <div className="bg-[color:var(--panel)] backdrop-blur-sm border-t border-[color:var(--line)] mt-6 pt-6 pb-4">
           {/* Primary Actions Row */}
           <div className="flex flex-wrap justify-center gap-3 mb-4 px-3">
             {/* Download Image Button */}
             <button
               onClick={handleDownloadImage}
               disabled={isGeneratingImage}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-[color:var(--panel-2)] disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Download deck as image (PNG)"
             >
               {isGeneratingImage ? '🔄 Generating…' : '🖼️ Download Image'}
@@ -1943,7 +1943,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             {/* Print Button */}
             <button
               onClick={() => window.print()}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              className="px-4 py-2 bg-[color:var(--sapphire)] hover:brightness-110 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Print deck presentation"
             >
               🖨️ Print
@@ -1957,7 +1957,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                 }
               }}
               disabled={!deckName.trim()}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-[color:var(--panel-2)] disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Save deck to storage"
             >
               💾 Save Deck
@@ -1997,7 +1997,7 @@ Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)
 Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
                 navigator.clipboard.writeText(stats);
               }}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
+              className="px-4 py-2 bg-[color:var(--sapphire)] hover:brightness-110 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
               title="Copy deck statistics to clipboard"
             >
               📊 Copy Stats
@@ -2006,14 +2006,14 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
 
           {/* Team Hub Section */}
           <div className="flex justify-center px-3">
-            <div className="flex flex-wrap items-center gap-3 bg-gray-800 p-4 rounded-lg max-w-md w-full">
-              <label className="text-gray-300 font-medium text-sm">
+            <div className="flex flex-wrap items-center gap-3 bg-[color:var(--panel-2)] border border-[color:var(--line)] p-4 rounded-lg max-w-md w-full">
+              <label className="text-[color:var(--muted)] font-medium text-sm">
                 Add to Team Hub:
               </label>
               <select
                 value={selectedHubId}
                 onChange={(e) => setSelectedHubId(e.target.value)}
-                className="flex-1 min-w-[160px] px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-emerald-400 focus:outline-none text-sm"
+                className="flex-1 min-w-[160px] px-3 py-2 bg-[color:var(--panel-2)] border border-[color:var(--line-2)] rounded-lg text-[color:var(--text)] focus:border-emerald-400 focus:outline-none text-sm"
                 disabled={loadingHubs}
               >
                 <option value="">Select a team hub...</option>
@@ -2026,7 +2026,7 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
               <button
                 onClick={handleSaveToHub}
                 disabled={!selectedHubId || !deckName.trim() || savingToHub}
-                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
+                className="px-3 py-2 bg-[color:var(--sapphire)] hover:brightness-110 disabled:bg-[color:var(--panel-2)] disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
                 title="Save deck to selected team hub"
               >
                 {savingToHub ? '🔄' : '👥'} {savingToHub ? 'Saving...' : 'Save'}
@@ -2037,7 +2037,7 @@ Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
           
           {/* Print Header */}
           <div className="hidden print:block text-center border-t pt-4 mt-4">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-[color:var(--muted)]">
               Generated by Lorcana Deck Builder • {new Date().toLocaleDateString()}
             </p>
           </div>
