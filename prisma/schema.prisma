@@ -70,7 +70,9 @@ model Hub {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner       User     @relation("HubOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  // Restrict (not Cascade): deleting a User must NOT silently destroy a whole
+  // team's data. Ownership must be transferred (or the hub deleted) first.
+  owner       User     @relation("HubOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   members     HubMember[]
 
   // Replay-review feature

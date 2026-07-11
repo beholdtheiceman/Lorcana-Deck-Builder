@@ -37,18 +37,31 @@ export default withAuth(async (req, res, session) => {
   }
 
   if (req.method === "DELETE") {
-    const { deckId } = req.body;
+    const { deckId } = req.body ?? {};
     if (!deckId) return res.status(400).json({ error: "Deck ID is required" });
 
     const isHubOwner = hub.ownerId === userId;
-    // Members may delete their own decks; the hub owner may delete any deck in the hub.
-    const ownDeck = await prisma.deck.findFirst({ where: { id: deckId, userId } });
-    if (!ownDeck && !isHubOwner) {
-      return res.status(403).json({ error: "You can only delete your own decks" });
+
+    // Scope every deletion to decks that actually belong to this hub. Members may
+    // delete their own decks; the hub owner may delete any deck owned by a hub
+    // member — but never a deck outside the hub (prevents platform-wide IDOR).
+    let where;
+    if (isHubOwner) {
+      const hubMembers = await prisma.hubMember.findMany({
+        where: { hubId },
+        select: { userId: true },
+      });
+      const memberIds = [hub.ownerId, ...hubMembers.map((m) => m.userId)];
+      where = { id: deckId, userId: { in: memberIds } };
+    } else {
+      where = { id: deckId, userId };
     }
 
-    const result = await prisma.deck.deleteMany({ where: { id: deckId } });
-    if (result.count === 0) return res.status(404).json({ error: "Deck not found" });
+    const result = await prisma.deck.deleteMany({ where });
+    if (result.count === 0) {
+      // Either the deck doesn't exist or it isn't in scope for this caller.
+      return res.status(404).json({ error: "Deck not found" });
+    }
 
     return res.status(200).json({ message: "Deck deleted successfully" });
   }
