@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uninkable — Team Hub: Team Uninkable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,560;0,9..144,700;1,9..144,400;1,9..144,500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ---------- tokens: same single source as the deck page ---------- */
+  :root {
+    --canvas:   #101114;
+    --panel:    #17181c;
+    --panel-2:  #1d1f24;
+    --line:     rgba(255,255,255,.07);
+    --line-2:   rgba(255,255,255,.13);
+    --text:     #e9e7e2;
+    --muted:    #9a978f;
+    --faint:    #6b6963;
+
+    --amber:    #f4b223;
+    --amethyst: #9b59d0;
+    --emerald:  #2ecc71;
+    --ruby:     #e74c5e;
+    --sapphire: #3aa0e0;
+    --steel:    #9aa7b8;
+
+    --serif: "Fraunces", "Palatino Linotype", Constantia, Georgia, serif;
+    --sans:  "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+    --hex: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--canvas); color: var(--text);
+    font-family: var(--sans); font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--sapphire); outline-offset: 2px; border-radius: 4px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- top bar (identical chrome to deck page) ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 28px;
+    padding: 0 28px; height: 56px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--canvas) 92%, black);
+  }
+  .wordmark { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 19px; font-weight: 560; }
+  .wordmark .hexmark { width: 18px; height: 20px; clip-path: var(--hex); position: relative;
+    background: linear-gradient(135deg, var(--ruby), var(--sapphire)); }
+  .wordmark .hexmark::before { content: ""; position: absolute; inset: 3px; clip-path: var(--hex); background: var(--canvas); }
+  .nav { display: flex; gap: 4px; }
+  .nav a { padding: 6px 12px; border-radius: var(--r-sm); color: var(--muted); font-weight: 500; }
+  .nav a:hover { color: var(--text); background: var(--panel-2); }
+  .nav a.active { color: var(--text); box-shadow: inset 0 -2px 0 var(--sapphire); border-radius: var(--r-sm) var(--r-sm) 0 0; }
+  .topbar .spacer { flex: 1; }
+  .search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line-2); border-radius: var(--r-md);
+    padding: 6px 12px; color: var(--faint); min-width: 220px; font-size: 13px; }
+  .search kbd { margin-left: auto; font-size: 11px; color: var(--faint); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 5px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--ruby), var(--sapphire)); flex: none; }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 36px 28px 80px; }
+
+  /* ---------- hub header: roomier than the deck page ---------- */
+  .hub-head { display: flex; align-items: flex-start; gap: 24px; padding: 8px 4px 28px; }
+  .crest {
+    width: 74px; height: 84px; clip-path: var(--hex); position: relative; flex: none;
+    background: conic-gradient(from 210deg,
+      var(--amber), var(--ruby), var(--amethyst), var(--sapphire), var(--steel), var(--emerald), var(--amber));
+  }
+  .crest::before { content: ""; position: absolute; inset: 4px; clip-path: var(--hex); background: var(--panel); }
+  .crest span {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-family: var(--serif); font-weight: 700; font-size: 26px; z-index: 1;
+  }
+  .hub-id { flex: 1; min-width: 0; }
+  .eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .hub-title { font-family: var(--serif); font-weight: 560; font-size: 40px; line-height: 1.05; margin: 8px 0 6px; letter-spacing: -.01em; }
+  .hub-sub { color: var(--muted); font-size: 13.5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .hub-sub b { color: var(--text); font-weight: 600; }
+  .invite {
+    font-size: 12px; color: var(--muted); border: 1px dashed var(--line-2); border-radius: var(--r-sm);
+    padding: 2px 9px; letter-spacing: .12em; cursor: pointer;
+  }
+  .invite:hover { color: var(--text); border-color: var(--muted); }
+  .head-actions { display: flex; gap: 10px; padding-top: 6px; }
+  .btn {
+    font: inherit; font-weight: 600; cursor: pointer;
+    border-radius: var(--r-md); padding: 9px 16px;
+    border: 1px solid var(--line-2); background: transparent; color: var(--text);
+    transition: background 140ms ease, border-color 140ms ease;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--panel-2); }
+  .btn.primary { background: var(--sapphire); border-color: var(--sapphire); color: #0b1620; }
+  .btn.primary:hover { background: color-mix(in srgb, var(--sapphire) 88%, white); }
+
+  /* ---------- members roster ---------- */
+  .roster { display: flex; gap: 10px; flex-wrap: wrap; padding: 0 4px 30px; }
+  .member {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
+    padding: 6px 16px 6px 7px;
+  }
+  .member .a { width: 30px; height: 30px; border-radius: 50%; flex: none; }
+  .member .nm { font-weight: 600; font-size: 13px; }
+  .member .rec { color: var(--faint); font-size: 12px; }
+  .a.rs { background: linear-gradient(135deg, var(--ruby), var(--sapphire)); }
+  .a.ast { background: linear-gradient(135deg, var(--amber), var(--steel)); }
+  .a.amr { background: linear-gradient(135deg, var(--amethyst), var(--ruby)); }
+  .a.sst { background: linear-gradient(135deg, var(--sapphire), var(--steel)); }
+  .a.aam { background: linear-gradient(135deg, var(--amber), var(--amethyst)); }
+  .a.str { background: linear-gradient(135deg, var(--steel), var(--ruby)); }
+
+  /* ---------- main grid ---------- */
+  .main { display: grid; grid-template-columns: 1fr 340px; gap: 28px; align-items: start; }
+  .col { display: grid; gap: 24px; min-width: 0; }
+
+  .panel { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); padding: 22px; }
+  .panel > h3 { margin: 0 0 16px; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+    display: flex; align-items: baseline; justify-content: space-between; }
+  .panel > h3 a { color: var(--faint); font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+  .panel > h3 a:hover { color: var(--text); }
+
+  /* ---------- upcoming events ---------- */
+  .events { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .event {
+    border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel-2);
+    padding: 16px; display: grid; gap: 6px;
+  }
+  .event .when { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .event .what { font-family: var(--serif); font-size: 18px; font-weight: 560; line-height: 1.2; }
+  .event .meta { color: var(--muted); font-size: 12.5px; }
+  .event .going { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .going .a { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--panel-2); }
+  .going .a + .a { margin-left: -10px; }
+  .going .more { color: var(--faint); font-size: 12px; margin-left: 4px; }
+  .event.practice { border-left: 3px solid var(--emerald); }
+  .event.tourney  { border-left: 3px solid var(--amber); }
+
+  /* ---------- activity feed ---------- */
+  .feed { display: grid; }
+  .item {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 14px; align-items: start;
+    padding: 14px 2px; border-top: 1px solid var(--line);
+  }
+  .feed .item:first-of-type { border-top: 0; }
+  .item .a { width: 30px; height: 30px; border-radius: 50%; margin-top: 2px; }
+  .item .body { min-width: 0; }
+  .item .line1 { font-size: 13.5px; }
+  .item .line1 b { font-weight: 600; }
+  .item .line1 .obj { font-family: var(--serif); font-style: italic; }
+  .item .detail {
+    margin-top: 6px; padding: 10px 14px; border-left: 2px solid var(--line-2);
+    color: var(--muted); font-size: 13px; border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    background: color-mix(in srgb, var(--panel-2) 60%, transparent);
+  }
+  .item .detail .q { font-family: var(--serif); font-style: italic; color: var(--text); }
+  .item time { color: var(--faint); font-size: 12px; white-space: nowrap; padding-top: 2px; }
+  .pill {
+    display: inline-block; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    border-radius: 4px; padding: 1px 7px; margin-right: 6px; font-weight: 600;
+  }
+  .pill.report { color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); }
+  .pill.review { color: var(--sapphire); border: 1px solid color-mix(in srgb, var(--sapphire) 40%, transparent); }
+  .pill.practice { color: var(--emerald); border: 1px solid color-mix(in srgb, var(--emerald) 40%, transparent); }
+  .pill.deck { color: var(--amethyst); border: 1px solid color-mix(in srgb, var(--amethyst) 40%, transparent); }
+
+  /* ---------- gauntlet coverage (signature panel) ---------- */
+  .coverage { display: flex; justify-content: space-between; gap: 6px; }
+  .cov { text-align: center; flex: 1; }
+  .cov .hexbig {
+    width: 40px; height: 46px; clip-path: var(--hex); position: relative; margin: 0 auto;
+    display: grid; place-items: center;
+    animation: pop 500ms cubic-bezier(.2,.9,.3,1.4) both;
+  }
+  .cov:nth-child(1) .hexbig { animation-delay: 60ms; }
+  .cov:nth-child(2) .hexbig { animation-delay: 120ms; }
+  .cov:nth-child(3) .hexbig { animation-delay: 180ms; }
+  .cov:nth-child(4) .hexbig { animation-delay: 240ms; }
+  .cov:nth-child(5) .hexbig { animation-delay: 300ms; }
+  .cov:nth-child(6) .hexbig { animation-delay: 360ms; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .cov .hexbig b { position: relative; z-index: 1; font-size: 13px; font-weight: 600; }
+  .cov .k { font-size: 10.5px; color: var(--faint); margin-top: 6px; letter-spacing: .06em; text-transform: uppercase; }
+  .cov.amber    .hexbig { background: var(--amber); }    .cov.amber    b { color: #201700; }
+  .cov.amethyst .hexbig { background: var(--amethyst); } .cov.amethyst b { color: #1b0d26; }
+  .cov.ruby     .hexbig { background: var(--ruby); }     .cov.ruby     b { color: #250508; }
+  .cov.sapphire .hexbig { background: var(--sapphire); } .cov.sapphire b { color: #06202f; }
+  .cov.steel    .hexbig { background: var(--steel); }    .cov.steel    b { color: #14181d; }
+  .cov.empty .hexbig { background: color-mix(in srgb, var(--emerald) 55%, transparent); }
+  .cov.empty .hexbig::before { content: ""; position: absolute; inset: 3px; clip-path: var(--hex); background: var(--panel); }
+  .cov.empty b { color: var(--faint); }
+  .cov-note { margin-top: 14px; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+  .cov-note .q { font-family: var(--serif); font-style: italic; color: var(--text); }
+
+  /* ---------- team decks ---------- */
+  .decks { display: grid; gap: 12px; }
+  .deck {
+    display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center;
+    border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel-2);
+    padding: 10px 14px 10px 10px; transition: border-color 140ms ease;
+  }
+  .deck:hover { border-color: var(--line-2); }
+  .deck .swatch { width: 44px; height: 44px; border-radius: var(--r-sm); position: relative; overflow: hidden; }
+  .swatch.rs  { background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--ruby) 70%, transparent), transparent 60%),
+                            radial-gradient(120% 120% at 80% 80%, color-mix(in srgb, var(--sapphire) 75%, transparent), transparent 60%), #0b0c0f; }
+  .swatch.ast { background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--amber) 70%, transparent), transparent 60%),
+                            radial-gradient(120% 120% at 80% 80%, color-mix(in srgb, var(--steel) 75%, transparent), transparent 60%), #0b0c0f; }
+  .swatch.amr { background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--amethyst) 70%, transparent), transparent 60%),
+                            radial-gradient(120% 120% at 80% 80%, color-mix(in srgb, var(--ruby) 75%, transparent), transparent 60%), #0b0c0f; }
+  .deck .info { min-width: 0; }
+  .deck .nm { font-family: var(--serif); font-weight: 560; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .deck .by { color: var(--faint); font-size: 12px; margin-top: 1px; }
+  .ministrip { display: flex; gap: 2px; margin-top: 6px; }
+  .ministrip i { width: 7px; height: 8.5px; clip-path: var(--hex); position: relative; }
+  .ministrip i.r { background: var(--ruby); } .ministrip i.s { background: var(--sapphire); }
+  .ministrip i.am { background: var(--amber); } .ministrip i.st { background: var(--steel); }
+  .ministrip i.ay { background: var(--amethyst); }
+  .ministrip i.h::before { content: ""; position: absolute; inset: 1.5px; clip-path: var(--hex); background: var(--panel-2); }
+  .deck .rec { text-align: right; }
+  .deck .rec .v { font-family: var(--serif); font-weight: 560; font-size: 16px; }
+  .deck .rec .k { color: var(--faint); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+
+  /* ---------- digest ---------- */
+  .digest { border-color: color-mix(in srgb, var(--sapphire) 30%, var(--line)); }
+  .digest blockquote { margin: 0; font-family: var(--serif); font-style: italic; font-size: 15.5px; line-height: 1.55; }
+  .digest .src { margin-top: 12px; font-size: 12px; color: var(--faint); }
+  .digest .btn { margin-top: 14px; width: 100%; }
+
+  /* ---------- responsive & a11y ---------- */
+  @media (max-width: 980px) {
+    .main { grid-template-columns: 1fr; }
+    .events { grid-template-columns: 1fr; }
+    .hub-head { flex-wrap: wrap; }
+    .hub-title { font-size: 32px; }
+    .search { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cov .hexbig { animation: none; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="#"><span class="hexmark"></span>Uninkable</a>
+  <nav class="nav">
+    <a href="#" class="active">Team Hub</a>
+    <a href="#">Decks</a>
+    <a href="#">Deck Lab</a>
+    <a href="#">Coach</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="search">Search cards, decks, players… <kbd>/</kbd></div>
+  <div class="avatar" aria-label="Larry"></div>
+</header>
+
+<main class="page">
+
+  <header class="hub-head">
+    <div class="crest" role="img" aria-label="Team crest"><span>U</span></div>
+    <div class="hub-id">
+      <div class="eyebrow">Team Hub</div>
+      <h1 class="hub-title">Team Uninkable</h1>
+      <div class="hub-sub">
+        <span><b>6</b> members</span> ·
+        <span><b>8</b> decks in the gauntlet</span> ·
+        <span><b>41–19</b> this season</span>
+        <button class="invite" title="Copy invite code">UNINK4EV ⧉</button>
+      </div>
+    </div>
+    <div class="head-actions">
+      <button class="btn primary">Log practice</button>
+      <button class="btn">New report</button>
+    </div>
+  </header>
+
+  <div class="roster" aria-label="Members">
+    <span class="member"><span class="a rs"></span><span class="nm">Larry</span><span class="rec num">12–4</span></span>
+    <span class="member"><span class="a ast"></span><span class="nm">Sarah</span><span class="rec num">9–3</span></span>
+    <span class="member"><span class="a amr"></span><span class="nm">Mike</span><span class="rec num">7–6</span></span>
+    <span class="member"><span class="a sst"></span><span class="nm">Dana</span><span class="rec num">6–2</span></span>
+    <span class="member"><span class="a aam"></span><span class="nm">Priya</span><span class="rec num">4–2</span></span>
+    <span class="member"><span class="a str"></span><span class="nm">Ben</span><span class="rec num">3–2</span></span>
+  </div>
+
+  <div class="main">
+
+    <div class="col">
+
+      <section class="panel">
+        <h3>Upcoming <a href="#">Calendar →</a></h3>
+        <div class="events">
+          <div class="event practice">
+            <div class="when">Thu · 7:00 pm</div>
+            <div class="what">Weekly testing pods</div>
+            <div class="meta">Two pods of three · gauntlet vs. Emerald discard</div>
+            <div class="going">
+              <span class="a rs"></span><span class="a ast"></span><span class="a amr"></span><span class="a sst"></span>
+              <span class="more">+2 going</span>
+            </div>
+          </div>
+          <div class="event tourney">
+            <div class="when">Sat · 10:00 am</div>
+            <div class="what">Store Championship — Card Haven</div>
+            <div class="meta">Core legal · 5 rounds swiss · decklists due Friday</div>
+            <div class="going">
+              <span class="a rs"></span><span class="a ast"></span><span class="a aam"></span>
+              <span class="more">3 registered</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3>This week <a href="#">All activity →</a></h3>
+        <div class="feed">
+
+          <div class="item">
+            <span class="a ast"></span>
+            <div class="body">
+              <div class="line1"><span class="pill report">Report</span><b>Sarah</b> went <b class="num">3–1</b> at Tuesday locals with <span class="obj">Songs Unsung</span></div>
+              <div class="detail">Dropped the mirror on a missed <span class="q">A Whole New World</span> line — full notes and round-by-round inside.</div>
+            </div>
+            <time>2h</time>
+          </div>
+
+          <div class="item">
+            <span class="a rs"></span>
+            <div class="body">
+              <div class="line1"><span class="pill review">Coach</span>New read on <b>Larry's</b> <span class="obj">The Azurite Sea</span> v7</div>
+              <div class="detail"><span class="q">The curve leans hard on turn two. If Tipo doesn't land on one, this deck plays from behind.</span></div>
+            </div>
+            <time>2d</time>
+          </div>
+
+          <div class="item">
+            <span class="a amr"></span>
+            <div class="body">
+              <div class="line1"><span class="pill practice">Practice</span><b>Mike</b> logged <b class="num">12</b> games — pod with Dana &amp; Ben</div>
+              <div class="detail"><span class="obj">Midnight Bargain</span> went <b class="num">4–2</b> into Steel songs, <b class="num">1–5</b> into ramp. Matchup table updated.</div>
+            </div>
+            <time>3d</time>
+          </div>
+
+          <div class="item">
+            <span class="a sst"></span>
+            <div class="body">
+              <div class="line1"><span class="pill deck">Deck</span><b>Dana</b> forked <span class="obj">The Azurite Sea</span> → <span class="obj">Azurite Storm</span></div>
+              <div class="detail">−4 Fishbone Quill, +3 Dragon Fire, +1 Brawl · "trying the aggressive split before Saturday"</div>
+            </div>
+            <time>4d</time>
+          </div>
+
+          <div class="item">
+            <span class="a aam"></span>
+            <div class="body">
+              <div class="line1"><span class="pill report">Report</span><b>Priya</b> posted a primer: <span class="obj">Beating the Amber Mirror</span></div>
+            </div>
+            <time>5d</time>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+    <aside class="col">
+
+      <section class="panel">
+        <h3>Gauntlet coverage</h3>
+        <div class="coverage" role="img" aria-label="Decks per ink: Amber 1, Amethyst 1, Emerald 0, Ruby 3, Sapphire 2, Steel 1">
+          <div class="cov amber"><div class="hexbig"><b class="num">1</b></div><div class="k">Amber</div></div>
+          <div class="cov amethyst"><div class="hexbig"><b class="num">1</b></div><div class="k">Ameth.</div></div>
+          <div class="cov empty"><div class="hexbig"><b class="num">0</b></div><div class="k">Emerald</div></div>
+          <div class="cov ruby"><div class="hexbig"><b class="num">3</b></div><div class="k">Ruby</div></div>
+          <div class="cov sapphire"><div class="hexbig"><b class="num">2</b></div><div class="k">Sapph.</div></div>
+          <div class="cov steel"><div class="hexbig"><b class="num">1</b></div><div class="k">Steel</div></div>
+        </div>
+        <div class="cov-note">
+          <span class="q">Nobody is piloting Emerald</span> — the coach suggests someone tests it before Saturday, or Thursday's pods can't rehearse the discard matchup.
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3>Team decks <a href="#">All 8 →</a></h3>
+        <div class="decks">
+
+          <a class="deck" href="#">
+            <span class="swatch rs"></span>
+            <span class="info">
+              <span class="nm">The Azurite Sea</span>
+              <span class="by">Larry · Ruby / Sapphire</span>
+              <span class="ministrip"><i class="s"></i><i class="s"></i><i class="s"></i><i class="s h"></i><i class="s"></i><i class="s"></i><i class="s h"></i><i class="r"></i><i class="r"></i><i class="r h"></i><i class="r"></i><i class="r h"></i></span>
+            </span>
+            <span class="rec"><span class="v num">12–4</span><br><span class="k">Record</span></span>
+          </a>
+
+          <a class="deck" href="#">
+            <span class="swatch ast"></span>
+            <span class="info">
+              <span class="nm">Songs Unsung</span>
+              <span class="by">Sarah · Amber / Steel</span>
+              <span class="ministrip"><i class="am"></i><i class="am"></i><i class="am"></i><i class="am h"></i><i class="am"></i><i class="am"></i><i class="st"></i><i class="st"></i><i class="st h"></i><i class="st"></i><i class="st"></i><i class="st h"></i></span>
+            </span>
+            <span class="rec"><span class="v num">9–3</span><br><span class="k">Record</span></span>
+          </a>
+
+          <a class="deck" href="#">
+            <span class="swatch amr"></span>
+            <span class="info">
+              <span class="nm">Midnight Bargain</span>
+              <span class="by">Mike · Amethyst / Ruby</span>
+              <span class="ministrip"><i class="ay"></i><i class="ay"></i><i class="ay h"></i><i class="ay"></i><i class="ay"></i><i class="ay h"></i><i class="ay"></i><i class="r"></i><i class="r h"></i><i class="r"></i><i class="r"></i><i class="r h"></i></span>
+            </span>
+            <span class="rec"><span class="v num">7–6</span><br><span class="k">Record</span></span>
+          </a>
+
+          <a class="deck" href="#">
+            <span class="swatch rs"></span>
+            <span class="info">
+              <span class="nm">Azurite Storm</span>
+              <span class="by">Dana · Ruby / Sapphire</span>
+              <span class="ministrip"><i class="s"></i><i class="s"></i><i class="s h"></i><i class="s"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="r h"></i><i class="r"></i><i class="r h"></i><i class="r"></i><i class="r"></i></span>
+            </span>
+            <span class="rec"><span class="v num">New</span><br><span class="k">Untested</span></span>
+          </a>
+
+        </div>
+      </section>
+
+      <section class="panel digest">
+        <h3>Weekly digest</h3>
+        <blockquote>A 7–3 week for the hub. Songs Unsung is your most reliable pilot-deck pair; the ramp matchup is still the team's soft spot going into Saturday.</blockquote>
+        <div class="src">Posted Monday · generated from 4 reports and 31 logged games</div>
+        <button class="btn">Read the digest</button>
+      </section>
+
+    </aside>
+  </div>
+
+</main>
+</body>
+</html>
