@@ -13,7 +13,7 @@ async function buildDigest(hub) {
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [games, practices, reports] = await Promise.all([
-    prisma.playTestGame.findMany({
+    prisma.playtestGame.findMany({
       where: { hubId: hub.id, createdAt: { gte: weekAgo } },
       select: { result: true, deckArchetype: true, vsArchetype: true },
     }),

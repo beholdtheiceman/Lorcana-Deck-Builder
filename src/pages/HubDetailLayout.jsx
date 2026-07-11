@@ -2,6 +2,7 @@ import { useParams, NavLink, Outlet, Navigate } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import Skeleton from '../components/ui/Skeleton'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { useAuth } from '../contexts/AuthContext'
 
 const NAV_TABS = [
   { label: 'Home',      path: 'home' },
@@ -21,8 +22,7 @@ export default function HubDetailLayout() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
-  // Get current user from localStorage (same pattern as existing code)
-  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  const { user } = useAuth()
 
   const copyInviteLink = useCallback((inviteCode) => {
     const url = `${window.location.origin}/join?code=${inviteCode}`

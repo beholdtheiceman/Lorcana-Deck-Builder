@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { prisma } from "../_lib/db.js";
 
 /**
  * Discord Interactions endpoint (inbound intake).
@@ -75,26 +74,16 @@ export default async function handler(req, res) {
     const opts = Object.fromEntries((interaction.data?.options ?? []).map((o) => [o.name, o.value]));
 
     if (name === "lorcana-review") {
-      const hubCode = String(opts.hub_code || "").toUpperCase();
-      const hub = hubCode
-        ? await prisma.hub.findUnique({ where: { inviteCode: hubCode }, select: { id: true, name: true } })
-        : null;
-      if (!hub) {
-        return reply(res, "❌ Unknown hub code. Use your team hub's invite code.", true);
-      }
-      await prisma.review.create({
-        data: {
-          hubId: hub.id,
-          generatedBy: "discord",
-          deckArchetype: opts.deck || null,
-          vsArchetype: opts.vs || null,
-          result: opts.result || null,
-          recap: opts.recap || "(filed from Discord)",
-          lines: [],
-          leakTags: [],
-        },
-      });
-      return reply(res, `✅ Review filed to **${hub.name}**.`);
+      // Filing reviews from Discord is disabled: a hub invite code is not proof
+      // of hub membership, and there is currently no Discord-user -> hub-member
+      // identity link to authorize the write against. Re-enable once that link
+      // exists (see H3 in POSTMORTEM.md). Until then, reject rather than let
+      // anyone with an invite code write into a team's review archive.
+      return reply(
+        res,
+        "⚠️ Filing reviews from Discord is temporarily unavailable. Please file reviews from the web app while we add account linking.",
+        true
+      );
     }
 
     return reply(res, "Unknown command.", true);

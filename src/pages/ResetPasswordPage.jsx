@@ -6,7 +6,7 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { checkAuth } = useAuth();
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -50,7 +50,7 @@ export default function ResetPasswordPage() {
       if (!res.ok) {
         setError(data.error || 'Something went wrong');
       } else {
-        if (refreshUser) await refreshUser();
+        if (checkAuth) await checkAuth();
         setSuccess(true);
       }
     } catch {
