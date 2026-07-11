@@ -25,9 +25,13 @@ import { useAuth } from './contexts/AuthContext'
 function TopNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // Comp chrome (design/comps): quiet text links, panel hover, and an inked
+  // underline on the active route — no boxed buttons.
   const linkClass = ({ isActive }) =>
-    `px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-      isActive ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-900/40 border-gray-800 text-gray-200 hover:bg-gray-800'
+    `px-3 py-1.5 rounded-sm text-sm font-medium transition-colors ${
+      isActive
+        ? 'text-[color:var(--text)] shadow-[inset_0_-2px_0_var(--sapphire)] rounded-b-none'
+        : 'text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-bg-overlay'
     }`
 
   const NAV_ITEMS = [
@@ -45,12 +49,31 @@ function TopNav() {
     ))
 
   return (
-    <div className="sticky top-0 z-50 border-b border-gray-800 bg-black/70 backdrop-blur">
+    <div
+      className="sticky top-0 z-50 border-b backdrop-blur"
+      style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--canvas) 92%, black)' }}
+    >
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/team-hub" className="flex items-center gap-2 font-semibold text-violet-400 shrink-0">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 shadow-[0_0_14px_-2px_rgba(139,108,255,0.7)] inline-block" aria-hidden="true"></span>
-            <span className="hidden sm:inline">Team Lorcana</span>
+        <div className="flex items-center gap-4 min-w-0">
+          <Link
+            to="/team-hub"
+            className="flex items-center gap-2.5 shrink-0 font-display"
+            style={{ fontSize: 19, fontWeight: 560, color: 'var(--text)' }}
+          >
+            {/* hexmark: two-ink gradient hex ring (comp .hexmark) */}
+            <span
+              className="relative inline-block"
+              aria-hidden="true"
+              style={{
+                width: 18,
+                height: 20,
+                clipPath: 'var(--hex)',
+                background: 'linear-gradient(135deg, var(--ink-a), var(--ink-b))',
+              }}
+            >
+              <span className="absolute" style={{ inset: 3, clipPath: 'var(--hex)', background: 'var(--canvas)' }} />
+            </span>
+            <span className="hidden sm:inline">Uninkable</span>
           </Link>
           {/* Full nav links — visible from md breakpoint up */}
           <div className="hidden md:flex items-center gap-3">
@@ -64,7 +87,7 @@ function TopNav() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((open) => !open)}
-            className="md:hidden w-9 h-9 shrink-0 rounded-lg bg-gray-900/40 border border-gray-800 text-gray-200 hover:bg-gray-800 transition-colors flex items-center justify-center"
+            className="md:hidden w-9 h-9 shrink-0 rounded-md border border-line text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-bg-overlay transition-colors flex items-center justify-center"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -81,7 +104,7 @@ function TopNav() {
 
       {/* Mobile nav drawer — stacked links below the bar */}
       {mobileMenuOpen && (
-        <div className="md:hidden px-4 pb-3 flex flex-col gap-2 border-t border-gray-800 pt-3">
+        <div className="md:hidden px-4 pb-3 flex flex-col gap-2 border-t border-line pt-3">
           {renderNavLinks()}
         </div>
       )}
@@ -97,7 +120,7 @@ function AppLayout() {
   // this same provider once it mounts under /builder.
   return (
     <ToastProvider>
-      <div className="min-h-screen overflow-x-clip bg-gradient-to-b from-gray-950 to-black text-gray-100">
+      <div className="min-h-screen overflow-x-clip text-[color:var(--text)]">
         <TopNav />
         <div className="mx-auto max-w-7xl px-4 py-6">
           <Outlet />
