@@ -133,8 +133,8 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
     }
   };
 
-  const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
-  const label = 'block text-xs font-medium text-gray-400 mb-1';
+  const input = 'w-full p-2 rounded-md text-sm bg-bg-overlay border border-line text-[color:var(--text)] placeholder-[color:var(--faint)] focus:outline-none';
+  const label = 'block text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--faint)] mb-1';
 
   const fmt = (iso) =>
     new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -143,25 +143,29 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
     const mine = (e.attendance || []).find((a) => a.memberId === currentUser?.id) || null;
     const [bringing, setBringing] = useState(mine?.bringing || '');
     const going = (e.attendance || []).filter((a) => a.going);
+    const toggleBase = 'px-2.5 py-1 rounded-md text-xs font-semibold transition-colors';
+    const toggleOn = { background: 'var(--sapphire)', color: '#0b1620' };
+    const toggleOff = { background: 'var(--panel-2)', color: 'var(--muted)', border: '1px solid var(--line-2)' };
     return (
       <div className="mt-2 space-y-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <button onClick={() => setAttendance(e.id, true, bringing)}
-            className={`px-2.5 py-1 rounded text-xs font-medium ${mine?.going ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            className={toggleBase} style={mine?.going ? toggleOn : toggleOff}>
             Going
           </button>
           <button onClick={() => setAttendance(e.id, false, bringing)}
-            className={`px-2.5 py-1 rounded text-xs font-medium ${mine && !mine.going ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            className={toggleBase} style={mine && !mine.going ? toggleOn : toggleOff}>
             Not going
           </button>
           <input value={bringing} onChange={(ev) => setBringing(ev.target.value)}
             onBlur={() => { if (mine && (bringing.trim() || '') !== (mine.bringing || '')) setAttendance(e.id, mine.going, bringing); }}
             placeholder="Bringing… (deck)"
-            className="flex-1 min-w-[8rem] p-1 bg-gray-800 border border-gray-700 rounded text-white text-xs" />
-          <span className="text-xs text-gray-500">{going.length} going</span>
+            className="flex-1 min-w-[8rem] p-1 rounded-md text-xs focus:outline-none"
+            style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }} />
+          <span className="text-xs tabular-nums" style={{ color: 'var(--faint)' }}>{going.length} going</span>
         </div>
         {going.length > 0 && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs" style={{ color: 'var(--muted)' }}>
             {going.map((a) => `${a.email || 'Unknown'}${a.bringing ? ` (${a.bringing})` : ''}`).join(', ')}
           </div>
         )}
@@ -170,25 +174,26 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
   };
 
   const Row = ({ e, dim }) => (
-    <li className={`bg-gray-800/60 rounded px-3 py-2 text-sm ${dim ? 'opacity-60' : ''}`}>
+    <li className={`rounded-md border px-3 py-2 text-sm ${dim ? 'opacity-60' : ''}`}
+      style={{ borderColor: 'var(--line)', background: 'var(--panel-2)' }}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-gray-100 font-medium">
+          <div className="font-medium" style={{ color: 'var(--text)' }}>
             {e.title}
-            {e.kind && <span className="ml-2 text-xs text-violet-300">{e.kind}</span>}
+            {e.kind && <span className="ml-2 text-xs" style={{ color: 'var(--sapphire)' }}>{e.kind}</span>}
           </div>
-          <div className="text-gray-400 text-xs mt-0.5">
+          <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
             {fmt(e.startsAt)}{e.location ? ` · ${e.location}` : ''}
           </div>
-          {e.notes && <div className="text-gray-400 text-xs mt-0.5">{e.notes}</div>}
+          {e.notes && <div className="text-xs mt-0.5" style={{ color: 'var(--faint)' }}>{e.notes}</div>}
         </div>
         {pendingDelete === e.id ? (
           <>
-            <button onClick={() => remove(e.id)} className="text-red-400 hover:text-red-300 text-xs shrink-0">Sure?</button>
-            <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs shrink-0">✕</button>
+            <button onClick={() => remove(e.id)} className="text-xs shrink-0 hover:brightness-125" style={{ color: 'var(--ruby)' }}>Sure?</button>
+            <button onClick={() => setPendingDelete(null)} className="text-xs shrink-0 hover:brightness-125" style={{ color: 'var(--faint)' }}>✕</button>
           </>
         ) : (
-          <button onClick={() => setPendingDelete(e.id)} className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete event">✕</button>
+          <button onClick={() => setPendingDelete(e.id)} className="text-xs shrink-0 hover:brightness-125" style={{ color: 'var(--faint)' }} title="Delete event">✕</button>
         )}
       </div>
       <AttendanceControls e={e} />
@@ -200,8 +205,8 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
       {error && <p className="text-bad text-sm">{error}</p>}
 
       {/* Add event */}
-      <form onSubmit={submit} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
-        <h4 className="text-sm font-semibold text-violet-300">Add an event</h4>
+      <form onSubmit={submit} className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+        <h4 className="font-display text-base" style={{ fontWeight: 560, color: 'var(--text)' }}>Add an event</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={label}>Title *</label>
@@ -240,7 +245,7 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
 
       {/* Lists */}
       <div>
-        <h4 className="text-sm font-semibold text-violet-300 mb-2">Upcoming</h4>
+        <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--muted)' }}>Upcoming</h4>
         {loading ? (
           <Skeleton variant="block" className="h-24" />
         ) : upcoming.length === 0 ? (
@@ -252,16 +257,16 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
 
       {past.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-400 mb-2">Past</h4>
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--faint)' }}>Past</h4>
           <ul className="space-y-2">{past.slice(0, 15).map((e) => <Row key={e.id} e={e} dim />)}</ul>
         </div>
       )}
 
       {/* Discord webhook config — owner only */}
       {isOwner && (
-        <div className="bg-gray-800/60 rounded-lg p-4 space-y-2">
-          <h4 className="text-sm font-semibold text-violet-300">Discord notifications</h4>
-          <p className="text-xs text-gray-400">
+        <div className="rounded-xl border p-4 space-y-2" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+          <h4 className="font-display text-base" style={{ fontWeight: 560, color: 'var(--text)' }}>Discord notifications</h4>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
             Paste a Discord channel webhook URL to post a message when a new event is added.
           </p>
           <div className="flex gap-2">
@@ -272,7 +277,7 @@ export default function EventsPanel({ hubId, isOwner = false, initialWebhook = '
               {savingWebhook ? 'Saving…' : 'Save'}
             </Button>
           </div>
-          {webhookMsg && <p className="text-xs text-gray-400">{webhookMsg}</p>}
+          {webhookMsg && <p className="text-xs" style={{ color: 'var(--muted)' }}>{webhookMsg}</p>}
         </div>
       )}
     </div>

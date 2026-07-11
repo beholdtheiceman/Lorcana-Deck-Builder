@@ -12,21 +12,16 @@ import { useAuth } from '../contexts/AuthContext';
  *   onEdit(rev)     - optional callback to open an editor for this review
  *   onOpenPrimer(p) - optional callback to open the linked primer
  */
-const LEAK_COLORS = [
-  'bg-violet-500/15 text-violet-300 border-violet-500/30',
-  'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-  'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
-];
+const LEAK_INKS = ['--amethyst', '--sapphire', '--amber'];
 
 function resultBadge(result) {
   if (!result) return null;
   const win = result === 'W';
+  const v = win ? '--emerald' : '--ruby';
   return (
     <span
-      className={[
-        'rounded px-1.5 py-0.5 text-xs font-semibold',
-        win ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300',
-      ].join(' ')}
+      className="rounded px-1.5 py-0.5 text-xs font-semibold"
+      style={{ color: `var(${v})`, background: `color-mix(in srgb, var(${v}) 16%, transparent)` }}
     >
       {win ? 'Win' : 'Loss'}
     </span>
@@ -123,19 +118,19 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#11151f] p-5">
+    <div className="rounded-xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
       {/* Header */}
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="truncate text-base font-semibold text-white">
+            <h4 className="truncate font-display text-base" style={{ fontWeight: 560, color: 'var(--text)' }}>
               {review.deckArchetype || 'Your deck'}{' '}
-              <span className="text-gray-500">vs</span>{' '}
+              <span style={{ color: 'var(--faint)' }}>vs</span>{' '}
               {review.vsArchetype || 'Opponent'}
             </h4>
             {resultBadge(review.result)}
           </div>
-          <p className="mt-0.5 text-xs text-gray-400">
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--faint)' }}>
             {review.player ? `${review.player} • ` : ''}
             {review.gameNumber ? `Game ${review.gameNumber} • ` : ''}
             {review.generatedBy ? `via ${review.generatedBy}` : ''}
@@ -147,19 +142,22 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
               <button
                 onClick={regenerate}
                 disabled={regenerating}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:brightness-110 disabled:opacity-50"
+                style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' }}
               >
                 {regenerating ? 'Regenerating…' : 'Regenerate'}
               </button>
               <button
                 onClick={startEdit}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium hover:brightness-110"
+                style={{ background: 'var(--sapphire)', color: '#0b1620' }}
               >
                 Edit
               </button>
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm text-red-300 hover:bg-red-500/20"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:brightness-110"
+                style={{ borderColor: 'color-mix(in srgb, var(--ruby) 40%, transparent)', background: 'color-mix(in srgb, var(--ruby) 10%, transparent)', color: 'var(--ruby)' }}
               >
                 Delete
               </button>
@@ -170,14 +168,16 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
               <button
                 onClick={saveEdit}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-emerald-500 to-green-600 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium hover:brightness-110 disabled:opacity-50"
+                style={{ background: 'var(--emerald)', color: '#0b1620' }}
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
               <button
                 onClick={() => setEditing(false)}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06]"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:brightness-110"
+                style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' }}
               >
                 Cancel
               </button>
@@ -187,7 +187,7 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
       </div>
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <div className="mb-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--ruby) 30%, transparent)', background: 'color-mix(in srgb, var(--ruby) 10%, transparent)', color: 'var(--ruby)' }}>
           {error}
         </div>
       )}
@@ -195,20 +195,21 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
       {/* Recap */}
       {editing ? (
         <div className="mb-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Recap</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>Recap</p>
           <textarea
             value={editRecap}
             onChange={e => setEditRecap(e.target.value)}
             rows={5}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none resize-y"
+            className="w-full rounded-lg border p-3 text-sm focus:outline-none resize-y"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           />
         </div>
       ) : review.recap ? (
         <div className="mb-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
             Recap
           </p>
-          <p className="whitespace-pre-line text-sm leading-relaxed text-gray-200">
+          <p className="whitespace-pre-line text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
             {review.recap}
           </p>
         </div>
@@ -217,35 +218,36 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
       {/* Decision points */}
       {lines.length > 0 && (
         <div className="mb-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
             Decision points
           </p>
           <ul className="space-y-2">
             {lines.map((line, i) => (
               <li
                 key={i}
-                className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+                className="rounded-lg border p-3"
+                style={{ borderColor: 'var(--line)', background: 'var(--panel-2)' }}
               >
                 <div className="mb-1 flex items-center gap-2">
-                  <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-xs font-semibold text-violet-300">
+                  <span className="rounded px-1.5 py-0.5 text-xs font-semibold" style={{ color: 'var(--sapphire)', border: '1px solid color-mix(in srgb, var(--sapphire) 40%, transparent)' }}>
                     Turn {line.turn ?? '?'}
                   </span>
                 </div>
                 {line.whatHappened && (
-                  <p className="text-sm text-gray-200">
-                    <span className="text-gray-500">What happened: </span>
+                  <p className="text-sm" style={{ color: 'var(--text)' }}>
+                    <span style={{ color: 'var(--faint)' }}>What happened: </span>
                     {line.whatHappened}
                   </p>
                 )}
                 {line.betterLine && (
-                  <p className="mt-1 text-sm text-violet-200">
-                    <span className="text-gray-500">Better line: </span>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--sapphire)' }}>
+                    <span style={{ color: 'var(--faint)' }}>Better line: </span>
                     {line.betterLine}
                   </p>
                 )}
                 {line.why && (
-                  <p className="mt-1 text-sm text-gray-400">
-                    <span className="text-gray-500">Why: </span>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
+                    <span style={{ color: 'var(--faint)' }}>Why: </span>
                     {line.why}
                   </p>
                 )}
@@ -258,54 +260,58 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
       {/* Leak tags */}
       {editing ? (
         <div className="mb-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Leaks <span className="font-normal text-gray-500">(comma-separated)</span>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
+            Leaks <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--faint)' }}>(comma-separated)</span>
           </p>
           <input
             type="text"
             value={editTags}
             onChange={e => setEditTags(e.target.value)}
             placeholder="over-traded, target selection, …"
-            className="w-full rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none"
+            className="w-full rounded-lg border p-2.5 text-sm focus:outline-none"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           />
         </div>
       ) : leakTags.length > 0 ? (
         <div className="mb-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
             Leaks
           </p>
           <div className="flex flex-wrap gap-2">
-            {leakTags.map((tag, i) => (
-              <span
-                key={`${tag}-${i}`}
-                className={[
-                  'rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                  LEAK_COLORS[i % LEAK_COLORS.length],
-                ].join(' ')}
-              >
-                {tag}
-              </span>
-            ))}
+            {leakTags.map((tag, i) => {
+              const v = LEAK_INKS[i % LEAK_INKS.length];
+              return (
+                <span
+                  key={`${tag}-${i}`}
+                  className="rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                  style={{ color: `var(${v})`, borderColor: `color-mix(in srgb, var(${v}) 40%, transparent)`, background: `color-mix(in srgb, var(${v}) 12%, transparent)` }}
+                >
+                  {tag}
+                </span>
+              );
+            })}
           </div>
         </div>
       ) : null}
 
       {/* Delete confirmation */}
       {confirmDelete && (
-        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/[0.08] p-4">
-          <p className="mb-3 text-sm text-red-200">Delete this review? This cannot be undone.</p>
+        <div className="mb-4 rounded-lg border p-4" style={{ borderColor: 'color-mix(in srgb, var(--ruby) 30%, transparent)', background: 'color-mix(in srgb, var(--ruby) 8%, transparent)' }}>
+          <p className="mb-3 text-sm" style={{ color: 'var(--ruby)' }}>Delete this review? This cannot be undone.</p>
           <div className="flex gap-2">
             <button
               onClick={deleteReview}
               disabled={deleting}
-              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium hover:brightness-110 disabled:opacity-50"
+              style={{ background: 'var(--ruby)', color: '#0b1620' }}
             >
               {deleting ? 'Deleting…' : 'Yes, delete'}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
               disabled={deleting}
-              className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-200 hover:bg-white/[0.06]"
+              className="rounded-lg border px-3 py-1.5 text-sm hover:brightness-110"
+              style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' }}
             >
               Cancel
             </button>
@@ -317,18 +323,21 @@ const ReviewCard = ({ review, onUpdated, onDeleted, onEdit, onOpenPrimer }) => {
       {primer && (
         <button
           onClick={() => onOpenPrimer?.(primer)}
-          className="flex w-full items-center justify-between rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-left transition-colors hover:bg-violet-500/[0.12]"
+          className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors"
+          style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 25%, transparent)', background: 'color-mix(in srgb, var(--sapphire) 6%, transparent)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--sapphire) 12%, transparent)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--sapphire) 6%, transparent)')}
         >
-          <span className="text-sm text-violet-200">
+          <span className="text-sm" style={{ color: 'var(--sapphire)' }}>
             Primer:{' '}
             <span className="font-medium">
               {primer.deckArchetype} vs {primer.vsArchetype}
             </span>
             {primer.verdict ? (
-              <span className="ml-2 text-xs text-gray-400">({primer.verdict})</span>
+              <span className="ml-2 text-xs" style={{ color: 'var(--faint)' }}>({primer.verdict})</span>
             ) : null}
           </span>
-          <svg className="h-4 w-4 text-violet-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" style={{ color: 'var(--sapphire)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>

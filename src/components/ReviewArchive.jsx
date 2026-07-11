@@ -20,12 +20,13 @@ function uniqueSorted(values) {
 }
 
 const Select = ({ label, value, onChange, options }) => (
-  <label className="flex flex-col gap-1 text-xs text-gray-400">
-    <span className="uppercase tracking-wide">{label}</span>
+  <label className="flex flex-col gap-1 text-[11px]" style={{ color: 'var(--faint)' }}>
+    <span className="uppercase tracking-[0.1em]">{label}</span>
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-sm text-gray-100 focus:border-violet-400 focus:outline-none"
+      className="rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none"
+      style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
     >
       <option value={ALL}>All</option>
       {options.map((o) => (
@@ -106,7 +107,7 @@ const ReviewArchive = ({ hubId, refreshKey, onEditReview, onOpenPrimer }) => {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border p-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
         <Select label="Deck" value={deck} onChange={setDeck} options={deckOptions} />
         <Select label="Matchup" value={matchup} onChange={setMatchup} options={matchupOptions} />
         <Select label="Player" value={player} onChange={setPlayer} options={playerOptions} />
@@ -118,7 +119,8 @@ const ReviewArchive = ({ hubId, refreshKey, onEditReview, onOpenPrimer }) => {
             setPlayer(ALL);
             setResult(ALL);
           }}
-          className="ml-auto rounded-lg border border-white/10 px-3 py-1.5 text-sm text-gray-300 hover:bg-white/[0.06]"
+          className="ml-auto rounded-lg border px-3 py-1.5 text-sm hover:brightness-110"
+          style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
         >
           Clear
         </button>
@@ -131,11 +133,11 @@ const ReviewArchive = ({ hubId, refreshKey, onEditReview, onOpenPrimer }) => {
           <Skeleton variant="block" className="h-28" />
         </div>
       ) : error ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--ruby) 30%, transparent)', background: 'color-mix(in srgb, var(--ruby) 10%, transparent)', color: 'var(--ruby)' }}>
           {error}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-gray-400">
+        <div className="rounded-lg border px-4 py-8 text-center text-sm" style={{ borderColor: 'var(--line)', background: 'var(--panel)', color: 'var(--faint)' }}>
           {reviews.length === 0
             ? 'No reviews yet. Upload a replay and generate one.'
             : 'No reviews match these filters.'}

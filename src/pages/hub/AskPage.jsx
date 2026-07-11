@@ -12,11 +12,11 @@ const EXAMPLE_QUESTIONS = [
 function MarkdownText({ text }) {
   const lines = text.split('\n');
   return (
-    <div className="space-y-2 text-sm text-gray-200 leading-relaxed">
+    <div className="space-y-2 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
       {lines.map((line, i) => {
-        if (line.startsWith('## ')) return <h3 key={i} className="text-base font-semibold text-violet-300 mt-4 first:mt-0">{line.slice(3)}</h3>;
-        if (line.startsWith('### ')) return <h4 key={i} className="text-sm font-semibold text-gray-100 mt-3">{line.slice(4)}</h4>;
-        if (line.startsWith('- ') || line.startsWith('* ')) return <p key={i} className="pl-3 border-l-2 border-violet-500/30">{line.slice(2)}</p>;
+        if (line.startsWith('## ')) return <h3 key={i} className="font-display text-base mt-4 first:mt-0" style={{ fontWeight: 560, color: 'var(--text)' }}>{line.slice(3)}</h3>;
+        if (line.startsWith('### ')) return <h4 key={i} className="font-display text-sm mt-3" style={{ fontWeight: 560, color: 'var(--text)' }}>{line.slice(4)}</h4>;
+        if (line.startsWith('- ') || line.startsWith('* ')) return <p key={i} className="pl-3" style={{ borderLeft: '2px solid var(--line-2)', color: 'var(--muted)' }}>{line.slice(2)}</p>;
         if (line.trim() === '') return <div key={i} className="h-1" />;
         return <p key={i}>{line}</p>;
       })}
@@ -105,8 +105,8 @@ export default function AskPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white mb-0.5">Ask the Meta</h3>
-        <p className="text-sm text-gray-400">
+        <h3 className="font-display text-lg mb-0.5" style={{ fontWeight: 560, color: 'var(--text)' }}>Ask the Meta</h3>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
           Ask questions about your team's data — matchup win rates, primers, and meta reports are all in context.
           Attach a deck to ask about a specific list.
         </p>
@@ -119,7 +119,8 @@ export default function AskPage() {
           <button
             type="button"
             onClick={() => (panelOpen ? setPanelOpen(false) : openPanel())}
-            className="text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06] transition-colors"
+            className="text-xs px-3 py-1.5 rounded-full border transition-colors"
+            style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
           >
             📎 Attach a deck
           </button>
@@ -127,7 +128,10 @@ export default function AskPage() {
 
         {attachedDeck && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/[0.08] text-violet-200">
+            <span
+              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border"
+              style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 40%, transparent)', background: 'color-mix(in srgb, var(--sapphire) 10%, transparent)', color: 'var(--sapphire)' }}
+            >
               🃏 {attachedDeck.type === 'saved'
                 ? `${attachedDeck.title}${attachedDeck.cardCount ? ` · ${attachedDeck.cardCount} cards` : ''}`
                 : 'Pasted list'}
@@ -135,55 +139,61 @@ export default function AskPage() {
                 type="button"
                 onClick={removeDeck}
                 aria-label="Remove attached deck"
-                className="text-violet-300 hover:text-white"
+                style={{ color: 'var(--sapphire)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--sapphire)')}
               >
                 ✕
               </button>
             </span>
-            <span className="text-xs text-gray-500">Attached to every question until removed</span>
+            <span className="text-xs" style={{ color: 'var(--faint)' }}>Attached to every question until removed</span>
           </div>
         )}
 
         {deckWarnings.length > 0 && (
-          <p className="text-xs text-amber-400">
+          <p className="text-xs" style={{ color: 'var(--amber)' }}>
             {deckWarnings.length} deck line{deckWarnings.length > 1 ? 's' : ''} not recognized: {deckWarnings.join('; ')}
           </p>
         )}
 
         {panelOpen && !attachedDeck && (
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+          <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
             <div className="flex gap-2">
-              {[['saved', 'Saved decks'], ['paste', 'Paste a list']].map(([tab, label]) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setPanelTab(tab)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    panelTab === tab
-                      ? 'border-violet-500/50 bg-violet-500/[0.12] text-violet-200'
-                      : 'border-white/10 text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              {[['saved', 'Saved decks'], ['paste', 'Paste a list']].map(([tab, label]) => {
+                const active = panelTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setPanelTab(tab)}
+                    className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                    style={active
+                      ? { borderColor: 'color-mix(in srgb, var(--sapphire) 50%, transparent)', background: 'color-mix(in srgb, var(--sapphire) 12%, transparent)', color: 'var(--sapphire)' }
+                      : { borderColor: 'var(--line-2)', color: 'var(--muted)' }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
             {panelTab === 'saved' && (
               <div className="max-h-56 overflow-y-auto space-y-1">
-                {savedDecks === null && <p className="text-xs text-gray-500">Loading decks…</p>}
+                {savedDecks === null && <p className="text-xs" style={{ color: 'var(--faint)' }}>Loading decks…</p>}
                 {savedDecks?.length === 0 && (
-                  <p className="text-xs text-gray-500">No saved decks in this hub yet — try pasting a list instead.</p>
+                  <p className="text-xs" style={{ color: 'var(--faint)' }}>No saved decks in this hub yet — try pasting a list instead.</p>
                 )}
                 {savedDecks?.map((d) => (
                   <button
                     key={d.id}
                     type="button"
                     onClick={() => attachSaved(d)}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] transition-colors"
+                    className="w-full text-left px-3 py-2 rounded-lg transition-colors"
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--panel-2)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span className="text-sm text-gray-200">{d.title}</span>
-                    <span className="text-xs text-gray-500 ml-2">
+                    <span className="text-sm" style={{ color: 'var(--text)' }}>{d.title}</span>
+                    <span className="text-xs ml-2" style={{ color: 'var(--faint)' }}>
                       {d.cardCount} cards · {d.user?.email}
                     </span>
                   </button>
@@ -198,13 +208,15 @@ export default function AskPage() {
                   onChange={(e) => setPasteText(e.target.value)}
                   placeholder={'4 Be Prepared\n3 Mickey Mouse - Brave Little Tailor\n…'}
                   rows={6}
-                  className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm font-mono resize-none focus:border-violet-500 focus:outline-none"
+                  className="w-full p-3 rounded-xl border text-sm font-mono resize-none focus:outline-none focus:shadow-[0_0_0_1px_var(--sapphire)]"
+                  style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                 />
                 <button
                   type="button"
                   onClick={attachPasted}
                   disabled={!pasteText.trim()}
-                  className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:brightness-110"
+                  style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                 >
                   Attach list
                 </button>
@@ -222,15 +234,17 @@ export default function AskPage() {
           placeholder="Ask anything about your team's meta…"
           rows={3}
           disabled={loading}
-          className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm resize-none focus:border-violet-500 focus:outline-none disabled:opacity-50"
+          className="w-full p-3 rounded-xl border text-sm resize-none focus:outline-none focus:shadow-[0_0_0_1px_var(--sapphire)] disabled:opacity-50"
+          style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{error}</p>}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <p className="text-xs text-gray-500 order-2 sm:order-1">Press Enter to send · Shift+Enter for new line</p>
+          <p className="text-xs order-2 sm:order-1" style={{ color: 'var(--faint)' }}>Press Enter to send · Shift+Enter for new line</p>
           <button
             type="submit"
             disabled={loading || !question.trim()}
-            className="order-1 sm:order-2 w-full sm:w-auto px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            className="order-1 sm:order-2 w-full sm:w-auto px-4 py-2 rounded-md text-sm font-semibold disabled:opacity-50 transition hover:brightness-110"
+            style={{ background: 'var(--sapphire)', color: '#0b1620' }}
           >
             {loading ? 'Thinking…' : 'Ask'}
           </button>
@@ -239,13 +253,14 @@ export default function AskPage() {
 
       {history.length === 0 && !loading && (
         <div>
-          <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">Try asking</p>
+          <p className="text-[11px] mb-2 uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Try asking</p>
           <div className="flex flex-wrap gap-2">
             {EXAMPLE_QUESTIONS.map((q) => (
               <button
                 key={q}
                 onClick={() => ask(q)}
-                className="text-xs px-3 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/[0.06] text-violet-300 hover:bg-violet-500/[0.12] transition-colors"
+                className="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
               >
                 {q}
               </button>
@@ -255,19 +270,19 @@ export default function AskPage() {
       )}
 
       {loading && (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-gray-400 animate-pulse">
+        <div className="rounded-xl border p-5 text-sm animate-pulse" style={{ borderColor: 'var(--line)', background: 'var(--panel)', color: 'var(--muted)' }}>
           Consulting your team's data…
         </div>
       )}
 
       {history.map((item, i) => (
         <div key={i} className="space-y-3">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">Question</p>
-            <p className="text-sm text-gray-200">{item.question}</p>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+            <p className="text-[11px] mb-1 uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Question</p>
+            <p className="text-sm" style={{ color: 'var(--text)' }}>{item.question}</p>
           </div>
-          <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
-            <p className="text-xs text-violet-400 mb-3 uppercase tracking-wide font-medium">Answer</p>
+          <div className="rounded-xl border p-5" style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 30%, var(--line))', background: 'var(--panel)' }}>
+            <p className="text-[11px] mb-3 uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--sapphire)' }}>Answer</p>
             <MarkdownText text={item.answer} />
           </div>
         </div>

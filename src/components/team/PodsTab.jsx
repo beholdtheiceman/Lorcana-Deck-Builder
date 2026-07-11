@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Skeleton, EmptyState, Button } from '../ui';
 
-const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
+const input = 'w-full p-2 rounded text-sm bg-[color:var(--panel-2)] border border-[color:var(--line-2)] text-[color:var(--text)] focus:outline-none';
 
 /**
  * Practice pods: fixed/persistent groups within a hub. Any member can create
@@ -147,7 +147,7 @@ export default function PodsTab({ hubId, currentUser }) {
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-bad text-sm">{error}</p>}
+      {error && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{error}</p>}
 
       {/* Create pod */}
       <form onSubmit={createPod} className="flex gap-2">
@@ -166,31 +166,31 @@ export default function PodsTab({ hubId, currentUser }) {
             const memberIds = new Set(pod.members.map((m) => m.memberId));
             const available = roster.filter((r) => !memberIds.has(r.id));
             return (
-              <li key={pod.id} className="bg-gray-800/60 rounded-lg p-4 space-y-2">
+              <li key={pod.id} className="rounded-xl border p-4 space-y-2" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
                 <div className="flex items-center justify-between gap-3">
-                  <h5 className="text-gray-100 font-semibold">{pod.name}</h5>
+                  <h5 className="font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>{pod.name}</h5>
                   <div className="flex gap-2 shrink-0">
-                    <button onClick={() => renamePod(pod)} className="text-gray-500 hover:text-violet-300 text-xs">Rename</button>
+                    <button onClick={() => renamePod(pod)} className="text-xs text-[color:var(--faint)] hover:text-[color:var(--text)]">Rename</button>
                     {pendingDelete === pod.id ? (
                       <>
-                        <button onClick={() => deletePod(pod.id)} className="text-red-400 hover:text-red-300 text-xs">Sure?</button>
-                        <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+                        <button onClick={() => deletePod(pod.id)} className="text-xs text-[color:var(--ruby)] hover:brightness-110">Sure?</button>
+                        <button onClick={() => setPendingDelete(null)} className="text-xs text-[color:var(--faint)] hover:text-[color:var(--muted)]">✕</button>
                       </>
                     ) : (
-                      <button onClick={() => setPendingDelete(pod.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                      <button onClick={() => setPendingDelete(pod.id)} className="text-xs text-[color:var(--faint)] hover:text-[color:var(--ruby)]">Delete</button>
                     )}
                   </div>
                 </div>
 
                 {pod.members.length === 0 ? (
-                  <p className="text-gray-600 text-xs">No members yet.</p>
+                  <p className="text-xs" style={{ color: 'var(--faint)' }}>No members yet.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {pod.members.map((m) => (
-                      <span key={m.memberId} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-700 text-gray-200">
+                      <span key={m.memberId} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[color:var(--panel-2)] text-[color:var(--muted)] border border-[color:var(--line)]">
                         {m.email || emailOf[m.memberId] || 'Unknown'}
                         <button onClick={() => removeMember(pod.id, m.memberId)}
-                          className="text-gray-400 hover:text-red-400" title="Remove">×</button>
+                          className="text-[color:var(--faint)] hover:text-[color:var(--ruby)]" title="Remove">×</button>
                       </span>
                     ))}
                   </div>

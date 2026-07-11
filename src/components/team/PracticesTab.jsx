@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Skeleton, EmptyState, Button } from '../ui';
 
-const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
-const label = 'block text-xs font-medium text-gray-400 mb-1';
+const input = 'w-full p-2 rounded text-sm bg-[color:var(--panel-2)] border border-[color:var(--line-2)] text-[color:var(--text)] focus:outline-none';
+const label = 'block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1 text-[color:var(--faint)]';
 const EMPTY_FORM = { id: null, title: '', startsAt: '', focus: '' };
 const STATUSES = [['yes', 'Yes'], ['maybe', 'Maybe'], ['no', 'No']];
 
@@ -154,26 +154,26 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
     const yes = (p.rsvps || []).filter((r) => r.status === 'yes');
     const maybe = (p.rsvps || []).filter((r) => r.status === 'maybe');
     return (
-      <li className={`bg-gray-800/60 rounded-lg p-4 space-y-2 ${dim ? 'opacity-60' : ''}`}>
+      <li className={`rounded-xl border p-4 space-y-2 ${dim ? 'opacity-60' : ''}`} style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-gray-100 font-medium">{p.title}</div>
-            <div className="text-gray-400 text-xs mt-0.5">
+            <div className="font-medium" style={{ color: 'var(--text)' }}>{p.title}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
               {fmt(p.startsAt)}
-              {p.startsAt && <span className="text-violet-300"> · {countdown(p.startsAt)}</span>}
+              {p.startsAt && <span style={{ color: 'var(--sapphire)' }}> · {countdown(p.startsAt)}</span>}
             </div>
-            {p.focus && <div className="text-gray-400 text-xs mt-1">{p.focus}</div>}
+            {p.focus && <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{p.focus}</div>}
           </div>
           {canModify(p) && (
             <div className="flex gap-2 shrink-0">
-              <button onClick={() => openEdit(p)} className="text-gray-500 hover:text-violet-300 text-xs">Edit</button>
+              <button onClick={() => openEdit(p)} className="text-xs text-[color:var(--faint)] hover:text-[color:var(--text)]">Edit</button>
               {pendingDelete === p.id ? (
                 <>
-                  <button onClick={() => remove(p.id)} className="text-red-400 hover:text-red-300 text-xs">Sure?</button>
-                  <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+                  <button onClick={() => remove(p.id)} className="text-xs text-[color:var(--ruby)] hover:brightness-110">Sure?</button>
+                  <button onClick={() => setPendingDelete(null)} className="text-xs text-[color:var(--faint)] hover:text-[color:var(--muted)]">✕</button>
                 </>
               ) : (
-                <button onClick={() => setPendingDelete(p.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                <button onClick={() => setPendingDelete(p.id)} className="text-xs text-[color:var(--faint)] hover:text-[color:var(--ruby)]">Delete</button>
               )}
             </div>
           )}
@@ -183,16 +183,17 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
         <div className="flex flex-wrap items-center gap-1.5">
           {STATUSES.map(([val, lbl]) => (
             <button key={val} onClick={() => setRsvp(p.id, val)}
-              className={`px-2.5 py-1.5 rounded text-xs font-medium ${myStatus === val ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+              className="px-2.5 py-1.5 rounded text-xs font-medium hover:brightness-110"
+              style={myStatus === val ? { background: 'var(--sapphire)', color: '#0b1620' } : { background: 'var(--panel-2)', color: 'var(--muted)' }}>
               {lbl}
             </button>
           ))}
-          <span className="text-xs text-gray-500 ml-1">
+          <span className="text-xs ml-1" style={{ color: 'var(--faint)' }}>
             {yes.length} going{maybe.length ? ` · ${maybe.length} maybe` : ''}
           </span>
         </div>
         {yes.length > 0 && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs" style={{ color: 'var(--muted)' }}>
             Going: {yes.map((r) => r.email || 'Unknown').join(', ')}
           </div>
         )}
@@ -202,10 +203,10 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-bad text-sm">{error}</p>}
+      {error && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{error}</p>}
 
       <div className="flex items-center justify-between gap-3">
-        <h4 className="text-sm font-semibold text-violet-300">Practices ({practices.length})</h4>
+        <h4 className="text-sm font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>Practices ({practices.length})</h4>
         {!showForm && (
           <Button variant="primary" onClick={openNew} className="text-xs">
             New practice
@@ -214,8 +215,8 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
-          <h5 className="text-sm font-semibold text-violet-300">{form.id ? 'Edit practice' : 'New practice'}</h5>
+        <form onSubmit={submit} className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+          <h5 className="text-sm font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>{form.id ? 'Edit practice' : 'New practice'}</h5>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={label}>Title *</label>
@@ -247,7 +248,7 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
       )}
 
       <div>
-        <h4 className="text-sm font-semibold text-violet-300 mb-2">Upcoming</h4>
+        <h4 className="text-sm font-display mb-2" style={{ fontWeight: 560, color: 'var(--text)' }}>Upcoming</h4>
         {loading ? (
           <Skeleton variant="block" className="h-24" />
         ) : upcoming.length === 0 ? (
@@ -259,7 +260,7 @@ export default function PracticesTab({ hubId, currentUser, isOwner = false }) {
 
       {past.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-400 mb-2">Past</h4>
+          <h4 className="text-sm font-display mb-2" style={{ fontWeight: 560, color: 'var(--muted)' }}>Past</h4>
           <ul className="space-y-2">{past.slice(0, 15).map((p) => <Card key={p.id} p={p} dim />)}</ul>
         </div>
       )}

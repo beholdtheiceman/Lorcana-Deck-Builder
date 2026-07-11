@@ -11,15 +11,15 @@ function parseList(text) {
   )];
 }
 
-const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
-const label = 'block text-xs font-medium text-gray-400 mb-1';
+const input = 'w-full p-2 rounded text-sm bg-[color:var(--panel-2)] border border-[color:var(--line-2)] text-[color:var(--text)] focus:outline-none';
+const label = 'block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1 text-[color:var(--faint)]';
 
 function Chips({ items, empty }) {
-  if (!items || items.length === 0) return <span className="text-gray-600 text-xs">{empty}</span>;
+  if (!items || items.length === 0) return <span className="text-xs text-[color:var(--faint)]">{empty}</span>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((it) => (
-        <span key={it} className="px-2 py-0.5 rounded-full text-xs bg-gray-700 text-gray-200">{it}</span>
+        <span key={it} className="px-2 py-0.5 rounded-full text-xs bg-[color:var(--panel-2)] text-[color:var(--muted)] border border-[color:var(--line)]">{it}</span>
       ))}
     </div>
   );
@@ -109,10 +109,10 @@ export default function RosterTab({ hubId, currentUser }) {
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-bad text-sm">{error}</p>}
+      {error && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{error}</p>}
 
       <div className="flex items-baseline justify-between">
-        <h4 className="text-sm font-semibold text-violet-300">
+        <h4 className="text-sm font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>
           Roster ({members.length + (owner ? 1 : 0)})
         </h4>
         {me && !editing && (
@@ -124,8 +124,8 @@ export default function RosterTab({ hubId, currentUser }) {
 
       {/* Self-edit form */}
       {editing && (
-        <form onSubmit={save} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
-          <h5 className="text-sm font-semibold text-violet-300">Your profile</h5>
+        <form onSubmit={save} className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+          <h5 className="text-sm font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>Your profile</h5>
           <div>
             <label className={label}>Display name</label>
             <input className={input} value={form.displayName}
@@ -156,7 +156,7 @@ export default function RosterTab({ hubId, currentUser }) {
             <Button type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save profile'}
             </Button>
-            <Button type="button" onClick={() => setEditing(false)} variant="secondary">
+            <Button type="button" onClick={() => setEditing(false)} variant="ghost">
               Cancel
             </Button>
           </div>
@@ -165,12 +165,12 @@ export default function RosterTab({ hubId, currentUser }) {
 
       {/* Owner card */}
       {owner && (
-        <div className="bg-gray-800/60 rounded-lg p-4 flex items-start justify-between gap-3">
+        <div className="rounded-xl border p-4 flex items-start justify-between gap-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
           <div>
-            <div className="text-gray-100 font-medium">{owner.email}</div>
-            <div className="text-xs text-gray-500 mt-0.5">Hub owner</div>
+            <div className="font-medium" style={{ color: 'var(--text)' }}>{owner.email}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--faint)' }}>Hub owner</div>
           </div>
-          <span className="px-2 py-0.5 rounded-full text-xs bg-purple-600 text-white shrink-0">Owner</span>
+          <span className="px-2 py-0.5 rounded-full text-xs shrink-0" style={{ color: 'var(--amethyst)', background: 'color-mix(in srgb, var(--amethyst) 16%, transparent)' }}>Owner</span>
         </div>
       )}
 
@@ -182,11 +182,11 @@ export default function RosterTab({ hubId, currentUser }) {
           {members.map((m) => {
             const isMe = m.userId === currentUser?.id;
             return (
-              <li key={m.id} className="bg-gray-800/60 rounded-lg p-4 space-y-2">
+              <li key={m.id} className="rounded-xl border p-4 space-y-2" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-gray-100 font-medium">{m.displayName || m.email}</span>
-                  {m.displayName && <span className="text-gray-500 text-xs">{m.email}</span>}
-                  {isMe && <span className="px-2 py-0.5 rounded-full text-[10px] bg-violet-600/70 text-white">You</span>}
+                  <span className="font-medium" style={{ color: 'var(--text)' }}>{m.displayName || m.email}</span>
+                  {m.displayName && <span className="text-xs" style={{ color: 'var(--faint)' }}>{m.email}</span>}
+                  {isMe && <span className="px-2 py-0.5 rounded-full text-[10px]" style={{ color: 'var(--amethyst)', background: 'color-mix(in srgb, var(--amethyst) 16%, transparent)' }}>You</span>}
                 </div>
                 <div>
                   <div className={label}>Pet decks</div>
@@ -196,7 +196,7 @@ export default function RosterTab({ hubId, currentUser }) {
                   <div className={label}>Strong pilots</div>
                   <Chips items={m.pilots} empty="—" />
                 </div>
-                {m.notes && <div className="text-gray-400 text-xs">{m.notes}</div>}
+                {m.notes && <div className="text-xs" style={{ color: 'var(--muted)' }}>{m.notes}</div>}
               </li>
             );
           })}

@@ -177,16 +177,16 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
     }
   };
 
-  const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
-  const label = 'block text-xs font-medium text-gray-400 mb-1';
+  const input = 'w-full p-2 rounded-md text-sm bg-bg-overlay border border-line text-[color:var(--text)] placeholder-[color:var(--faint)] focus:outline-none';
+  const label = 'block text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--faint)] mb-1';
 
   return (
     <div className="space-y-6">
       {error && <p className="text-bad text-sm">{error}</p>}
 
       {/* Log a game */}
-      <form onSubmit={submit} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
-        <h4 className="text-sm font-semibold text-violet-300">Log a practice game</h4>
+      <form onSubmit={submit} className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+        <h4 className="font-display text-base" style={{ fontWeight: 560, color: 'var(--text)' }}>Log a practice game</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={label}>Your deck</label>
@@ -252,8 +252,8 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
       {/* Win-rate by matchup */}
       <div>
         <div className="flex items-baseline justify-between mb-2">
-          <h4 className="text-sm font-semibold text-violet-300">Win rate by matchup</h4>
-          <span className="text-xs text-gray-400">
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--muted)' }}>Win rate by matchup</h4>
+          <span className="text-xs tabular-nums" style={{ color: 'var(--faint)' }}>
             Overall: {overall.wins}–{overall.losses}
             {overall.total ? ` (${Math.round((overall.wins / overall.total) * 100)}%)` : ''}
           </span>
@@ -266,31 +266,31 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
             description="Log a practice game to see matchup statistics"
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-700">
+          <div className="overflow-x-auto rounded-md border" style={{ borderColor: 'var(--line)' }}>
             <table className="w-full text-sm">
-              <thead className="bg-gray-800 text-gray-400">
+              <thead style={{ background: 'var(--panel-2)', color: 'var(--faint)' }}>
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">Deck</th>
-                  <th className="text-left px-3 py-2 font-medium">vs</th>
-                  <th className="text-right px-3 py-2 font-medium">W–L</th>
-                  <th className="text-right px-3 py-2 font-medium">Win %</th>
-                  <th className="text-right px-3 py-2 font-medium hidden md:table-cell">On play</th>
-                  <th className="text-right px-3 py-2 font-medium hidden md:table-cell">On draw</th>
+                  <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">Deck</th>
+                  <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">vs</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">W–L</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">Win %</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] hidden md:table-cell">On play</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] hidden md:table-cell">On draw</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.map((r) => (
-                  <tr key={`${r.deckArchetype} ${r.vsArchetype}`} className="border-t border-gray-700/60">
-                    <td className="px-3 py-2 text-gray-200">{r.deckArchetype}</td>
-                    <td className="px-3 py-2 text-gray-200">{r.vsArchetype}</td>
-                    <td className="px-3 py-2 text-right text-gray-200">{r.wins}–{r.losses}</td>
-                    <td className={`px-3 py-2 text-right font-medium ${r.winPct >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <tr key={`${r.deckArchetype} ${r.vsArchetype}`} style={{ borderTop: '1px solid var(--line)' }}>
+                    <td className="px-3 py-2" style={{ color: 'var(--text)' }}>{r.deckArchetype}</td>
+                    <td className="px-3 py-2" style={{ color: 'var(--text)' }}>{r.vsArchetype}</td>
+                    <td className="px-3 py-2 text-right tabular-nums" style={{ color: 'var(--text)' }}>{r.wins}–{r.losses}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums" style={{ color: r.winPct >= 50 ? 'var(--emerald)' : 'var(--ruby)' }}>
                       {r.winPct}%
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-400 hidden md:table-cell">
+                    <td className="px-3 py-2 text-right tabular-nums hidden md:table-cell" style={{ color: 'var(--muted)' }}>
                       {r.onPlayGames ? `${r.onPlayWins}/${r.onPlayGames}` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-400 hidden md:table-cell">
+                    <td className="px-3 py-2 text-right tabular-nums hidden md:table-cell" style={{ color: 'var(--muted)' }}>
                       {r.onDrawGames ? `${r.onDrawWins}/${r.onDrawGames}` : '—'}
                     </td>
                   </tr>
@@ -304,20 +304,20 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
       {/* Win-rate bar chart by matchup */}
       {chartData.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-violet-300 mb-2">Matchup win % (top {chartData.length})</h4>
-          <div className="bg-gray-800/60 rounded-lg p-3" style={{ width: '100%', height: Math.max(120, chartData.length * 34) }}>
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--muted)' }}>Matchup win % (top {chartData.length})</h4>
+          <div className="rounded-md border p-3" style={{ width: '100%', height: Math.max(120, chartData.length * 34), borderColor: 'var(--line)', background: 'var(--panel-2)' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#9ca3af', fontSize: 11 }} unit="%" />
-                <YAxis type="category" dataKey="name" width={150} tick={{ fill: '#d1d5db', fontSize: 11 }} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: 'var(--faint)', fontSize: 11 }} unit="%" />
+                <YAxis type="category" dataKey="name" width={150} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                  contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 6, fontSize: 12 }}
+                  cursor={{ fill: 'var(--line)' }}
+                  contentStyle={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 6, fontSize: 12, color: 'var(--text)' }}
                   formatter={(value, _n, p) => [`${value}% (${p.payload.record})`, 'Win rate']}
                 />
                 <Bar dataKey="winPct" radius={[0, 4, 4, 0]}>
                   {chartData.map((d) => (
-                    <Cell key={d.name} fill={d.winPct >= 50 ? '#34d399' : '#f87171'} />
+                    <Cell key={d.name} fill={d.winPct >= 50 ? 'var(--emerald)' : 'var(--ruby)'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -329,24 +329,24 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
       {/* Win-rate by player */}
       {playerStats.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-violet-300 mb-2">Win rate by player</h4>
-          <div className="overflow-x-auto rounded-lg border border-gray-700">
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--muted)' }}>Win rate by player</h4>
+          <div className="overflow-x-auto rounded-md border" style={{ borderColor: 'var(--line)' }}>
             <table className="w-full text-sm">
-              <thead className="bg-gray-800 text-gray-400">
+              <thead style={{ background: 'var(--panel-2)', color: 'var(--faint)' }}>
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">Player</th>
-                  <th className="text-right px-3 py-2 font-medium">Games</th>
-                  <th className="text-right px-3 py-2 font-medium">W–L</th>
-                  <th className="text-right px-3 py-2 font-medium">Win %</th>
+                  <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">Player</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">Games</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">W–L</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em]">Win %</th>
                 </tr>
               </thead>
               <tbody>
                 {playerStats.map((p) => (
-                  <tr key={p.player} className="border-t border-gray-700/60">
-                    <td className="px-3 py-2 text-gray-200">{p.player}</td>
-                    <td className="px-3 py-2 text-right text-gray-400">{p.total}</td>
-                    <td className="px-3 py-2 text-right text-gray-200">{p.wins}–{p.losses}</td>
-                    <td className={`px-3 py-2 text-right font-medium ${p.winPct >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <tr key={p.player} style={{ borderTop: '1px solid var(--line)' }}>
+                    <td className="px-3 py-2" style={{ color: 'var(--text)' }}>{p.player}</td>
+                    <td className="px-3 py-2 text-right tabular-nums" style={{ color: 'var(--muted)' }}>{p.total}</td>
+                    <td className="px-3 py-2 text-right tabular-nums" style={{ color: 'var(--text)' }}>{p.wins}–{p.losses}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums" style={{ color: p.winPct >= 50 ? 'var(--emerald)' : 'var(--ruby)' }}>
                       {p.winPct}%
                     </td>
                   </tr>
@@ -360,31 +360,31 @@ export default function PlaytestLog({ hubId, decks = [], currentUser }) {
       {/* Recent games */}
       {games.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-violet-300 mb-2">Recent games</h4>
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--muted)' }}>Recent games</h4>
           <ul className="space-y-2">
             {games.slice(0, 25).map((g) => (
-              <li key={g.id} className="flex items-start gap-3 bg-gray-800/60 rounded px-3 py-2 text-sm">
-                <span className={`mt-0.5 font-bold ${g.result === 'W' ? 'text-emerald-400' : 'text-red-400'}`}>
+              <li key={g.id} className="flex items-start gap-3 rounded-md border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--panel-2)' }}>
+                <span className="mt-0.5 font-bold tabular-nums" style={{ color: g.result === 'W' ? 'var(--emerald)' : 'var(--ruby)' }}>
                   {g.result}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-gray-200">
-                    {g.deckArchetype} <span className="text-gray-500">vs</span> {g.vsArchetype}
-                    {g.onPlay != null && <span className="text-gray-500"> · {g.onPlay ? 'on play' : 'on draw'}</span>}
-                    {g.format && <span className="text-gray-500"> · {g.format}</span>}
+                  <div style={{ color: 'var(--text)' }}>
+                    {g.deckArchetype} <span style={{ color: 'var(--faint)' }}>vs</span> {g.vsArchetype}
+                    {g.onPlay != null && <span style={{ color: 'var(--faint)' }}> · {g.onPlay ? 'on play' : 'on draw'}</span>}
+                    {g.format && <span style={{ color: 'var(--faint)' }}> · {g.format}</span>}
                   </div>
-                  {g.lesson && <div className="text-gray-400 text-xs mt-0.5">{g.lesson}</div>}
-                  <div className="text-gray-600 text-xs mt-0.5">
+                  {g.lesson && <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{g.lesson}</div>}
+                  <div className="text-xs mt-0.5 tabular-nums" style={{ color: 'var(--faint)' }}>
                     {new Date(g.playedAt).toLocaleDateString()}
                   </div>
                 </div>
                 {pendingDelete === g.id ? (
                   <>
-                    <button onClick={() => remove(g.id)} className="text-red-400 hover:text-red-300 text-xs shrink-0">Sure?</button>
-                    <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs shrink-0">✕</button>
+                    <button onClick={() => remove(g.id)} className="text-xs shrink-0 hover:brightness-125" style={{ color: 'var(--ruby)' }}>Sure?</button>
+                    <button onClick={() => setPendingDelete(null)} className="text-xs shrink-0 hover:brightness-125" style={{ color: 'var(--faint)' }}>✕</button>
                   </>
                 ) : (
-                  <button onClick={() => setPendingDelete(g.id)} className="text-gray-500 hover:text-red-400 text-xs shrink-0" title="Delete game">✕</button>
+                  <button onClick={() => setPendingDelete(g.id)} className="text-xs shrink-0 hover:brightness-125" style={{ color: 'var(--faint)' }} title="Delete game">✕</button>
                 )}
               </li>
             ))}

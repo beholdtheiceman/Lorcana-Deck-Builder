@@ -18,10 +18,11 @@ const VERDICTS = ["Favored", "Even", "Behind"];
 const CONFIDENCES = ["Draft", "Tentative", "Solid"];
 const STALE_DAYS = 45;
 
+// Active-segment ink per verdict (design-token vars, see tokens.css).
 const VERDICT_STYLE = {
-  Favored: "from-emerald-500 to-green-600",
-  Even: "from-slate-500 to-slate-600",
-  Behind: "from-rose-500 to-red-600",
+  Favored: "--emerald",
+  Even: "--steel",
+  Behind: "--ruby",
 };
 
 function daysSince(date) {
@@ -35,10 +36,10 @@ function Field({ label, hint, children }) {
   return (
     <label className="block">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
           {label}
         </span>
-        {hint ? <span className="text-[11px] text-gray-500">{hint}</span> : null}
+        {hint ? <span className="text-[11px]" style={{ color: 'var(--faint)' }}>{hint}</span> : null}
       </div>
       {children}
     </label>
@@ -46,25 +47,23 @@ function Field({ label, hint, children }) {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-violet-400/60 focus:ring-1 focus:ring-violet-400/40";
+  "w-full rounded-lg border px-3 py-2 text-sm outline-none border-[color:var(--line-2)] bg-[var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--faint)] focus:outline-none focus:shadow-[0_0_0_1px_var(--sapphire)]";
 
 function Segmented({ options, value, onChange, styleMap }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => {
         const active = value === opt;
-        const grad = styleMap?.[opt] || "from-violet-500 to-indigo-500";
+        const ink = styleMap?.[opt] || "--sapphire";
         return (
           <button
             key={opt}
             type="button"
             onClick={() => onChange(active ? "" : opt)}
-            className={[
-              "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-              active
-                ? `bg-gradient-to-b ${grad} text-white shadow`
-                : "border border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20",
-            ].join(" ")}
+            className="rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors"
+            style={active
+              ? { background: `var(${ink})`, color: '#0b1620', borderColor: 'transparent' }
+              : { background: 'var(--panel-2)', color: 'var(--muted)', borderColor: 'var(--line-2)' }}
           >
             {opt}
           </button>
@@ -220,28 +219,32 @@ const PrimerEditor = ({ primer, hubId, onSaved, onClose }) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div className="my-8 w-full max-w-2xl rounded-2xl border border-white/10 bg-[#11151f] shadow-2xl">
+      <div className="my-8 w-full max-w-2xl rounded-2xl border shadow-2xl" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b px-6 py-4" style={{ borderColor: 'var(--line)' }}>
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold text-white">
+            <h2 className="truncate font-display text-lg" style={{ fontWeight: 560, color: 'var(--text)' }}>
               {isEdit ? "Edit primer" : "New primer"}
             </h2>
-            <p className="mt-0.5 truncate text-sm text-gray-400">
-              {deckArchetype || "Your deck"} <span className="text-violet-300">vs</span>{" "}
+            <p className="mt-0.5 truncate text-sm" style={{ color: 'var(--muted)' }}>
+              {deckArchetype || "Your deck"} <span style={{ color: 'var(--faint)' }}>vs</span>{" "}
               {vsArchetype || "Opponent"}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {isStale ? (
-              <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+              <span
+                className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                style={{ borderColor: 'color-mix(in srgb, var(--amber) 40%, transparent)', background: 'color-mix(in srgb, var(--amber) 15%, transparent)', color: 'var(--amber)' }}
+              >
                 Stale · {reviewedDays}d
               </span>
             ) : null}
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white"
+              className="rounded-lg p-1.5 hover:bg-[var(--panel-2)] hover:text-[color:var(--text)]"
+              style={{ color: 'var(--muted)' }}
               aria-label="Close"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -337,23 +340,27 @@ const PrimerEditor = ({ primer, hubId, onSaved, onClose }) => {
                 <button
                   type="button"
                   onClick={addTypedCard}
-                  className="shrink-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-gray-200 hover:border-white/20"
+                  className="shrink-0 rounded-lg border px-3 py-2 text-sm font-medium hover:border-[color:var(--line-2)]"
+                  style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                 >
                   Add
                 </button>
               </div>
 
               {suggestions.length > 0 ? (
-                <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-white/10 bg-[#161b27] shadow-xl">
+                <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border shadow-xl" style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)' }}>
                   {suggestions.map((s) => (
                     <button
                       key={s.id}
                       type="button"
                       onClick={() => addCard(s)}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-200 hover:bg-violet-500/15"
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm"
+                      style={{ color: 'var(--text)' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--sapphire) 15%, transparent)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <span className="truncate">{s.name}</span>
-                      <span className="shrink-0 text-xs text-gray-500">
+                      <span className="shrink-0 text-xs" style={{ color: 'var(--faint)' }}>
                         {s.color || ""}
                         {s.cost != null ? ` · ${s.cost}⬢` : ""}
                       </span>
@@ -368,20 +375,23 @@ const PrimerEditor = ({ primer, hubId, onSaved, onClose }) => {
                 {keyCards.map((c, idx) => (
                   <li
                     key={`${c.id ?? c.name}-${idx}`}
-                    className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2"
+                    className="rounded-lg border px-3 py-2"
+                    style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)' }}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-violet-200">{c.name}</span>
+                      <span className="truncate text-sm font-medium" style={{ color: 'var(--text)' }}>{c.name}</span>
                       <button
                         type="button"
                         onClick={() => removeCard(idx)}
-                        className="shrink-0 text-xs text-gray-500 hover:text-red-300"
+                        className="shrink-0 text-xs hover:text-[color:var(--ruby)]"
+                        style={{ color: 'var(--faint)' }}
                       >
                         Remove
                       </button>
                     </div>
                     <input
-                      className="mt-1.5 w-full rounded-md border border-white/5 bg-transparent px-2 py-1 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-violet-400/40"
+                      className="mt-1.5 w-full rounded-md border bg-transparent px-2 py-1 text-xs outline-none placeholder-[color:var(--faint)] focus:outline-none focus:shadow-[0_0_0_1px_var(--sapphire)]"
+                      style={{ borderColor: 'var(--line)', color: 'var(--muted)' }}
                       value={c.note || ""}
                       onChange={(e) => setCardNote(idx, e.target.value)}
                       placeholder="note (e.g. lore scaling, recursion)…"
@@ -393,42 +403,49 @@ const PrimerEditor = ({ primer, hubId, onSaved, onClose }) => {
           </Field>
 
           {/* Meta: owner + last reviewed / stale */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-4 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs" style={{ borderColor: 'var(--line)', color: 'var(--faint)' }}>
             <span>
-              Owner: <span className="text-gray-300">{ownerLabel}</span>
+              Owner: <span style={{ color: 'var(--text)' }}>{ownerLabel}</span>
             </span>
             <span className="flex items-center gap-2">
               {primer?.lastReviewedAt ? (
                 <>
                   Last reviewed{" "}
-                  <span className="text-gray-300">
+                  <span style={{ color: 'var(--text)' }}>
                     {new Date(primer.lastReviewedAt).toLocaleDateString()}
                   </span>
                   {isStale ? (
-                    <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-300">
+                    <span
+                      className="rounded-full border px-2 py-0.5 font-semibold"
+                      style={{ borderColor: 'color-mix(in srgb, var(--amber) 40%, transparent)', background: 'color-mix(in srgb, var(--amber) 15%, transparent)', color: 'var(--amber)' }}
+                    >
                       Stale
                     </span>
                   ) : null}
                 </>
               ) : (
-                <span className="text-gray-500">New — not yet reviewed</span>
+                <span style={{ color: 'var(--faint)' }}>New — not yet reviewed</span>
               )}
             </span>
           </div>
 
           {error ? (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+            <div
+              className="rounded-lg border px-4 py-2 text-sm"
+              style={{ borderColor: 'color-mix(in srgb, var(--ruby) 30%, transparent)', background: 'color-mix(in srgb, var(--ruby) 10%, transparent)', color: 'var(--ruby)' }}
+            >
               {error}
             </div>
           ) : null}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
+        <div className="flex items-center justify-end gap-3 border-t px-6 py-4" style={{ borderColor: 'var(--line)' }}>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-200 hover:border-white/20"
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:border-[color:var(--line-2)]"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           >
             Cancel
           </button>
@@ -436,7 +453,8 @@ const PrimerEditor = ({ primer, hubId, onSaved, onClose }) => {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow hover:brightness-110 disabled:opacity-50"
+            style={{ background: 'var(--sapphire)', color: '#0b1620' }}
           >
             {saving ? "Saving…" : isEdit ? "Save changes" : "Create primer"}
           </button>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button, Skeleton, EmptyState } from '../ui';
 
-const input = 'w-full p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm';
-const label = 'block text-xs font-medium text-gray-400 mb-1';
+const input = 'w-full p-2 rounded text-sm border outline-none border-[color:var(--line-2)] bg-[var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--faint)] focus:outline-none focus:shadow-[0_0_0_1px_var(--sapphire)]';
+const label = 'block text-[11px] font-semibold uppercase tracking-[0.1em] mb-1 text-[color:var(--faint)]';
 const PRESET_TAGS = ['meta', 'matchup', 'event-report'];
 const EMPTY_FORM = { id: null, title: '', body: '', tags: '' };
 
@@ -146,7 +146,7 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
       {error && <p className="text-bad text-sm">{error}</p>}
 
       <div className="flex items-center justify-between gap-3">
-        <h4 className="text-sm font-semibold text-violet-300">Meta reports ({reports.length})</h4>
+        <h4 className="font-display text-sm" style={{ fontWeight: 560, color: 'var(--text)' }}>Meta reports ({reports.length})</h4>
         {!showForm && (
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => { setShowDraftModal(true); setDraftError(''); }}>
@@ -162,9 +162,9 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
       {/* AI Draft Modal */}
       {showDraftModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-900 rounded-xl border border-white/10 p-6 w-full max-w-lg">
-            <h2 className="text-lg font-semibold text-white mb-1">Draft with AI</h2>
-            <p className="text-sm text-gray-400 mb-4">
+          <div className="rounded-xl border p-6 w-full max-w-lg" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+            <h2 className="font-display text-lg mb-1" style={{ fontWeight: 560, color: 'var(--text)' }}>Draft with AI</h2>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
               Describe the report you want. The AI will use your team's match data and recent reports as context.
             </p>
             <form onSubmit={draftReport} className="space-y-3">
@@ -173,12 +173,13 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
                 onChange={(e) => setDraftPrompt(e.target.value)}
                 rows={3}
                 placeholder='e.g. "Write a meta report on Steel Song after rotation" or "Summarize our win rates this week"'
-                className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm resize-none focus:border-violet-500 focus:outline-none"
+                className="w-full p-2.5 rounded-lg border text-sm resize-none outline-none focus:outline-none focus:shadow-[0_0_0_1px_var(--sapphire)]"
+                style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                 autoFocus
                 required
               />
               {draftError && (
-                <p className="text-sm text-red-400">{draftError}</p>
+                <p className="text-sm" style={{ color: 'var(--ruby)' }}>{draftError}</p>
               )}
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" type="button" onClick={() => setShowDraftModal(false)} disabled={drafting}>
@@ -197,12 +198,18 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           <button onClick={() => setActiveTag('')}
-            className={`px-2 py-0.5 rounded-full text-xs ${activeTag === '' ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            className="px-2 py-0.5 rounded-full text-xs border"
+            style={activeTag === ''
+              ? { background: 'var(--sapphire)', color: '#0b1620', borderColor: 'transparent' }
+              : { background: 'var(--panel-2)', color: 'var(--muted)', borderColor: 'var(--line-2)' }}>
             All
           </button>
           {allTags.map((t) => (
             <button key={t} onClick={() => setActiveTag(t === activeTag ? '' : t)}
-              className={`px-2 py-0.5 rounded-full text-xs ${t === activeTag ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+              className="px-2 py-0.5 rounded-full text-xs border"
+              style={t === activeTag
+                ? { background: 'var(--sapphire)', color: '#0b1620', borderColor: 'transparent' }
+                : { background: 'var(--panel-2)', color: 'var(--muted)', borderColor: 'var(--line-2)' }}>
               {t}
             </button>
           ))}
@@ -211,8 +218,8 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
 
       {/* Create / edit form */}
       {showForm && (
-        <form onSubmit={submit} className="bg-gray-800/60 rounded-lg p-4 space-y-3">
-          <h5 className="text-sm font-semibold text-violet-300">{form.id ? 'Edit report' : 'New report'}</h5>
+        <form onSubmit={submit} className="rounded-lg p-4 space-y-3" style={{ background: 'var(--panel-2)' }}>
+          <h5 className="font-display text-sm" style={{ fontWeight: 560, color: 'var(--text)' }}>{form.id ? 'Edit report' : 'New report'}</h5>
           <div>
             <label className={label}>Title *</label>
             <input className={input} value={form.title}
@@ -256,11 +263,11 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
       ) : (
         <ul className="space-y-3">
           {visible.map((r) => (
-            <li key={r.id} className="bg-gray-800/60 rounded-lg p-4 space-y-2">
+            <li key={r.id} className="rounded-lg p-4 space-y-2" style={{ background: 'var(--panel-2)' }}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h5 className="text-gray-100 font-semibold">{r.title}</h5>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <h5 className="font-display font-semibold" style={{ color: 'var(--text)' }}>{r.title}</h5>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--faint)' }}>
                     {r.authorEmail || 'Unknown'} · {new Date(r.createdAt).toLocaleDateString()}
                     {r.updatedAt && r.updatedAt !== r.createdAt ? ' · edited' : ''}
                   </div>
@@ -268,14 +275,14 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
                 {canModify(r) && (
                   <div className="flex gap-2 shrink-0">
                     <button onClick={() => openEdit(r)}
-                      className="text-gray-500 hover:text-violet-300 text-xs">Edit</button>
+                      className="text-xs hover:text-[color:var(--sapphire)]" style={{ color: 'var(--faint)' }}>Edit</button>
                     {pendingDelete === r.id ? (
                       <>
-                        <button onClick={() => remove(r.id)} className="text-red-400 hover:text-red-300 text-xs">Sure?</button>
-                        <button onClick={() => setPendingDelete(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+                        <button onClick={() => remove(r.id)} className="text-xs" style={{ color: 'var(--ruby)' }}>Sure?</button>
+                        <button onClick={() => setPendingDelete(null)} className="text-xs hover:text-[color:var(--muted)]" style={{ color: 'var(--faint)' }}>✕</button>
                       </>
                     ) : (
-                      <button onClick={() => setPendingDelete(r.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                      <button onClick={() => setPendingDelete(r.id)} className="text-xs hover:text-[color:var(--ruby)]" style={{ color: 'var(--faint)' }}>Delete</button>
                     )}
                   </div>
                 )}
@@ -283,11 +290,11 @@ export default function MetaReportsTab({ hubId, currentUser, isOwner = false }) 
               {r.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {r.tags.map((t) => (
-                    <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-gray-700 text-gray-300">{t}</span>
+                    <span key={t} className="px-2 py-0.5 rounded-full text-xs border" style={{ borderColor: 'var(--line-2)', color: 'var(--faint)' }}>{t}</span>
                   ))}
                 </div>
               )}
-              <div className="text-gray-300 text-sm whitespace-pre-wrap break-words">{r.body}</div>
+              <div className="text-sm whitespace-pre-wrap break-words" style={{ color: 'var(--text)' }}>{r.body}</div>
             </li>
           ))}
         </ul>

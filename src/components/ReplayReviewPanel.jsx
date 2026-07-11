@@ -18,10 +18,10 @@ const TABS = [
   { id: 'primers', label: 'Primers' },
 ];
 
-function verdictTone(verdict) {
-  if (verdict === 'Favored') return 'text-emerald-300';
-  if (verdict === 'Behind') return 'text-red-300';
-  return 'text-gray-300';
+function verdictColor(verdict) {
+  if (verdict === 'Favored') return 'var(--emerald)';
+  if (verdict === 'Behind') return 'var(--ruby)';
+  return 'var(--muted)';
 }
 
 const ReplayReviewPanel = ({ hubId }) => {
@@ -72,23 +72,24 @@ const ReplayReviewPanel = ({ hubId }) => {
   };
 
   return (
-    <div className="text-gray-100">
+    <div style={{ color: 'var(--text)' }}>
       {/* Sub-tabs */}
-      <div className="mb-5 flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={[
-              'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              tab === t.id
-                ? 'bg-gradient-to-b from-violet-500 to-indigo-500 text-white'
-                : 'text-gray-300 hover:bg-white/[0.06]',
-            ].join(' ')}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-5 flex gap-1 rounded-xl border p-1" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              style={active
+                ? { background: 'var(--sapphire)', color: '#0b1620' }
+                : { color: 'var(--muted)' }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === 'upload' && (
@@ -111,27 +112,28 @@ const ReplayReviewPanel = ({ hubId }) => {
       {tab === 'primers' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--muted)' }}>
               Strategy primers
             </h3>
             <button
               onClick={() => setEditingPrimer({})}
-              className="rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+              className="rounded-lg px-3 py-1.5 text-sm font-semibold transition hover:brightness-110"
+              style={{ background: 'var(--sapphire)', color: '#0b1620' }}
             >
               New primer
             </button>
           </div>
 
           {primersLoading ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-gray-400">
+            <div className="rounded-lg border px-4 py-8 text-center text-sm" style={{ borderColor: 'var(--line)', background: 'var(--panel)', color: 'var(--muted)' }}>
               Loading primers…
             </div>
           ) : primersError ? (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            <div className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--ruby) 30%, transparent)', background: 'color-mix(in srgb, var(--ruby) 10%, transparent)', color: 'var(--ruby)' }}>
               {primersError}
             </div>
           ) : primers.length === 0 ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-gray-400">
+            <div className="rounded-lg border px-4 py-8 text-center text-sm" style={{ borderColor: 'var(--line)', background: 'var(--panel)', color: 'var(--faint)' }}>
               No primers yet. Create one to capture a matchup gameplan.
             </div>
           ) : (
@@ -140,23 +142,26 @@ const ReplayReviewPanel = ({ hubId }) => {
                 <button
                   key={p.id}
                   onClick={() => setEditingPrimer(p)}
-                  className="rounded-xl border border-white/10 bg-[#11151f] p-4 text-left transition-colors hover:border-violet-500/40"
+                  className="rounded-xl border p-4 text-left transition-colors"
+                  style={{ borderColor: 'var(--line)', background: 'var(--panel-2)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--sapphire) 40%, var(--line))')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--line)')}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-white">
-                      {p.deckArchetype} <span className="text-gray-500">vs</span> {p.vsArchetype}
+                    <span className="font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>
+                      {p.deckArchetype} <span style={{ color: 'var(--faint)' }}>vs</span> {p.vsArchetype}
                     </span>
-                    <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-gray-300">
+                    <span className="rounded px-1.5 py-0.5 text-xs" style={{ border: '1px solid var(--line-2)', color: 'var(--faint)' }}>
                       {p.confidence}
                     </span>
                   </div>
                   {p.verdict && (
-                    <p className={`mt-1 text-sm font-medium ${verdictTone(p.verdict)}`}>
+                    <p className="mt-1 text-sm font-medium" style={{ color: verdictColor(p.verdict) }}>
                       {p.verdict}
                     </p>
                   )}
                   {p.gameplan && (
-                    <p className="mt-2 line-clamp-2 text-sm text-gray-400">{p.gameplan}</p>
+                    <p className="mt-2 line-clamp-2 text-sm" style={{ color: 'var(--muted)' }}>{p.gameplan}</p>
                   )}
                 </button>
               ))}
