@@ -6284,7 +6284,6 @@ useEffect(() => {
   console.log('[App] Rendering with ImageCacheProvider wrapper');
 
   return (
-      <ImageCacheProvider>
         <div className="flex flex-col min-h-screen overflow-x-clip bg-gradient-to-b from-gray-950 to-black text-gray-100">
           {/* Card search/filter toolbar — below lg this belongs to the mobile
               "Cards" tab; hidden entirely on the "Deck" tab so switching tabs
@@ -6819,7 +6818,6 @@ useEffect(() => {
 )}
         </>
       </div>
-    </ImageCacheProvider>
 );
 } // End AppInner function
 
