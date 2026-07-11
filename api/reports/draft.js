@@ -80,23 +80,42 @@ export default withAuth(async (req, res, session) => {
     `=== TEAM DATA ===\n${context}`;
 
   const client = getAnthropicClient();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    // Meta reports are prose (no JSON contract); adaptive thinking improves the
-    // analysis and the large MAX_TOKENS budget leaves room for it.
-    thinking: { type: "adaptive" },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userInstruction }],
-  });
 
-  await recordUsage(hubId, userId, "report-draft", response.usage);
+  // Adaptive thinking SHARES the max_tokens budget with the visible answer, so
+  // on a data-heavy hub it can consume most of the 6000 tokens and truncate the
+  // report — or leave no prose at all. First attempt runs with thinking ON for
+  // better analysis; if it truncates (max_tokens) or produces no prose, retry
+  // with thinking OFF so the whole budget goes to the report body.
+  async function draft(think) {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      thinking: think ? { type: "adaptive" } : { type: "disabled" },
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userInstruction }],
+    });
+    const text = (response.content || [])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    return { text, usage: response.usage, stopReason: response.stop_reason };
+  }
 
-  const text = (response.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("")
-    .trim();
+  let result = await draft(true);
+  await recordUsage(hubId, userId, "report-draft", result.usage);
+  if (!result.text || result.stopReason === "max_tokens") {
+    console.warn(
+      `[reports/draft] report call hit ${result.stopReason || "empty text"} (think=true); retrying without thinking`
+    );
+    result = await draft(false);
+    await recordUsage(hubId, userId, "report-draft", result.usage);
+  }
+
+  const text = result.text;
+  if (!text) {
+    return res.status(502).json({ error: "Model did not return a report" });
+  }
 
   const lines = text.split("\n");
   let title = "AI Draft";

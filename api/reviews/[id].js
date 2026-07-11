@@ -148,9 +148,12 @@ export default withAuth(async (req, res, session) => {
   let result = await callModel(client, userInstruction);
   addUsage(result.usage);
   if (!result.data) {
+    // Retry with thinking OFF so the full token budget goes to the JSON — the
+    // first attempt's adaptive thinking can eat the budget and truncate it.
     result = await callModel(
       client,
-      userInstruction + "\n\nYour previous reply was not valid JSON. Reply with the raw JSON object only."
+      userInstruction + "\n\nYour previous reply was not valid JSON. Reply with the raw JSON object only.",
+      { think: false }
     );
     addUsage(result.usage);
   }

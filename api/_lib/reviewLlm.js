@@ -64,14 +64,25 @@ export function extractJson(text) {
   return t.slice(start, end + 1);
 }
 
-export async function callModel(client, userInstruction) {
+/**
+ * Call the review model and parse its strict-JSON reply.
+ *
+ * `think` controls adaptive thinking. Adaptive thinking SHARES the max_tokens
+ * budget with the visible answer, so on a complex game it can consume most of
+ * the 6000 tokens and truncate (or entirely drop) the JSON text block —
+ * historically the exact cause of "Model did not return valid JSON". The happy
+ * path runs with thinking ON for better analysis; the invalid-JSON retry runs
+ * with thinking OFF so the whole budget goes to producing the JSON.
+ *
+ * @param {import("@anthropic-ai/sdk").default} client
+ * @param {string} userInstruction
+ * @param {{ think?: boolean }} [opts]
+ */
+export async function callModel(client, userInstruction, { think = true } = {}) {
   const resp = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    // Adaptive thinking makes the review analysis substantially better; the
-    // large MAX_TOKENS budget + the invalid-JSON retry below keep the strict
-    // JSON contract safe from truncation.
-    thinking: { type: "adaptive" },
+    thinking: think ? { type: "adaptive" } : { type: "disabled" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userInstruction }],
   });
@@ -81,16 +92,24 @@ export async function callModel(client, userInstruction) {
     .join("")
     .trim();
   const usage = resp.usage;
+  const stopReason = resp.stop_reason;
+  // Truncation is the dominant failure mode here — surface it in logs instead
+  // of collapsing every cause into a silent null.
+  if (stopReason === "max_tokens") {
+    console.warn(
+      `[reviewLlm] review call hit max_tokens (think=${think}); JSON likely truncated`
+    );
+  }
   const json = extractJson(text);
-  if (!json) return { data: null, usage };
+  if (!json) return { data: null, usage, stopReason };
   let obj;
   try {
     obj = JSON.parse(json);
   } catch {
-    return { data: null, usage };
+    return { data: null, usage, stopReason };
   }
   const validated = ModelOutSchema.safeParse(obj);
-  return { data: validated.success ? validated.data : null, usage };
+  return { data: validated.success ? validated.data : null, usage, stopReason };
 }
 
 /** Build the exact user-instruction string for a review generation. */
