@@ -10,23 +10,32 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { TOOL_SPECS, runTool } from "./agentTools.js";
+import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
 
-export const MODEL = "claude-sonnet-4-6";
+export const MODEL = COACH_MODEL;
 const MAX_TOKENS = 1200;
 const MAX_ITERATIONS = 6;
 const MAX_TOOL_RESULT_CHARS = 8000;
 
+// The canonical Lorcana Coach persona (mirrored from the Console agent) plus an
+// app-runtime addendum. The Console agent grounds card lookups with web tools,
+// which this runtime does NOT have — so we redirect grounding to the app's
+// database tools and add the hub-scoping rules that only exist in the app.
 const BASE_SYSTEM_PROMPT =
-  "You are the Ask AI assistant for a competitive Disney Lorcana team app. You have tools that can look up " +
-  "card oracle text, a user's own saved decks, a teammate's deck (when logged in a shared hub's practice games), " +
-  "hub-scoped team stats (win rates by matchup and by archetype), replay reviews, matchup primers, meta reports, " +
-  "and synced tournament results.\n\n" +
-  "Ground every claim in a tool result — never invent card text, stats, or review content. If a hub-scoped " +
-  "question doesn't specify which hub and there's more than one candidate, call list_my_hubs and, if it's still " +
-  "ambiguous, ask the user to clarify rather than guessing. If the data needed to answer confidently isn't " +
-  "available (e.g. no review exists for that matchup), say so plainly instead of speculating. " +
-  "When asked to build around or suggest strategy for a card, look up its real text with get_card/search_cards " +
-  "first and reason from that. Be concise and direct — these are competitive players, not beginners.";
+  COACH_SYSTEM_PROMPT +
+  "\n\n--- APP RUNTIME (Team Hub \"Ask AI\") ---\n" +
+  "You are running inside the Team Hub app as the Ask AI assistant, NOT in the Console. " +
+  "You do NOT have web_fetch, web_search, or code execution here — ignore those grounding " +
+  "instructions above and ground yourself with the database tools you DO have: look up card " +
+  "oracle text with get_card/search_cards, and use the tools for the user's own saved decks, a " +
+  "teammate's deck (in a shared hub's practice games), hub-scoped team stats (win rates by " +
+  "matchup and by archetype), replay reviews, matchup primers, meta reports, and synced " +
+  "tournament results. The lorcana-knowledge Skill's files are available to these tools.\n" +
+  "Ground every claim in a tool result — never invent card text, stats, or review content. If a " +
+  "hub-scoped question doesn't specify which hub and there's more than one candidate, call " +
+  "list_my_hubs and, if it's still ambiguous, ask the user to clarify rather than guessing. If the " +
+  "data needed to answer confidently isn't available (e.g. no review exists for that matchup), say " +
+  "so plainly instead of speculating.";
 
 /**
  * @param {object} opts

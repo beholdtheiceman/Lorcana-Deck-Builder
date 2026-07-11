@@ -5,8 +5,9 @@ import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
 import { requireHubMember } from "../_lib/hubAuth.js";
 import { getBudgetStatus, recordUsage } from "../_lib/llmBudget.js";
+import { COACH_MODEL } from "../_lib/coachPrompt.js";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = COACH_MODEL;
 const MAX_TOKENS = 3000;
 const MAX_CONTEXT_CHARS = 40000;
 

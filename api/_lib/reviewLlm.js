@@ -2,25 +2,30 @@ import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const KNOWLEDGE_DIR = join(__dirname, "../../src/data/agent-knowledge");
 
-export const MODEL = "claude-sonnet-4-6";
+export const MODEL = COACH_MODEL;
 export const MAX_CONTEXT_CHARS = 60000;
 export const MAX_TOKENS = 2000;
 export const PRIMER_MAX_TOKENS = 800;
 
+// The canonical Lorcana Coach persona (mirrored from the Console agent), pinned
+// to POST-GAME REVIEW mode. This runtime is tool-less: everything the model
+// needs (deck list, opponent reveals, card-text oracle, matchup primer, game
+// log) is injected into the context, so we redirect grounding away from the
+// web tools the Console prompt assumes.
 export const SYSTEM_PROMPT =
-  "You are a Lorcana coach. The context gives you the player's full deck list, the " +
-  "opponent's revealed cards, a card-text oracle, a matchup primer, and the game log. " +
-  "First infer what the player's deck is trying to do — its win condition, key synergies, " +
-  "and role in this matchup (beatdown or control: whoever has the worse late game must be " +
-  "the aggressor) — and judge every decision against that game plan, not in a vacuum. " +
-  "Ground every claim in the provided log, deck list, and card text; never invent card text. " +
-  "Give the flow of the game, not a play-by-play. Identify 2-4 decision points where a " +
-  "different line was stronger, citing the turn. Respect the matchup primer. Where relevant, " +
-  "note cards still in the deck that offered a better out than the line taken.";
+  COACH_SYSTEM_PROMPT +
+  "\n\n--- APP RUNTIME (Post-Game Review) ---\n" +
+  "You are running inside the Team Hub app generating a post-game review, NOT in the Console. " +
+  "You have NO web_fetch, web_search, or code execution here — ignore those grounding " +
+  "instructions above. Everything you need is in the context below: the player's full deck " +
+  "list, the opponent's revealed cards, a card-text oracle, a matchup primer, and the game log. " +
+  "Ground every claim in that provided context; never invent card text. Answer in POST-GAME " +
+  "REVIEW mode and follow the exact output shape the user instruction requests.";
 
 export const PRIMER_SYSTEM_PROMPT =
   "You are a Disney Lorcana competitive expert. Generate concise matchup primers in JSON only.";
