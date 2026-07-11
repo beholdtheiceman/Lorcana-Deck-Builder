@@ -1,6 +1,26 @@
-# HANDOFF — Uninkable overhaul (2026-07-11, session 2)
+# HANDOFF — Uninkable overhaul (2026-07-11, session 3)
 
 **Branch:** `feature/uninkable-overhaul`
+
+## Session 3 — "finish everything" run, CUT SHORT by an API session limit (reset 10:50am ET)
+Launched 5 parallel Opus subagents + did UI myself. Then the account session limit hit: 3 subagents finished, 4 failed mid-work.
+
+**DONE + committed this session (tests 159/159):**
+- `4b2fd50` — logged-out **landing page** + sapphire auth buttons (browser-verified).
+- `b683a70` — **Team Hub overview** restyled to the design system (HubOverviewPage).
+- `60bcfb4` — **JSZip decompression bound** (zip-bomb gap closed); **backlog** (insights case-insensitive, UTC time labels, CSV escaping, requireHubMember consolidation); **LLM gateway** (`api/_lib/anthropic.js`, 5 call sites consolidated, behavior-identical).
+
+**GROUNDWORK committed but NOT wired (`aba2d85`) — finish next:**
+- `api/_lib/rateLimit.js` — complete pluggable limiter, but NOT applied to any endpoint yet. TODO: wire into api/auth/{login,register,forgot-password}.js + api/hubs/join.js (limits: login 10/min, register 5/min, forgot 5/min, join 20/min). Add UPSTASH_* to env.example.
+- `prisma/schema.prisma` **Card model** — validates, additive, but NO ingest script / endpoint / cron and nothing reads it. TODO: `scripts/ingest-cards.mjs` + `api/cards/ingest.js` (cron-guarded) + `api/cards/index.js` (read) + vercel.json nightly cron + `db push`. (See the failed card-DB plan in this session's task #7.)
+
+**NOT started (session limit):**
+- **HubDetailLayout** restyle (hub header/crest/roster/nav) — pattern to follow: HubOverviewPage.jsx idiom + design/comps/uninkable-team-hub-comp.html.
+- **DeckPresentationView** restyle + 2 bug fixes (empty-deck NaN ~L500/1078; broken pie legend HTML-in-SVG ~L1199) — comp: uninkable-deck-detail-comp.html.
+- **Deck Lab** (App.jsx builder) restyle — comp: uninkable-deck-lab-comp.html; monolith, /builder is logged-out accessible so it's browser-verifiable.
+- **Deck versioning** (DeckVersion/DeckCard + snapshot on api/decks POST) — not started.
+
+**Verify note:** the safety classifier (opus-4-8) was down late in the session, blocking browser screenshots/navigation. HubOverviewPage restyle was NOT browser-verified (logged-in surface); it compiles + tests pass but eyeball it. Landing page WAS fully verified earlier.
 
 ## Status
 - **Step 1 (post-mortem):** ✅ `POSTMORTEM.md`. 6 Opus readers; every CRITICAL/HIGH re-verified against real code.
