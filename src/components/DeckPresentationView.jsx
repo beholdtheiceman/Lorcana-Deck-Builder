@@ -39,21 +39,23 @@ import {
   Legend,
 } from "recharts";
 import {
-  TournamentResultsSection,
   getCost,
   getInks,
   deckKey,
   normalizedType,
   FALLBACK_IMG,
+  rolesForCard,
+  ROLE_ORDER,
+  detectSynergies,
+} from "../lib/cardUtils.js";
+import {
   EnhancedCurveChart,
   DrawProbabilityTool,
   DrawSimulator,
   HoverableStatLine,
   HoverableStatBox,
-  rolesForCard,
-  ROLE_ORDER,
-  detectSynergies,
-} from "../App.jsx";
+} from "./deckCharts.jsx";
+import { TournamentResultsSection } from "./TournamentResults.jsx";
 
 // `mobileSection` is used by the mobile "Deck" tab (see AppInner in App.jsx) to
 // render only half of this component's content at a time, inside its own

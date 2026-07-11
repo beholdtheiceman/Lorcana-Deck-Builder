@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { LS_KEYS, loadLS, saveLS } from '../lib/storage.js'
 import { fetchAllCards } from '../lib/cardsApi.js'
 import { generateDeckImagePNG } from '../lib/deckImage.js'
-import { useToasts } from '../App.jsx'
+import { useToasts } from '../contexts/ToastContext.jsx'
 import DeckPresentationView from '../components/DeckPresentationView.jsx'
 
 const INK_COLORS = {
