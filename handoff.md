@@ -1,3 +1,33 @@
+# HANDOFF — Uninkable overhaul (2026-07-11)
+
+**Branch:** `feature/uninkable-overhaul`
+
+## Status
+- **Step 1 (post-mortem):** ✅ `POSTMORTEM.md`. 6 Opus readers; every CRITICAL/HIGH re-verified against real code. Baseline 152/22 green.
+- **Step 2 (plans):** ✅ `PLANS.md` — P0–P4, each task tiered OPUS_SAFE vs FABLE_SUPERVISED.
+- **Step 3 (execute):** 🔶 P0 security cluster landed (below); P1–P4 pending.
+
+## Just completed (P0 — done directly, security-critical) — tests 152/152 ✅
+- **C1 arbitrary deck deletion** — `api/hubs/[id]/decks.js` DELETE now scopes to hub members (owner) / own decks (member). Closes platform-wide IDOR.
+- **H1 team-wipe cascade** — `prisma/schema.prisma:73` `Hub.owner` `onDelete: Cascade → Restrict`. `prisma validate` ✅. **NOT pushed to any DB** — needs `db push`/migration at deploy time.
+
+## Next (priority order, per PLANS.md)
+1. **H3 Discord injection** — BLOCKED ON YOUR DECISION (see below).
+2. **P1 OPUS_SAFE batch** → Opus: C2 dead `user` key (`HubDetailLayout.jsx:25`→`useAuth().user`), H8 `refreshUser`→`checkAuth` (`ResetPasswordPage.jsx`), H2 digest typo (`digest.js:16`).
+3. **P1 FABLE:** C3+H4 text import (monolith).
+4. P2 hardening → P3 architecture → P4 UI redesign (approved comps).
+
+## Open questions / judgment calls
+- **H3 (Discord):** anyone with a hub invite code can file reviews into it; no Discord-user→member link exists in the data model, so a correct check needs a product decision — (a) disable Discord write until identity linking exists, (b) require a second per-hub secret, or (c) accept + document. **Need your call.**
+- **Deploy:** everything is on the feature branch; schema change isn't live until a DB push. No prod deploy without your explicit "deploy".
+- **Cost:** session is ~$78+ (the 6 Opus readers were the bulk). P1–P4 remain large — confirm how far to push in one session.
+
+## Notes
+- Rate limiting (P2.6) matches the still-open Upstash item in the prior handoff below.
+- Commit per cluster, explicit pathspecs (never `git add -A`), author `sportlarry@gmail.com`. Keep `.claude/` untracked.
+
+---
+
 # HANDOFF — Review agent deck-context upgrade (2026-07-04)
 
 ## Status: implementation complete, all 134 tests green, NOT committed / NOT deployed.
