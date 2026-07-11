@@ -1235,9 +1235,10 @@ function importDeck(data, format = 'json') {
 
 // Find card by Lorcanito export format: "Card Name — Subtitle (Set #Number)"
 function findCardByLorcanitoFormat(cardName, subtitle, setId, setNumber) {
-  if (window.getCurrentCards) {
-    const cards = window.getCurrentCards();
-    
+  const getCards = window.getAllCards || window.getCurrentCards;
+  if (getCards) {
+    const cards = getCards();
+
     if (!cards || cards.length === 0) {
       console.warn('[findCardByLorcanitoFormat] No cards available in database');
       return null;
@@ -1340,11 +1341,20 @@ function parseTextImport(text) {
     
     totalCards += countNum;
     const cardName = fullCardName.trim();
-    
+    // The permissive line format only yields a full name; there is no separate
+    // subtitle/set/number token. These are declared (empty) so the placeholder
+    // fallbacks below resolve to their defaults instead of throwing ReferenceError.
+    const cardSubtitle = '';
+    const cardSet = '';
+    const cardNumber = '';
+
     console.log(`[parseTextImport] Parsed: ${countNum}x "${cardName}"`);
-    
-    // Try to find the card by the complete name
-    const cards = window.getCurrentCards ? window.getCurrentCards() : [];
+
+    // Resolve against the FULL catalog, not the currently filtered view — an
+    // active search/filter must not make deck-list cards unresolvable on import.
+    const cards = window.getAllCards
+      ? window.getAllCards()
+      : (window.getCurrentCards ? window.getCurrentCards() : []);
     const foundCard = findCardByName(cardName, cards);
     
     if (foundCard && !foundCard.reason) {
@@ -5595,16 +5605,21 @@ useEffect(() => {
   
   // Also expose the current card list for debugging
   window.getCurrentCards = () => shownCards || [];
-  
+  // Full, unfiltered catalog — used by import parsers so an active filter can't
+  // hide deck-list cards. Re-bound with shownCards (derived from allCards), so
+  // it tracks catalog changes and never goes stale.
+  window.getAllCards = () => allCards || [];
+
   // Expose the text import function globally
   window.parseTextImport = parseTextImport;
-  
+
   return () => {
     delete window.checkCardFields;
     delete window.getCurrentCards;
+    delete window.getAllCards;
     delete window.parseTextImport;
   };
-}, [shownCards]);
+}, [shownCards, allCards]);
 
 const deckValid = deck.total >= DECK_RULES.MIN_SIZE && deck.total <= DECK_RULES.MAX_SIZE;
 
