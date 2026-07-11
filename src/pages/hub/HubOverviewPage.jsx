@@ -7,12 +7,16 @@ const EXAMPLE_QUESTIONS = [
   "Which decks should we focus on testing this week?",
 ];
 
+// ---- small comp-styled helpers -------------------------------------------
+
 function MarkdownText({ text }) {
   return (
-    <div className="space-y-1.5 text-sm text-gray-200 leading-relaxed">
+    <div className="space-y-1.5 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
       {text.split('\n').map((line, i) => {
-        if (line.startsWith('## ')) return <p key={i} className="font-semibold text-violet-300">{line.slice(3)}</p>;
-        if (line.startsWith('- ') || line.startsWith('* ')) return <p key={i} className="pl-3 border-l-2 border-violet-500/30">{line.slice(2)}</p>;
+        if (line.startsWith('## '))
+          return <p key={i} className="font-display" style={{ fontWeight: 560, color: 'var(--text)' }}>{line.slice(3)}</p>;
+        if (line.startsWith('- ') || line.startsWith('* '))
+          return <p key={i} className="pl-3" style={{ borderLeft: '2px solid var(--line-2)', color: 'var(--muted)' }}>{line.slice(2)}</p>;
         if (!line.trim()) return <div key={i} className="h-1" />;
         return <p key={i}>{line}</p>;
       })}
@@ -22,22 +26,31 @@ function MarkdownText({ text }) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">{label}</p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+    <div className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+      <p className="text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>{label}</p>
+      <p className="font-display text-2xl tabular-nums" style={{ fontWeight: 560, color: 'var(--text)' }}>{value}</p>
+      {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--faint)' }}>{sub}</p>}
     </div>
   );
 }
 
-function SectionCard({ title, linkTo, linkLabel, children }) {
+function SectionCard({ title, linkTo, linkLabel, accent, children }) {
   const { id } = useParams();
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+    <div
+      className="rounded-xl border p-5"
+      style={{ borderColor: 'var(--line)', background: 'var(--panel)', boxShadow: accent ? `inset 3px 0 0 var(${accent})` : undefined }}
+    >
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-200">{title}</h4>
+        <h4 className="font-display text-base" style={{ fontWeight: 560, color: 'var(--text)' }}>{title}</h4>
         {linkTo && (
-          <Link to={`/team-hub/${id}/${linkTo}`} className="text-xs text-violet-400 hover:text-violet-300">
+          <Link
+            to={`/team-hub/${id}/${linkTo}`}
+            className="text-xs transition-colors"
+            style={{ color: 'var(--faint)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--faint)')}
+          >
             {linkLabel || 'View all →'}
           </Link>
         )}
@@ -70,51 +83,42 @@ function relTime(iso) {
   return formatDate(iso);
 }
 
+// Ink-colored type pill (the comp's activity vocabulary).
+const PILL = {
+  report:   { v: '--amber',    label: 'Report' },
+  practice: { v: '--emerald',  label: 'Practice' },
+  event:    { v: '--sapphire', label: 'Event' },
+};
+
 function ActivityBadge({ type, result }) {
   if (type === 'game') {
-    const cls = result === 'W' ? 'bg-emerald-500/20 text-emerald-400' : result === 'L' ? 'bg-red-500/20 text-red-400' : 'bg-gray-700 text-gray-400';
-    return <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold shrink-0 ${cls}`}>{result || '?'}</span>;
+    const v = result === 'W' ? '--emerald' : result === 'L' ? '--ruby' : '--steel';
+    return (
+      <span
+        className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold shrink-0 tabular-nums"
+        style={{ color: `var(${v})`, background: `color-mix(in srgb, var(${v}) 16%, transparent)` }}
+      >
+        {result || '?'}
+      </span>
+    );
   }
-  const map = {
-    report:   'bg-violet-500/15 text-violet-400',
-    practice: 'bg-blue-500/15 text-blue-400',
-    event:    'bg-amber-500/15 text-amber-400',
-  };
-  const label = { report: 'R', practice: 'P', event: 'E' };
-  return <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold shrink-0 ${map[type] || 'bg-gray-700 text-gray-400'}`}>{label[type] || '?'}</span>;
+  const p = PILL[type];
+  return (
+    <span
+      className="inline-flex items-center justify-center px-1.5 h-5 rounded text-[10px] font-semibold uppercase tracking-wide shrink-0"
+      style={{ color: p ? `var(${p.v})` : 'var(--faint)', border: `1px solid ${p ? `color-mix(in srgb, var(${p.v}) 40%, transparent)` : 'var(--line-2)'}` }}
+    >
+      {p ? p.label : '?'}
+    </span>
+  );
 }
 
 function ActivityFeed({ games, reports, practices, events }) {
   const items = [
-    ...games.slice(-30).map(g => ({
-      key: `g-${g.id}`,
-      type: 'game',
-      result: g.result,
-      primary: `${g.deckArchetype || '?'} vs ${g.vsArchetype || '?'}`,
-      secondary: g.result === 'W' ? 'Win' : g.result === 'L' ? 'Loss' : 'Draw',
-      time: g.playedAt,
-    })),
-    ...reports.slice(0, 15).map(r => ({
-      key: `r-${r.id}`,
-      type: 'report',
-      primary: r.title,
-      secondary: `by ${r.authorEmail || 'someone'}`,
-      time: r.createdAt,
-    })),
-    ...practices.slice(0, 15).map(p => ({
-      key: `p-${p.id}`,
-      type: 'practice',
-      primary: p.title || 'Practice session',
-      secondary: p.startsAt ? formatDate(p.startsAt) : 'TBD',
-      time: p.createdAt || p.startsAt,
-    })),
-    ...events.slice(0, 15).map(e => ({
-      key: `e-${e.id}`,
-      type: 'event',
-      primary: e.title,
-      secondary: formatDate(e.startsAt),
-      time: e.createdAt || e.startsAt,
-    })),
+    ...games.slice(-30).map(g => ({ key: `g-${g.id}`, type: 'game', result: g.result, primary: `${g.deckArchetype || '?'} vs ${g.vsArchetype || '?'}`, secondary: g.result === 'W' ? 'Win' : g.result === 'L' ? 'Loss' : 'Draw', time: g.playedAt })),
+    ...reports.slice(0, 15).map(r => ({ key: `r-${r.id}`, type: 'report', primary: r.title, secondary: `by ${r.authorEmail || 'someone'}`, time: r.createdAt })),
+    ...practices.slice(0, 15).map(p => ({ key: `p-${p.id}`, type: 'practice', primary: p.title || 'Practice session', secondary: p.startsAt ? formatDate(p.startsAt) : 'TBD', time: p.createdAt || p.startsAt })),
+    ...events.slice(0, 15).map(e => ({ key: `e-${e.id}`, type: 'event', primary: e.title, secondary: formatDate(e.startsAt), time: e.createdAt || e.startsAt })),
   ]
     .filter(item => item.time)
     .sort((a, b) => new Date(b.time) - new Date(a.time))
@@ -123,17 +127,17 @@ function ActivityFeed({ games, reports, practices, events }) {
   if (items.length === 0) return null;
 
   return (
-    <div>
-      <h4 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">Recent activity</h4>
-      <ul className="divide-y divide-white/[0.04]">
-        {items.map(item => (
-          <li key={item.key} className="flex items-center gap-3 py-2">
+    <div className="rounded-xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+      <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-3" style={{ color: 'var(--muted)' }}>This week</h4>
+      <ul>
+        {items.map((item, i) => (
+          <li key={item.key} className="flex items-center gap-3 py-2.5" style={{ borderTop: i === 0 ? 'none' : '1px solid var(--line)' }}>
             <ActivityBadge type={item.type} result={item.result} />
             <div className="flex-1 min-w-0">
-              <span className="text-sm text-gray-200 truncate">{item.primary}</span>
-              <span className="text-xs text-gray-500 ml-1.5">{item.secondary}</span>
+              <span className="text-sm truncate" style={{ color: 'var(--text)' }}>{item.primary}</span>
+              <span className="text-xs ml-1.5" style={{ color: 'var(--faint)' }}>{item.secondary}</span>
             </div>
-            <span className="text-xs text-gray-600 shrink-0">{relTime(item.time)}</span>
+            <span className="text-xs shrink-0 tabular-nums" style={{ color: 'var(--faint)' }}>{relTime(item.time)}</span>
           </li>
         ))}
       </ul>
@@ -141,24 +145,24 @@ function ActivityFeed({ games, reports, practices, events }) {
   );
 }
 
-const ONBOARDING_KEY = (hubId) => `hub_welcomed_${hubId}`
+const ONBOARDING_KEY = (hubId) => `hub_welcomed_${hubId}`;
 
 function useOnboarding(hub, user) {
-  const isOwner = hub?.ownerId === user?.id || hub?.ownerId === user?.uid
-  const key = hub ? ONBOARDING_KEY(hub.id) : null
-  const [show, setShow] = useState(false)
+  const isOwner = hub?.ownerId === user?.id || hub?.ownerId === user?.uid;
+  const key = hub ? ONBOARDING_KEY(hub.id) : null;
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (!key || isOwner) return
-    if (!localStorage.getItem(key)) setShow(true)
-  }, [key, isOwner])
+    if (!key || isOwner) return;
+    if (!localStorage.getItem(key)) setShow(true);
+  }, [key, isOwner]);
 
   const dismiss = () => {
-    if (key) localStorage.setItem(key, '1')
-    setShow(false)
-  }
+    if (key) localStorage.setItem(key, '1');
+    setShow(false);
+  };
 
-  return { show, dismiss }
+  return { show, dismiss };
 }
 
 export default function HubOverviewPage() {
@@ -171,7 +175,6 @@ export default function HubOverviewPage() {
   const { id } = useParams();
   const { show: showBanner, dismiss: dismissBanner } = useOnboarding(hub, user);
 
-  // Ask AI widget state
   const [askQ, setAskQ] = useState('');
   const [askAnswer, setAskAnswer] = useState('');
   const [askLoading, setAskLoading] = useState(false);
@@ -217,15 +220,8 @@ export default function HubOverviewPage() {
   }, [hub?.id]);
 
   const now = new Date();
-
-  const nextPractice = practices
-    .filter(p => new Date(p.startsAt) > now)
-    .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
-
-  const nextEvent = events
-    .filter(e => new Date(e.date || e.startsAt) > now)
-    .sort((a, b) => new Date(a.date || a.startsAt) - new Date(b.date || b.startsAt))[0];
-
+  const nextPractice = practices.filter(p => new Date(p.startsAt) > now).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
+  const nextEvent = events.filter(e => new Date(e.date || e.startsAt) > now).sort((a, b) => new Date(a.date || a.startsAt) - new Date(b.date || b.startsAt))[0];
   const latestReport = reports[0];
 
   const matchupStats = {};
@@ -250,7 +246,7 @@ export default function HubOverviewPage() {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-pulse">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="rounded-xl border border-white/10 bg-white/[0.03] h-20" />
+          <div key={i} className="rounded-xl border h-20" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }} />
         ))}
       </div>
     );
@@ -260,63 +256,44 @@ export default function HubOverviewPage() {
     <div className="space-y-5">
       {/* New-member onboarding banner */}
       {showBanner && (
-        <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.06] p-4 relative">
-          <button
-            onClick={dismissBanner}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-300 text-sm"
-          >
-            ✕
-          </button>
-          <p className="text-sm font-semibold text-violet-300 mb-3">Welcome to {hub.name}! 👋</p>
+        <div className="rounded-xl border p-4 relative" style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 30%, var(--line))', background: 'color-mix(in srgb, var(--sapphire) 6%, transparent)' }}>
+          <button onClick={dismissBanner} className="absolute top-3 right-3 text-sm" style={{ color: 'var(--faint)' }}>✕</button>
+          <p className="font-display text-base mb-3" style={{ fontWeight: 560, color: 'var(--text)' }}>Welcome to {hub.name} 👋</p>
           <div className="space-y-2">
-            <div className="flex items-start gap-3">
-              <span className="text-xs font-bold text-violet-400 mt-0.5 shrink-0">1</span>
-              <div>
-                <p className="text-sm text-gray-200">Fill out your profile</p>
-                <p className="text-xs text-gray-500">Add your display name and the decks you play on the <Link to={`/team-hub/${id}/roster`} className="text-violet-400 hover:underline">Roster</Link> tab.</p>
+            {[
+              { n: 1, t: 'Fill out your profile', d: <>Add your display name and the decks you play on the <Link to={`/team-hub/${id}/roster`} className="underline" style={{ color: 'var(--sapphire)' }}>Roster</Link> tab.</> },
+              { n: 2, t: 'RSVP to the next practice', d: <>Let the team know you're coming on the <Link to={`/team-hub/${id}/practices`} className="underline" style={{ color: 'var(--sapphire)' }}>Practices</Link> tab.</> },
+              { n: 3, t: 'Log your first match', d: <>Track wins and losses on the <Link to={`/team-hub/${id}/playtest`} className="underline" style={{ color: 'var(--sapphire)' }}>Playtest</Link> tab.</> },
+            ].map(step => (
+              <div key={step.n} className="flex items-start gap-3">
+                <span className="text-xs font-bold mt-0.5 shrink-0 tabular-nums" style={{ color: 'var(--sapphire)' }}>{step.n}</span>
+                <div>
+                  <p className="text-sm" style={{ color: 'var(--text)' }}>{step.t}</p>
+                  <p className="text-xs" style={{ color: 'var(--faint)' }}>{step.d}</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-xs font-bold text-violet-400 mt-0.5 shrink-0">2</span>
-              <div>
-                <p className="text-sm text-gray-200">RSVP to the next practice</p>
-                <p className="text-xs text-gray-500">Let the team know you're coming on the <Link to={`/team-hub/${id}/practices`} className="text-violet-400 hover:underline">Practices</Link> tab.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-xs font-bold text-violet-400 mt-0.5 shrink-0">3</span>
-              <div>
-                <p className="text-sm text-gray-200">Log your first match</p>
-                <p className="text-xs text-gray-500">Track wins and losses on the <Link to={`/team-hub/${id}/playtest`} className="text-violet-400 hover:underline">Playtest</Link> tab.</p>
-              </div>
-            </div>
+            ))}
           </div>
-          <button
-            onClick={dismissBanner}
-            className="mt-3 text-xs text-gray-500 hover:text-gray-300"
-          >
-            Got it, dismiss
-          </button>
+          <button onClick={dismissBanner} className="mt-3 text-xs" style={{ color: 'var(--faint)' }}>Got it, dismiss</button>
         </div>
       )}
 
-      {/* Ask AI widget */}
-      <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-4 space-y-3">
-        <form
-          onSubmit={(e) => { e.preventDefault(); ask(); }}
-          className="flex gap-2"
-        >
+      {/* Ask the coach */}
+      <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 30%, var(--line))', background: 'var(--panel)' }}>
+        <form onSubmit={(e) => { e.preventDefault(); ask(); }} className="flex gap-2">
           <input
             value={askQ}
             onChange={(e) => setAskQ(e.target.value)}
-            placeholder="Ask about your team's data…"
+            placeholder="Ask the coach about your team's data…"
             disabled={askLoading}
-            className="flex-1 px-3 py-2 rounded-lg border border-white/10 bg-white/[0.03] text-sm text-white placeholder-gray-500 focus:border-violet-400/60 focus:outline-none disabled:opacity-50"
+            className="flex-1 px-3 py-2 rounded-md border text-sm focus:outline-none disabled:opacity-50"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           />
           <button
             type="submit"
             disabled={askLoading || !askQ.trim()}
-            className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-40 transition-colors shrink-0"
+            className="px-4 py-2 rounded-md text-sm font-semibold disabled:opacity-40 transition shrink-0 hover:brightness-110"
+            style={{ background: 'var(--sapphire)', color: '#0b1620' }}
           >
             {askLoading ? '…' : 'Ask'}
           </button>
@@ -328,7 +305,8 @@ export default function HubOverviewPage() {
               <button
                 key={q}
                 onClick={() => ask(q)}
-                className="text-xs px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/[0.06] text-violet-300 hover:bg-violet-500/[0.14] transition-colors"
+                className="text-xs px-3 py-1 rounded-full border transition-colors"
+                style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
               >
                 {q}
               </button>
@@ -336,113 +314,83 @@ export default function HubOverviewPage() {
           </div>
         )}
 
-        {askLoading && (
-          <p className="text-sm text-gray-400 animate-pulse">Consulting your team's data…</p>
-        )}
-
-        {askError && <p className="text-sm text-red-400">{askError}</p>}
+        {askLoading && <p className="text-sm animate-pulse" style={{ color: 'var(--muted)' }}>Consulting your team's data…</p>}
+        {askError && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{askError}</p>}
 
         {askAnswer && (
           <div className="space-y-2">
             <MarkdownText text={askAnswer} />
             <div className="flex items-center justify-between pt-1">
-              <button
-                onClick={() => setAskAnswer('')}
-                className="text-xs text-gray-500 hover:text-gray-300"
-              >
-                Clear
-              </button>
-              <Link
-                to={`/team-hub/${hub.id}/ask`}
-                className="text-xs text-violet-400 hover:text-violet-300"
-              >
-                Open Ask AI for full history →
-              </Link>
+              <button onClick={() => setAskAnswer('')} className="text-xs" style={{ color: 'var(--faint)' }}>Clear</button>
+              <Link to={`/team-hub/${hub.id}/ask`} className="text-xs" style={{ color: 'var(--sapphire)' }}>Open Ask AI for full history →</Link>
             </div>
           </div>
         )}
       </div>
 
+      {/* Stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Members" value={memberCount} />
         <StatCard label="Games logged" value={totalGames} />
-        <StatCard
-          label="Win rate"
-          value={winRate !== null ? `${winRate}%` : '—'}
-          sub={totalGames > 0 ? `${overallWins}W / ${totalGames - overallWins}L` : 'No games yet'}
-        />
+        <StatCard label="Win rate" value={winRate !== null ? `${winRate}%` : '—'} sub={totalGames > 0 ? `${overallWins}W / ${totalGames - overallWins}L` : 'No games yet'} />
         <StatCard label="Reports" value={reports.length} />
       </div>
 
+      {/* Detail panels */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <SectionCard title="Next Practice" linkTo="practices" linkLabel="All practices →">
+        <SectionCard title="Next practice" linkTo="practices" linkLabel="All practices →" accent="--emerald">
           {nextPractice ? (
             <div>
-              <p className="text-sm font-medium text-white">{nextPractice.title || 'Practice session'}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{formatDate(nextPractice.startsAt)} at {formatTime(nextPractice.startsAt)}</p>
-              {nextPractice.focus && <p className="text-xs text-gray-500 mt-1 italic">Focus: {nextPractice.focus}</p>}
-              {nextPractice.rsvps?.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">{nextPractice.rsvps.filter(r => r.status === 'yes').length} going</p>
-              )}
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{nextPractice.title || 'Practice session'}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{formatDate(nextPractice.startsAt)} at {formatTime(nextPractice.startsAt)}</p>
+              {nextPractice.focus && <p className="text-xs mt-1 italic font-display" style={{ color: 'var(--faint)' }}>Focus: {nextPractice.focus}</p>}
+              {nextPractice.rsvps?.length > 0 && <p className="text-xs mt-1 tabular-nums" style={{ color: 'var(--faint)' }}>{nextPractice.rsvps.filter(r => r.status === 'yes').length} going</p>}
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">No upcoming practices scheduled.</p>
-          )}
+          ) : <p className="text-sm" style={{ color: 'var(--faint)' }}>No upcoming practices scheduled.</p>}
         </SectionCard>
 
-        <SectionCard title="Next Event" linkTo="events" linkLabel="All events →">
+        <SectionCard title="Next event" linkTo="events" linkLabel="All events →" accent="--amber">
           {nextEvent ? (
             <div>
-              <p className="text-sm font-medium text-white">{nextEvent.name || nextEvent.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{formatDate(nextEvent.date || nextEvent.startsAt)}</p>
-              {nextEvent.location && <p className="text-xs text-gray-500 mt-1">{nextEvent.location}</p>}
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{nextEvent.name || nextEvent.title}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{formatDate(nextEvent.date || nextEvent.startsAt)}</p>
+              {nextEvent.location && <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>{nextEvent.location}</p>}
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">No upcoming events posted.</p>
-          )}
+          ) : <p className="text-sm" style={{ color: 'var(--faint)' }}>No upcoming events posted.</p>}
         </SectionCard>
 
-        <SectionCard title="Top Matchups" linkTo="playtest" linkLabel="Playtest log →">
+        <SectionCard title="Top matchups" linkTo="playtest" linkLabel="Playtest log →" accent="--sapphire">
           {topMatchups.length > 0 ? (
             <ul className="space-y-2">
               {topMatchups.map(m => (
                 <li key={m.matchup} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-gray-300 truncate">{m.matchup}</span>
-                  <span className={`shrink-0 font-semibold ${m.pct >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {m.pct}%{' '}
-                    <span className="text-gray-500 font-normal">({m.wins}W-{m.losses}L)</span>
+                  <span className="truncate" style={{ color: 'var(--muted)' }}>{m.matchup}</span>
+                  <span className="shrink-0 font-semibold tabular-nums" style={{ color: m.pct >= 50 ? 'var(--emerald)' : 'var(--ruby)' }}>
+                    {m.pct}% <span className="font-normal" style={{ color: 'var(--faint)' }}>({m.wins}W-{m.losses}L)</span>
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">
-              {totalGames === 0 ? 'No games logged yet.' : 'Need at least 2 games per matchup to show stats.'}
-            </p>
+            <p className="text-sm" style={{ color: 'var(--faint)' }}>{totalGames === 0 ? 'No games logged yet.' : 'Need at least 2 games per matchup to show stats.'}</p>
           )}
         </SectionCard>
 
-        <SectionCard title="Latest Report" linkTo="reports" linkLabel="All reports →">
+        <SectionCard title="Latest report" linkTo="reports" linkLabel="All reports →" accent="--amethyst">
           {latestReport ? (
             <div>
-              <p className="text-sm font-medium text-white">{latestReport.title}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {latestReport.authorEmail} · {formatDate(latestReport.createdAt)}
-              </p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{latestReport.title}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--faint)' }}>{latestReport.authorEmail} · {formatDate(latestReport.createdAt)}</p>
               {latestReport.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {latestReport.tags.map(t => (
-                    <span key={t} className="px-1.5 py-0.5 rounded-full text-xs bg-gray-700 text-gray-400">{t}</span>
+                    <span key={t} className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide" style={{ color: 'var(--faint)', border: '1px solid var(--line-2)' }}>{t}</span>
                   ))}
                 </div>
               )}
-              <p className="text-xs text-gray-500 mt-2 line-clamp-2">
-                {latestReport.body?.slice(0, 120)}{latestReport.body?.length > 120 ? '…' : ''}
-              </p>
+              <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--muted)' }}>{latestReport.body?.slice(0, 120)}{latestReport.body?.length > 120 ? '…' : ''}</p>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">No reports yet.</p>
-          )}
+          ) : <p className="text-sm" style={{ color: 'var(--faint)' }}>No reports yet.</p>}
         </SectionCard>
       </div>
 
