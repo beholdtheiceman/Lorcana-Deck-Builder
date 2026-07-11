@@ -56,6 +56,21 @@ import {
   HoverableStatBox,
 } from "./deckCharts.jsx";
 import { TournamentResultsSection } from "./TournamentResults.jsx";
+import { InkCurve, inkVar } from "./ui/index.js";
+
+// Ink name → design token for the six Lorcana inks, plus a Dual-Ink accent.
+// HTML surfaces resolve colors through inkVar() (CSS var() works inline); this
+// map is only for the Recharts pie's SVG <Cell> fills, where var() does not
+// resolve — so we still drive the palette from the tokens' values.
+const INK_TOKEN_HEX = {
+  Amber: "#f4b223",
+  Amethyst: "#9b59d0",
+  Emerald: "#2ecc71",
+  Ruby: "#e74c5e",
+  Sapphire: "#3aa0e0",
+  Steel: "#9aa7b8",
+  "Dual-Ink": "#f4b223",
+};
 
 // `mobileSection` is used by the mobile "Deck" tab (see AppInner in App.jsx) to
 // render only half of this component's content at a time, inside its own
@@ -372,6 +387,22 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
     const normalizedCost = cost >= 10 ? 10 : cost;
     costCurve[normalizedCost] = (costCurve[normalizedCost] || 0) + e.count;
   });
+
+  // Per-cost ink breakdown for the token-colored InkCurve primitive. Buckets
+  // 0..10 (10 = "10+"); each card's count is attributed to its ink (first ink
+  // for multi-ink cards, Steel when a card has no detectable ink).
+  const curveBuckets = Array.from({ length: 11 }, (_, i) => ({
+    label: i === 10 ? "10+" : String(i),
+    counts: {},
+  }));
+  entries.forEach(e => {
+    const cost = getCost(e.card);
+    const idx = Number.isFinite(cost) ? (cost >= 10 ? 10 : Math.max(0, cost)) : 0;
+    const inks = getInks(e.card);
+    const inkKey = inks.length >= 1 ? inks[0] : "Steel";
+    const bucket = curveBuckets[idx];
+    bucket.counts[inkKey] = (bucket.counts[inkKey] || 0) + e.count;
+  });
   
   // Calculate type distribution
   const typeDistribution = {};
@@ -499,7 +530,11 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
   
   // Calculate average cost
   const totalCost = entries.reduce((sum, e) => sum + (getCost(e.card) * e.count), 0);
-  const averageCost = totalCost / totalCards;
+  // Guard against divide-by-zero on an empty deck (0 cards) so summary numbers
+  // show 0 / 0% instead of NaN / NaN%.
+  const averageCost = totalCards > 0 ? totalCost / totalCards : 0;
+  const inkableRatio = totalCards > 0 ? totalInkable / totalCards : 0;
+  const uninkableRatio = totalCards > 0 ? totalUninkable / totalCards : 0;
   
   // Find most expensive and cheapest cards
   const sortedByCost = entries.sort((a, b) => getCost(b.card) - getCost(a.card));
@@ -571,37 +606,50 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
         {/* Header with Deck Name Edit */}
         <div className="text-center">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Deck Name:
+            <label
+              className="block text-[11px] uppercase tracking-[0.14em] font-semibold mb-2"
+              style={{ color: 'var(--faint)' }}
+            >
+              Deck Name
             </label>
             <input
               type="text"
               value={deckName}
               onChange={(e) => setDeckName(e.target.value)}
-              className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none text-center text-2xl font-bold"
+              className="font-display px-4 py-2 rounded-lg border focus:outline-none text-center text-3xl"
+              style={{
+                background: 'var(--panel)',
+                borderColor: 'var(--line-2)',
+                color: 'var(--text)',
+                fontWeight: 560,
+                letterSpacing: '-0.01em',
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+              onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
               placeholder="Enter deck name..."
             />
           </div>
-          <p className="text-gray-400 mt-2">A Lorcana Deck</p>
+          <p className="font-display italic mt-2" style={{ color: 'var(--muted)' }}>A Lorcana Deck</p>
           {onEditInLab && (
             <button
               type="button"
               onClick={onEditInLab}
-              className="mt-2 text-sm text-violet-300 hover:text-violet-200 underline underline-offset-2"
+              className="mt-2 text-sm underline underline-offset-2 transition-colors"
+              style={{ color: 'var(--sapphire)' }}
             >
               Edit in Deck Lab
             </button>
           )}
           {deck.updatedAt && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>
               Last saved: {new Date(deck.updatedAt).toLocaleString()}
             </p>
           )}
         </div>
         
         {/* Card Images Grid - Organized by Type and Cost */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4 text-center">Deck Cards</h3>
+        <div className="rounded-lg p-4 border border-line bg-raised">
+          <h3 className="font-display text-lg mb-4 text-center">Deck Cards</h3>
           
           {/* Character Cards */}
           {(() => {
@@ -609,7 +657,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             if (characterCards.length > 0) {
               return (
                 <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-blue-400">Character Cards</h4>
+                  <h4 className="font-display text-base mb-3 text-center" style={{ color: 'var(--sapphire)' }}>Character Cards</h4>
                   <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
                     {characterCards.map((e) => (
                       <div key={deckKey(e.card)} className="relative w-[160px]">
@@ -617,7 +665,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                           <img 
                             src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
                             alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
+                            className="block w-full h-[224px] object-cover bg-overlay"
                             loading="lazy"
                           />
                         </div>
@@ -696,7 +744,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             if (actionCards.length > 0) {
               return (
                 <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-green-400">Action Cards</h4>
+                  <h4 className="font-display text-base mb-3 text-center" style={{ color: 'var(--emerald)' }}>Action Cards</h4>
                   <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
                     {actionCards.map((e) => (
                       <div key={deckKey(e.card)} className="relative w-[160px]">
@@ -704,7 +752,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                           <img 
                             src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
                             alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
+                            className="block w-full h-[224px] object-cover bg-overlay"
                             loading="lazy"
                           />
                         </div>
@@ -783,7 +831,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             if (songCards.length > 0) {
               return (
                 <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-purple-400">Song Cards</h4>
+                  <h4 className="font-display text-base mb-3 text-center" style={{ color: 'var(--amethyst)' }}>Song Cards</h4>
                   <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
                     {songCards.map((e) => (
                       <div key={deckKey(e.card)} className="relative w-[160px]">
@@ -791,7 +839,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                           <img 
                             src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
                             alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
+                            className="block w-full h-[224px] object-cover bg-overlay"
                             loading="lazy"
                           />
                         </div>
@@ -870,7 +918,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             if (itemCards.length > 0) {
               return (
                 <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-yellow-400">Item Cards</h4>
+                  <h4 className="font-display text-base mb-3 text-center" style={{ color: 'var(--amber)' }}>Item Cards</h4>
                   <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
                     {itemCards.map((e) => (
                       <div key={deckKey(e.card)} className="relative w-[160px]">
@@ -878,7 +926,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                           <img 
                             src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
                             alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
+                            className="block w-full h-[224px] object-cover bg-overlay"
                             loading="lazy"
                           />
                         </div>
@@ -957,7 +1005,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             if (locationCards.length > 0) {
               return (
                 <div className="mb-6">
-                  <h4 className="text-md font-semibold mb-3 text-center text-red-400">Location Cards</h4>
+                  <h4 className="font-display text-base mb-3 text-center" style={{ color: 'var(--ruby)' }}>Location Cards</h4>
                   <div className="grid justify-center gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
                     {locationCards.map((e) => (
                       <div key={deckKey(e.card)} className="relative w-[160px]">
@@ -965,7 +1013,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                           <img 
                             src={e.card.image_url || e.card._imageFromAPI || FALLBACK_IMG} 
                             alt={e.card.name} 
-                            className="block w-full h-[224px] object-cover bg-gray-800"
+                            className="block w-full h-[224px] object-cover bg-overlay"
                             loading="lazy"
                           />
                         </div>
@@ -1045,120 +1093,80 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
         <>
         {/* Basic Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-blue-400">{totalCards}</div>
-            <div className="text-sm text-gray-400">Total Cards</div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-green-400">{totalInkable}</div>
-            <div className="text-sm text-gray-400">Inkable</div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-red-400">{totalUninkable}</div>
-            <div className="text-sm text-gray-400">Uninkable</div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-400">{averageCost.toFixed(1)}</div>
-            <div className="text-sm text-gray-400">Avg Cost</div>
-          </div>
+          {[
+            { label: 'Total Cards', value: totalCards, accent: '--sapphire' },
+            { label: 'Inkable', value: totalInkable, accent: '--emerald' },
+            { label: 'Uninkable', value: totalUninkable, accent: '--ruby' },
+            { label: 'Avg Cost', value: averageCost.toFixed(1), accent: '--amber' },
+          ].map((s) => (
+            <div key={s.label} className="rounded-lg p-4 text-center border border-line bg-raised">
+              <div className="font-display text-2xl tabular-nums" style={{ color: `var(${s.accent})`, fontWeight: 560 }}>{s.value}</div>
+              <div className="text-[11px] uppercase tracking-[0.1em] font-semibold mt-1" style={{ color: 'var(--faint)' }}>{s.label}</div>
+            </div>
+          ))}
         </div>
         
         {/* Deck Health Indicators */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-lg font-semibold mb-2">Deck Size</div>
-            <div className={`text-2xl font-bold ${totalCards >= 60 && totalCards <= 60 ? 'text-green-400' : totalCards >= 55 && totalCards <= 65 ? 'text-yellow-400' : 'text-red-400'}`}>
+          <div className="rounded-lg p-4 text-center border border-line bg-raised">
+            <div className="font-display text-base mb-2" style={{ color: 'var(--text)' }}>Deck Size</div>
+            <div className="text-2xl font-bold tabular-nums" style={{ color: totalCards === 60 ? 'var(--emerald)' : totalCards >= 55 && totalCards <= 65 ? 'var(--amber)' : 'var(--ruby)' }}>
               {totalCards}/60
             </div>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs" style={{ color: 'var(--faint)' }}>
               {totalCards === 60 ? 'Perfect!' : totalCards >= 55 && totalCards <= 65 ? 'Close' : 'Needs adjustment'}
             </div>
           </div>
-          
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-lg font-semibold mb-2">Inkable Ratio</div>
-            <div className={`text-2xl font-bold ${(totalInkable / totalCards) >= 0.7 ? 'text-green-400' : (totalInkable / totalCards) >= 0.6 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {((totalInkable / totalCards) * 100).toFixed(0)}%
+
+          <div className="rounded-lg p-4 text-center border border-line bg-raised">
+            <div className="font-display text-base mb-2" style={{ color: 'var(--text)' }}>Inkable Ratio</div>
+            <div className="text-2xl font-bold tabular-nums" style={{ color: inkableRatio >= 0.7 ? 'var(--emerald)' : inkableRatio >= 0.6 ? 'var(--amber)' : 'var(--ruby)' }}>
+              {(inkableRatio * 100).toFixed(0)}%
             </div>
-            <div className="text-xs text-gray-400">
-              {(totalInkable / totalCards) >= 0.7 ? 'Good' : (totalInkable / totalCards) >= 0.6 ? 'Acceptable' : 'Low'}
+            <div className="text-xs" style={{ color: 'var(--faint)' }}>
+              {inkableRatio >= 0.7 ? 'Good' : inkableRatio >= 0.6 ? 'Acceptable' : 'Low'}
             </div>
           </div>
-          
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <div className="text-lg font-semibold mb-2">Cost Balance</div>
-            <div className={`text-2xl font-bold ${averageCost >= 2.5 && averageCost <= 4.5 ? 'text-green-400' : averageCost >= 2.0 && averageCost <= 5.0 ? 'text-yellow-400' : 'text-red-400'}`}>
+
+          <div className="rounded-lg p-4 text-center border border-line bg-raised">
+            <div className="font-display text-base mb-2" style={{ color: 'var(--text)' }}>Cost Balance</div>
+            <div className="text-2xl font-bold tabular-nums" style={{ color: averageCost >= 2.5 && averageCost <= 4.5 ? 'var(--emerald)' : averageCost >= 2.0 && averageCost <= 5.0 ? 'var(--amber)' : 'var(--ruby)' }}>
               {averageCost.toFixed(1)}
             </div>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs" style={{ color: 'var(--faint)' }}>
               {averageCost >= 2.5 && averageCost <= 4.5 ? 'Balanced' : averageCost >= 2.0 && averageCost <= 5.0 ? 'Moderate' : 'Extreme'}
             </div>
           </div>
         </div>
         
-        {/* Cost Curve Chart */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4 text-center">Cost Curve</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart 
-              data={Array.from({ length: 11 }, (_, i) => ({
-                cost: i === 10 ? '10+' : String(i),
-                count: costCurve[i] || 0
-              }))}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="cost" 
-                stroke="#9CA3AF"
-                fontSize={12}
-              />
-              <YAxis 
-                stroke="#9CA3AF"
-                fontSize={12}
-                allowDecimals={false}
-              />
-              <Tooltip 
-                formatter={(value, name) => [value, 'Cards']}
-                labelFormatter={(label) => `Cost ${label}`}
-                contentStyle={{
-                  backgroundColor: '#1F2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  color: '#F9FAFB'
-                }}
-              />
-              <Bar 
-                dataKey="count" 
-                fill="#3B82F6"
-                radius={[4, 4, 0, 0]}
-                className="hover:fill-blue-400 transition-colors"
-              />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Cost Curve Chart — CSS-only, token-colored InkCurve (comp .curve),
+            stacked by the deck's ink colors instead of a single hardcoded blue. */}
+        <div className="rounded-lg p-4 border border-line bg-raised">
+          <h3 className="font-display text-lg mb-4 text-center">Cost Curve</h3>
+          <InkCurve buckets={curveBuckets} height={200} />
         </div>
         
         {/* Type Distribution Pie Chart */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-4 text-center">Card Types</h3>
+          <div className="rounded-lg p-4 border border-line bg-raised">
+            <h3 className="font-display text-lg mb-4 text-center">Card Types</h3>
             <div className="space-y-2">
               {Object.entries(typeDistribution).map(([type, count]) => {
-                const percentage = ((count / totalCards) * 100).toFixed(1);
-                const colors = {
-                  'Character': 'bg-red-500',
-                  'Action': 'bg-blue-500',
-                  'Item': 'bg-green-500',
-                  'Location': 'bg-purple-500',
-                  'Song': 'bg-yellow-500'
+                const percentage = totalCards > 0 ? ((count / totalCards) * 100).toFixed(1) : '0';
+                const typeInk = {
+                  'Character': '--ruby',
+                  'Action': '--sapphire',
+                  'Item': '--emerald',
+                  'Location': '--amethyst',
+                  'Song': '--amber'
                 };
                 return (
                   <div key={type} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${colors[type] || 'bg-gray-500'}`} />
-                      <span className="text-sm">{type}</span>
+                      <div className="w-3 h-3 rounded-full" style={{ background: `var(${typeInk[type] || '--steel'})` }} />
+                      <span className="text-sm" style={{ color: 'var(--text)' }}>{type}</span>
                     </div>
-                    <div className="text-sm font-semibold">{count} ({percentage}%)</div>
+                    <div className="text-sm font-semibold tabular-nums" style={{ color: 'var(--muted)' }}>{count} ({percentage}%)</div>
                   </div>
                 );
               })}
@@ -1166,71 +1174,55 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
           </div>
           
           {/* Ink Color Distribution */}
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-4 text-center">Ink Colors</h3>
+          <div className="rounded-lg p-4 border border-line bg-raised">
+            <h3 className="font-display text-lg mb-4 text-center">Ink Colors</h3>
 
             {Object.keys(inkDistribution).length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={Object.entries(inkDistribution).map(([ink, count]) => ({
-                      name: ink,
-                      value: count
-                    }))}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={80}
-                  >
-                    {Object.entries(inkDistribution).map(([ink, count], index) => {
-                      const colors = {
-                        'Amber': '#f59e0b',
-                        'Amethyst': '#8b5cf6',
-                        'Emerald': '#10b981',
-                        'Ruby': '#ef4444',
-                        'Sapphire': '#3b82f6',
-                        'Steel': '#6b7280',
-                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
-                      };
-                      return (
-                        <Cell key={`cell-${index}`} fill={colors[ink] || '#6b7280'} />
-                      );
-                    })}
-                  </Pie>
-                  <Tooltip formatter={(value, name) => [value, name]} />
-                  
-                  {/* Custom Legend with Percentages */}
-                  <div className="mt-3 flex justify-center gap-4">
-                    {Object.entries(inkDistribution).map(([ink, count], index) => {
-                      // Calculate percentage based on actual deck size, not inflated ink distribution
-                      const percentage = ((count / totalCards) * 100).toFixed(0);
-                      const colors = {
-                        'Amber': '#f59e0b',
-                        'Amethyst': '#8b5cf6',
-                        'Emerald': '#10b981',
-                        'Ruby': '#ef4444',
-                        'Sapphire': '#3b82f6',
-                        'Steel': '#6b7280',
-                        'Dual-Ink': '#f97316' // Orange color for dual-ink cards
-                      };
-                      return (
-                        <div key={index} className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded"
-                            style={{ backgroundColor: colors[ink] || '#6b7280' }}
-                          />
-                          <span className="text-sm text-gray-300">{ink}</span>
-                          <span className="text-sm font-semibold text-gray-100">{percentage}%</span>
-                          <span className="text-xs text-gray-400">({count})</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </PieChart>
-                
+              <>
+                {/* Recharts pie: SVG <Cell> fills can't resolve CSS var(), so
+                    drive them from the tokens' hex values (INK_TOKEN_HEX). */}
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(inkDistribution).map(([ink, count]) => ({
+                        name: ink,
+                        value: count
+                      }))}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                    >
+                      {Object.entries(inkDistribution).map(([ink, count], index) => (
+                        <Cell key={`cell-${index}`} fill={INK_TOKEN_HEX[ink] || INK_TOKEN_HEX.Steel} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [value, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
 
-              </ResponsiveContainer>
+                {/* Bug B fix: this legend used to sit INSIDE <PieChart> (an SVG
+                    subtree) so it never rendered. It's now a sibling of the
+                    chart, and its swatches resolve through the ink tokens. */}
+                <div className="mt-3 flex flex-wrap justify-center gap-4">
+                  {Object.entries(inkDistribution).map(([ink, count], index) => {
+                    // Percentage against actual deck size, not the ink total.
+                    const percentage = totalCards > 0 ? ((count / totalCards) * 100).toFixed(0) : '0';
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded"
+                          style={{ backgroundColor: ink === 'Dual-Ink' ? 'var(--amber)' : inkVar(ink) }}
+                        />
+                        <span className="text-sm" style={{ color: 'var(--muted)' }}>{ink}</span>
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: 'var(--text)' }}>{percentage}%</span>
+                        <span className="text-xs tabular-nums" style={{ color: 'var(--faint)' }}>({count})</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             ) : (
-              <div className="text-center text-gray-400 py-8">
+              <div className="text-center py-8" style={{ color: 'var(--muted)' }}>
                 <p>No ink color data available</p>
                 <p className="text-sm mt-2">Debug: inkDistribution = {JSON.stringify(inkDistribution)}</p>
                 <p className="text-sm mt-2">Total cards: {totalCards}</p>
@@ -1245,7 +1237,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
         {/* Additional Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Cost Analysis - Hidden per user request */}
-          {/* <div className="bg-gray-800 rounded-lg p-4">
+          {/* <div className="rounded-lg p-4 border border-line bg-raised">
             <h4 className="font-semibold mb-2 text-center">Cost Analysis</h4>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
@@ -1263,28 +1255,28 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
             </div>
           </div> */}
           
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h4 className="font-semibold mb-2 text-center">Deck Composition</h4>
-            <div className="space-y-1 text-sm">
+          <div className="rounded-lg p-4 border border-line bg-raised">
+            <h4 className="font-display text-base mb-2 text-center" style={{ color: 'var(--text)' }}>Deck Composition</h4>
+            <div className="space-y-1 text-sm" style={{ color: 'var(--muted)' }}>
               <div className="flex justify-between">
                 <span>Inkable Ratio:</span>
-                <span className="font-semibold">{((totalInkable / totalCards) * 100).toFixed(1)}%</span>
+                <span className="font-semibold tabular-nums" style={{ color: 'var(--text)' }}>{(inkableRatio * 100).toFixed(1)}%</span>
               </div>
               <div className="flex justify-between">
                 <span>Uninkable Ratio:</span>
-                <span className="font-semibold">{((totalUninkable / totalCards) * 100).toFixed(1)}%</span>
+                <span className="font-semibold tabular-nums" style={{ color: 'var(--text)' }}>{(uninkableRatio * 100).toFixed(1)}%</span>
               </div>
               <div className="flex justify-between">
                 <span>Unique Cards:</span>
-                <span className="font-semibold">{entries.length}</span>
+                <span className="font-semibold tabular-nums" style={{ color: 'var(--text)' }}>{entries.length}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* NEW COMPETITIVE ANALYSIS IN DECK MODAL */}
-        <div className="bg-gray-800 rounded-lg p-6 mt-6">
-          <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">🎯 Competitive Analysis</h3>
+        <div className="rounded-lg p-6 mt-6 border border-line bg-raised">
+          <h3 className="font-display text-2xl text-center mb-6" style={{ color: 'var(--emerald)' }}>🎯 Competitive Analysis</h3>
           
           {(() => {
             // Calculate data for competitive analysis in modal
@@ -1801,7 +1793,7 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
         </div>}
         
         {/* Tournament Results Import & Management */}
-        <div className="bg-gray-800 rounded-lg p-6 mt-6">
+        <div className="rounded-lg p-6 mt-6 border border-line bg-raised">
           <TournamentResultsSection 
             deckId={deck.id || 'temp-deck'} 
             deckName={deckName || deck.name}
@@ -1872,8 +1864,8 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                 // Copy deck stats to clipboard
                 const stats = `Deck: ${deck.name}
 Total Cards: ${totalCards}
-Inkable: ${totalInkable} (${((totalInkable / totalCards) * 100).toFixed(1)}%)
-Uninkable: ${totalUninkable} (${((totalUninkable / totalCards) * 100).toFixed(1)}%)
+Inkable: ${totalInkable} (${(inkableRatio * 100).toFixed(1)}%)
+Uninkable: ${totalUninkable} (${(uninkableRatio * 100).toFixed(1)}%)
 Average Cost: ${averageCost.toFixed(1)}
 Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)})
 Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
