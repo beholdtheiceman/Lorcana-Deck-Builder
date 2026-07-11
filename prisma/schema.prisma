@@ -478,3 +478,35 @@ model Submission {
   @@index([submittedAt])
   @@index([tournamentId])
 }
+
+// ---------------------------------------------------------------------------
+// Card catalog (server-side mirror of the Lorcast catalog). ADDITIVE — the
+// live app still fetches cards from Lorcast directly (src/lib/cardsApi.js).
+// This table is populated by a nightly ingest (scripts/ingest-cards.mjs /
+// api/cards/ingest) and backs a future local card-search path. Nothing reads
+// from it yet, so it changes no existing behavior.
+// ---------------------------------------------------------------------------
+
+model Card {
+  id        String   @id                       // Lorcast card id (stable)
+  name      String                             // base name, e.g. "Elsa"
+  version   String?                            // subtitle / version, e.g. "Spirit of Winter"
+  setCode   String                             // canonical set code: "1".."12", "D100", etc.
+  setNum    Int?                               // numeric set index when derivable, else null
+  number    String?                            // collector number within the set
+  cost      Int?                               // ink cost (nullable for resilience)
+  inks      String[]                           // ["Amber"] or dual-ink ["Amber","Steel"]
+  type      String?                            // "Character" / "Action" / "Item" / "Location" / "Song"
+  rarity    String?
+  inkable   Boolean  @default(false)           // can be placed in the inkwell
+  text      String?  @db.Text                  // oracle / body text
+  lore      Int?
+  strength  Int?
+  willpower Int?
+  imageUrl  String?                            // best available digital image URL
+  raw       Json                               // full Lorcast object, for future fields
+  updatedAt DateTime @updatedAt
+
+  @@index([setCode])
+  @@index([name])
+}
