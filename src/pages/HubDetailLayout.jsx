@@ -51,43 +51,95 @@ export default function HubDetailLayout() {
   )
 
   if (error) return (
-    <div className="text-bad text-center py-12">Failed to load hub: {error}</div>
+    <div className="text-center py-12" style={{ color: 'var(--ruby)' }}>Failed to load hub: {error}</div>
   )
 
   if (!hub) return null
 
   const memberCount = (hub.members?.length ?? 0) + 1
+  const crestInitial = (hub.name?.trim()?.[0] || 'U').toUpperCase()
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-4 pb-4 border-b border-line">
-        <h2 className="text-xl font-semibold text-gray-100">{hub.name}</h2>
-        <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
-          {memberCount} member{memberCount !== 1 ? 's' : ''} · Invite:{' '}
-          <span className="font-mono bg-bg-overlay px-1.5 py-0.5 rounded text-gray-300">
-            {hub.inviteCode}
-          </span>
-          <button
-            onClick={() => copyInviteLink(hub.inviteCode)}
-            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+      {/* Header — crest hexagon, Fraunces title, invite chip on the flat canvas */}
+      <div className="flex items-start gap-5 mb-5 pb-5" style={{ borderBottom: '1px solid var(--line)' }}>
+        {/* Crest: hexagon with a conic six-ink gradient and a panel cutout ring */}
+        <div
+          className="relative shrink-0"
+          role="img"
+          aria-label="Team crest"
+          style={{
+            width: 64,
+            height: 72,
+            clipPath: 'var(--hex)',
+            background:
+              'conic-gradient(from 210deg, var(--amber), var(--ruby), var(--amethyst), var(--sapphire), var(--steel), var(--emerald), var(--amber))',
+          }}
+        >
+          <span className="absolute" style={{ inset: 4, clipPath: 'var(--hex)', background: 'var(--panel)' }} />
+          <span
+            className="absolute inset-0 grid place-items-center font-display"
+            style={{ fontWeight: 700, fontSize: 22, color: 'var(--text)' }}
           >
-            {copied ? '✓ Copied!' : 'Copy link'}
-          </button>
-        </p>
+            {crestInitial}
+          </span>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted)' }}>
+            Team Hub
+          </div>
+          <h2
+            className="font-display mt-1 mb-1.5"
+            style={{ fontWeight: 560, fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.01em', color: 'var(--text)' }}
+          >
+            {hub.name}
+          </h2>
+          <p className="text-sm flex items-center gap-2.5 flex-wrap" style={{ color: 'var(--muted)' }}>
+            <span>
+              <b className="tabular-nums" style={{ color: 'var(--text)', fontWeight: 600 }}>{memberCount}</b>
+              {' '}member{memberCount !== 1 ? 's' : ''}
+            </span>
+            <span style={{ color: 'var(--faint)' }}>·</span>
+            <span className="inline-flex items-center gap-1.5">
+              Invite
+              <span
+                className="font-mono text-xs"
+                style={{
+                  color: 'var(--muted)',
+                  border: '1px dashed var(--line-2)',
+                  borderRadius: 'var(--r-sm)',
+                  padding: '2px 9px',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                {hub.inviteCode}
+              </span>
+            </span>
+            <button
+              onClick={() => copyInviteLink(hub.inviteCode)}
+              className="text-xs transition-colors"
+              style={{ color: copied ? 'var(--emerald)' : 'var(--muted)' }}
+              onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = 'var(--text)' }}
+              onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = 'var(--muted)' }}
+            >
+              {copied ? '✓ Copied!' : 'Copy link'}
+            </button>
+          </p>
+        </div>
       </div>
 
-      {/* Sub-nav */}
-      <div className="flex gap-1 border-b border-line mb-6 overflow-x-auto">
+      {/* Sub-nav — quiet muted links, active tab gets the sapphire underline */}
+      <div className="flex gap-1 mb-6 overflow-x-auto" style={{ borderBottom: '1px solid var(--line)' }}>
         {NAV_TABS.map(tab => (
           <NavLink
             key={tab.path}
             to={tab.path}
             className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors duration-fast ${
+              `px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
                 isActive
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
+                  ? 'text-[color:var(--text)] shadow-[inset_0_-2px_0_var(--sapphire)] rounded-t-sm'
+                  : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
               }`
             }
           >
