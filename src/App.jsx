@@ -5483,35 +5483,41 @@ function AppInner() {
     console.log('[App] Decks collection:', decks);
   }, [currentDeckId, deck, decks]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts. The handlers are function declarations recreated every
+  // render (each closing over the current deck/state), so we route through a ref
+  // that is refreshed each render — the listener is bound once but always calls
+  // the latest handler instead of the stale mount-time closure.
+  const shortcutHandlersRef = useRef({});
+  shortcutHandlersRef.current = { handleSaveDeck, handleNewDeck, handleImport, handleExport, handlePrint };
   useEffect(() => {
     const onKey = (e) => {
       if (e.ctrlKey || e.metaKey) {
+        const h = shortcutHandlersRef.current;
         switch (e.key) {
           case 's':
             e.preventDefault();
-            handleSaveDeck();
+            h.handleSaveDeck();
             break;
           case 'n':
             e.preventDefault();
-            handleNewDeck();
+            h.handleNewDeck();
             break;
           case 'o':
             e.preventDefault();
-            handleImport();
+            h.handleImport();
             break;
           case 'e':
             e.preventDefault();
-            handleExport();
+            h.handleExport();
             break;
           case 'p':
             e.preventDefault();
-            handlePrint();
+            h.handlePrint();
             break;
         }
       }
     };
-    
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);

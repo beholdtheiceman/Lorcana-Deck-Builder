@@ -12,16 +12,17 @@ const PatchSchema = z.object({
 const withMembers = { members: { include: { member: { select: { id: true, email: true } } } } };
 
 // PATCH  /api/pods/:id -> rename a pod (any hub member; flat model)
-// DELETE /api/pods/:id -> delete a pod (any hub member)
+// DELETE /api/pods/:id -> delete a pod (creator or hub owner)
 export default withAuth(async (req, res, session) => {
   const userId = session.uid;
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: "Pod id is required" });
 
-  const pod = await prisma.pod.findUnique({ where: { id }, select: { hubId: true } });
+  const pod = await prisma.pod.findUnique({ where: { id }, select: { hubId: true, createdById: true } });
   if (!pod) return res.status(404).json({ error: "Pod not found" });
 
-  if (!(await requireHubMember(pod.hubId, userId, res))) return;
+  const hub = await requireHubMember(pod.hubId, userId, res);
+  if (!hub) return;
 
   if (req.method === "PATCH") {
     const body = req.body ?? (await readJson(req));
@@ -36,6 +37,11 @@ export default withAuth(async (req, res, session) => {
   }
 
   if (req.method === "DELETE") {
+    // Mirror Practice: only the pod's creator or the hub owner may delete it
+    // (previously any hub member could delete any pod).
+    if (pod.createdById !== userId && hub.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the creator or hub owner can delete this pod" });
+    }
     await prisma.pod.delete({ where: { id } });
     return res.status(200).json({ ok: true });
   }

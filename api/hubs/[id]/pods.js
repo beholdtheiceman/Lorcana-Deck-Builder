@@ -38,7 +38,7 @@ export default withAuth(async (req, res, session) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
 
   const pod = await prisma.pod.create({
-    data: { hubId, name: parsed.data.name.trim() },
+    data: { hubId, name: parsed.data.name.trim(), createdById: userId },
     include: withMembers,
   });
 

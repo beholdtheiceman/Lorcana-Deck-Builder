@@ -326,10 +326,11 @@ model EventAttendance {
 // ---------------------------------------------------------------------------
 
 model Pod {
-  id        String   @id @default(uuid())
-  hubId     String
-  name      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  hubId       String
+  name        String
+  createdById String?                          // userId of creator; null = legacy pod or deleted account
+  createdAt   DateTime @default(now())
 
   hub     Hub         @relation(fields: [hubId], references: [id], onDelete: Cascade)
   members PodMember[]
