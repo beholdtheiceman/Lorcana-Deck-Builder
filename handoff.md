@@ -1,31 +1,45 @@
-# HANDOFF — Uninkable overhaul (2026-07-11)
+# HANDOFF — Uninkable overhaul (2026-07-11, session 2)
 
 **Branch:** `feature/uninkable-overhaul`
 
 ## Status
 - **Step 1 (post-mortem):** ✅ `POSTMORTEM.md`. 6 Opus readers; every CRITICAL/HIGH re-verified against real code.
 - **Step 2 (plans):** ✅ `PLANS.md` — P0–P4, each task tiered OPUS_SAFE vs FABLE_SUPERVISED.
-- **Step 3 (execute):** 🔶 ALL CRITICAL + HIGH fixed & committed (P0–P2 hardening). Tests 152/152 throughout. P3 (architecture) + P4 (UI redesign) NOT started.
+- **Step 3 (execute):** 🔶 ALL CRITICAL + HIGH done. P2.9 dead code done. P3.2 (H9) done. P3.3 tokens done. P4.1 primitives done. P4.2 chrome done; **three comp surfaces remain** (hub overview, deck detail hero, Deck Lab). Tests 159/159.
 
 ## Completed & committed on `feature/uninkable-overhaul` (tests green each step)
-- `6360d9f` — **C1** arbitrary deck deletion (IDOR) scoped to hub members; **H1** owner-delete cascade `Cascade→Restrict`.
-- `26aba17` — **C2** dead `user` key → `useAuth()`; **H8** `refreshUser`→`checkAuth`; **H2** digest `playTestGame`→`playtestGame`; **H3** Discord review write DISABLED (per Larry's decision — reject until identity linking exists).
-- `e8abb80` — **C3** text-import ReferenceError fixed; **H4** imports resolve against full catalog (`window.getAllCards`).
-- `b276901` — **H6** removed duplicate inner `ImageCacheProvider`.
-- `cf70136` — **H7** replay list bounded (`take:200`, drops `parsed`) + 64MB gunzip cap; deck POST zod+512KB validation; reset tokens SHA-256 hashed; `RESEND_FROM_EMAIL` guarded; env.example documents 3 vars.
+Session 1 (security/correctness):
+- `6360d9f` — **C1** deck-deletion IDOR scoped; **H1** owner-delete cascade `Cascade→Restrict`.
+- `26aba17` — **C2** dead `user` key; **H8** post-reset login; **H2** digest typo; **H3** Discord review write DISABLED.
+- `e8abb80` — **C3** text-import crash; **H4** imports resolve against full catalog.
+- `b276901` — **H6** duplicate ImageCacheProvider removed.
+- `cf70136` — **H7** replay bounds, deck POST validation, hashed reset tokens, env docs.
+- `8f16288` — **H5** ref-routed keyboard shortcuts; pod delete authz (`Pod.createdById`, creator-or-owner; **needs `db push`**).
+
+Session 2 (architecture + redesign start, all browser-verified via `vite preview`):
+- `27d196f` — **P2.9** dead code deleted: `TeamHub.jsx` overlay (unreachable — TopBar never rendered its button; routed `HubListPage` is canonical), `DeckViewModal.jsx` (no importers), ImportModal saved-decks section (read a LS key nothing writes). `/api/results` intentionally KEPT — sole write path for `TournamentResult`, which agent tool `search_tournament_results` reads.
+- `f5579b0` — **P3.2 / H9** circular import broken. Extracted verbatim from App.jsx: `src/lib/cardUtils.js` (pure helpers, merged into existing M5 slice), `src/components/ui/{Section,Pill,WinRateBar,Modal}.jsx`, `src/components/deckCharts.jsx` (curve/draw-prob/simulator/hover-stats), `src/components/TournamentResults.jsx`, `src/contexts/ToastContext.jsx`. App.jsx has ZERO named exports now; 9.4k → 5.6k lines. ⚠️ Gotcha hit: `src/lib/cardUtils.js` and `src/components/ui/` **already existed** — merged, not clobbered (a scripted write briefly clobbered cardUtils; restored from git).
+- `40104be` — **P3.3** `src/tokens.css` single token source (comps' values verbatim: `--canvas #101114`, panels, six inks, Fraunces/Instrument Sans, radii, `--hex`). index.css/styles.css drop their duplicate `:root`s + purple gradients; tailwind.config consumes the vars. **Visible change:** app background is now the flat quiet canvas, headings are Fraunces.
+- `f66d5f5` — **P4.1** primitives in `src/components/ui/`: HexGlyph, CostHex, InkLedger, Panel, InkCurve, InkSplitBar (+ `inks.js` ink→var map); Button primary violet→sapphire. Approved comps copied INTO the repo at `design/comps/` (were only in a temp scratchpad). 7 new tests.
+- `a3691f8` — **P4.2a** shared topbar chrome per comps: Fraunces "Uninkable" wordmark + two-ink hexmark, quiet nav with sapphire active underline. (Wordmark renamed from "Team Lorcana" — matches comps + domain; flag if unwanted.)
 
 ## Still open (NOT done)
-- **H5** stale-closure keyboard shortcuts (`App.jsx` keydown effect `deps:[]`) — FABLE, monolith.
-- **H9** circular import: `DeckPresentationView.jsx` imports 14 symbols from `App.jsx` — prereq for any monolith split (P3.2).
-- **P2 remainder:** pod delete guard (needs `Pod.createdById` schema field), rate limiting (BLOCKED — needs Upstash creds, see prior handoff §1), dead-code removal (`DeckViewModal.jsx`, `TeamHub.jsx` vs `HubListPage`, `savedLorcanaDecks` section, `/api/results` wire-or-delete), MEDIUM/LOW backlog in `POSTMORTEM.md §3-5`.
-- **JSZip zip-member decompression** still unbounded in `replayParse.js` (no simple cap API) — follow-up.
-- **P3 architecture:** LLM gateway (P3.1). NOTE (corrected 2026-07-11): the coach WORKS in production, so `claude-sonnet-5` + `thinking:{type:"adaptive"}` are accepted at runtime — an earlier draft of this handoff wrongly called those params a likely bug; retracted. The prior session's "coach failed" symptom was already fixed by the recent Sonnet-5 commits (drop temperature, token budgets, disable thinking on strict-JSON calls). Real remaining item here is TECH DEBT, not a bug: installed `@anthropic-ai/sdk` is `0.30.1` vs latest `0.111.0`; a gateway module (one client + params in one place) plus an optional SDK bump would consolidate the 5 scattered call sites. Not urgent, not breaking. If touched, verify against prod (local `.env` has no `ANTHROPIC_API_KEY`).
-  - Also in P3: resolve H9 (circular import), single `tokens.css` (⚠️ changes the app's visible background — needs browser verification), card-DB + deck-versioning (large — spec separately).
-- **P4 UI redesign:** three approved comps (deck detail, Team Hub, Deck Lab) — build on P3 tokens.
+- **P4.2 remainder — the three comp surfaces**, in rough order of leverage:
+  1. **Hub overview** (`HubOverviewPage` + `HubDetailLayout`) per `design/comps/uninkable-team-hub-comp.html` — crest hex, roster pills, events, activity feed, gauntlet coverage, digest panel.
+  2. **Deck detail** per `uninkable-deck-detail-comp.html` — hero (serif title, stat row, InkLedger, actions), grouped card-list rows with CostHex, side rail (InkCurve/InkSplitBar/coach panel). Applies to `DeckPresentationView` and/or a hub deck page.
+  3. **Deck Lab** (App.jsx builder) per `uninkable-deck-lab-comp.html` — biggest; monolith.
+  The new ui/ primitives cover the shared pieces; each surface is FABLE layout judgment + browser verification. Old Tailwind gray/violet classNames remain on unrestyled surfaces (they read fine on the new canvas, just not comp-styled yet).
+- **Rate limiting (P2.6)** — still BLOCKED on Upstash creds (prior handoff §1).
+- **JSZip zip-member decompression** unbounded in `replayParse.js` — follow-up.
+- **P3.1 LLM gateway** — tech debt only (coach works in prod; SDK 0.30.1 vs 0.111.0; 5 scattered call sites). If touched, verify against prod (local `.env` has no `ANTHROPIC_API_KEY`).
+- **P3.4 card-DB + deck versioning** — large; spec separately.
+- MEDIUM/LOW backlog in `POSTMORTEM.md §3-5`.
+- `ui/Toast*.jsx` + `ui/useToast.js` are an UNUSED parallel toast system (live one is `src/contexts/ToastContext.jsx`) — candidates for deletion or convergence during P4.
 
 ## Open questions / judgment calls
-- **Deploy:** everything is on the feature branch; the schema change (H1) isn't live until a DB `db push`/migration. No prod deploy without Larry's explicit "deploy".
-- **Cost:** session reached ~$142 (6 Opus post-mortem readers + 2 Opus fix batches were the bulk). Paused before P3/P4 pending Larry's call on how far to push — those are realistically multi-session efforts.
+- **Deploy:** nothing deployed. Two schema changes now pending a `db push` (H1 Restrict + `Pod.createdById`). No prod deploy without Larry's explicit "deploy".
+- **Design direction check:** the token swap (quiet #101114 canvas, Fraunces headings, no purple) is now app-wide. Worth Larry eyeballing `npx vite preview` before the three big surface restyles proceed.
+- **Verify tooling note:** `.claude/launch.json` gained a "vite preview" config (port 4173). Browser screenshots timed out in this session's pane; verification used computed-style/JS/page-text checks instead.
 
 ## Notes
 - Commit per cluster, explicit pathspecs (never `git add -A`), author `sportlarry@gmail.com`. Keep `.claude/` untracked.
