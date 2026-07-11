@@ -54,7 +54,6 @@ import {
 
 // Authentication components
 import AuthButton from './components/AuthButton';
-import TeamHub from './components/TeamHub';
 import DeckStatistics from './components/DeckStats';
 import DeckPresentationView from './components/DeckPresentationView';
 
@@ -2180,7 +2179,7 @@ function filterReducer(state, action) {
 
 // Header & topbar -------------------------------------------------------------
 
-function TopBar({ onResetDeck, onExport, onImport, onPrint, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager, onTeamHub }) {
+function TopBar({ onResetDeck, onExport, onImport, onPrint, onSaveDeck, onToggleFilters, searchText, onSearchChange, onNewDeck, onDeckManager }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[#0a0d13]/70 border-b border-white/10 sticky top-0 z-40 backdrop-blur">
       {/* Search bar - always visible */}
@@ -4348,95 +4347,10 @@ return (
 function ImportModal({ open, onClose, onImport }) {
   const [text, setText] = useState("");
   const [importFormat, setImportFormat] = useState("json");
-  const [savedDecks, setSavedDecks] = useState([]);
-  const [showSavedDecks, setShowSavedDecks] = useState(false);
-  
-  // Load saved decks when modal opens
-  useEffect(() => {
-    if (open) {
-      const saved = JSON.parse(localStorage.getItem('savedLorcanaDecks') || '[]');
-      setSavedDecks(saved);
-    }
-  }, [open]);
-  
-  const handleLoadSavedDeck = (savedDeck) => {
-    // Convert saved deck format back to app format
-    const convertedDeck = {
-      name: savedDeck.name,
-      entries: {},
-      total: 0
-    };
-    
-    savedDeck.entries.forEach(entry => {
-      const cardKey = `${entry.card.name}-${entry.card.set}-${entry.card.number}`;
-      convertedDeck.entries[cardKey] = {
-        card: entry.card,
-        count: entry.count
-      };
-      convertedDeck.total += entry.count;
-    });
-    
-    onImport(convertedDeck);
-    onClose();
-  };
-  
-  const handleDeleteSavedDeck = (deckId) => {
-    if (confirm('Are you sure you want to delete this saved deck?')) {
-      const updatedDecks = savedDecks.filter(d => d.id !== deckId);
-      localStorage.setItem('savedLorcanaDecks', JSON.stringify(updatedDecks));
-      setSavedDecks(updatedDecks);
-    }
-  };
-  
+
   return (
     <Modal open={open} onClose={onClose} title="Import Deck" size="lg">
       <div className="space-y-4">
-        {/* Saved Decks Section */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold">Saved Decks</h3>
-            <button
-              onClick={() => setShowSavedDecks(!showSavedDecks)}
-              className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm"
-            >
-              {showSavedDecks ? 'Hide' : 'Show'} Saved Decks
-            </button>
-          </div>
-          
-          {showSavedDecks && (
-            <div className="space-y-2">
-              {savedDecks.length === 0 ? (
-                <p className="text-gray-400 text-sm">No saved decks found.</p>
-              ) : (
-                savedDecks.map(deck => (
-                  <div key={deck.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-semibold">{deck.name}</div>
-                      <div className="text-sm text-gray-400">
-                        {deck.entries.length} unique cards • Saved {new Date(deck.savedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleLoadSavedDeck(deck)}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-sm"
-                      >
-                        Load
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSavedDeck(deck.id)}
-                        className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-        
         {/* Import Section */}
         <div className="bg-gray-800 rounded-lg p-4">
           <h3 className="text-lg font-semibold mb-3">Import Deck</h3>
@@ -5256,7 +5170,6 @@ function AppInner() {
       setSearchParams({}, { replace: true });
     }
   }, []);
-  const [showTeamHub, setShowTeamHub] = useState(false);
 
   // Add batch image loader
   const { loadImagesInBatch } = useBatchImageLoader();
@@ -6308,8 +6221,6 @@ useEffect(() => {
             onSearchChange={(text) => filterDispatch({ type: "SET_TEXT", text })}
             onNewDeck={handleNewDeck}
             onDeckManager={() => setShowDeckManager(true)}
-            onTeamHub={() => setShowTeamHub(true)}
-
           />
 
           {/* Essential Quick Filters */}
@@ -6803,25 +6714,6 @@ useEffect(() => {
   onRenameDeck={handleRenameDeck}
 />
 
-{/* Team Hub */}
-{showTeamHub && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-      <div className="flex justify-between items-center p-4 border-b border-white/10 flex-shrink-0">
-        <h2 className="text-xl font-semibold text-white">Team Hub</h2>
-        <button
-          onClick={() => setShowTeamHub(false)}
-          className="text-gray-400 hover:text-white text-2xl font-bold"
-        >
-          ×
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <TeamHub />
-      </div>
-    </div>
-  </div>
-)}
         </>
       </div>
 );
