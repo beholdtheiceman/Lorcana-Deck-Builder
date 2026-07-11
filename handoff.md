@@ -19,7 +19,8 @@
 - **H9** circular import: `DeckPresentationView.jsx` imports 14 symbols from `App.jsx` — prereq for any monolith split (P3.2).
 - **P2 remainder:** pod delete guard (needs `Pod.createdById` schema field), rate limiting (BLOCKED — needs Upstash creds, see prior handoff §1), dead-code removal (`DeckViewModal.jsx`, `TeamHub.jsx` vs `HubListPage`, `savedLorcanaDecks` section, `/api/results` wire-or-delete), MEDIUM/LOW backlog in `POSTMORTEM.md §3-5`.
 - **JSZip zip-member decompression** still unbounded in `replayParse.js` (no simple cap API) — follow-up.
-- **P3 architecture:** LLM gateway (P3.1, first CONFIRM `claude-sonnet-5`+`adaptive` thinking are valid for the installed SDK — `POSTMORTEM.md §8`), resolve H9, single `tokens.css`, card-DB + deck-versioning (large — spec separately).
+- **P3 architecture:** LLM gateway (P3.1). ⚠️ FINDING (verified 2026-07-11): installed `@anthropic-ai/sdk` is `0.30.1` — it has NO `thinking` param support at all (latest is `0.111.0`), yet `api/_lib/agent.js:73` sends `thinking:{type:"adaptive"}` and reviewLlm/reports send `adaptive` too. `"adaptive"` is not a documented thinking type (API wants `{type:"enabled",budget_tokens:N}` or `disabled`). This likely IS the "coach tried but failed" symptom from the prior session. FIX (needs a live API key to verify — not available locally): upgrade the SDK to current, then either use `{type:"enabled",budget_tokens:N}` or drop `thinking`; fold into the P3.1 gateway (one client + params in one module). Do NOT change blind — test with `ANTHROPIC_API_KEY` set.
+  - Also in P3: resolve H9 (circular import), single `tokens.css` (⚠️ changes the app's visible background — needs browser verification), card-DB + deck-versioning (large — spec separately).
 - **P4 UI redesign:** three approved comps (deck detail, Team Hub, Deck Lab) — build on P3 tokens.
 
 ## Open questions / judgment calls
