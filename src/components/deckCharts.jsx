@@ -14,6 +14,25 @@ import {
   Line,
 } from "recharts";
 
+// Design-token hex values for Recharts. Recharts writes fill/stroke as SVG
+// presentation attributes where a plain var() does NOT resolve, so we mirror
+// the ink + surface tokens from src/tokens.css here as literal hex/rgba.
+const INK_HEX = {
+  amber: "#f4b223",
+  amethyst: "#9b59d0",
+  emerald: "#2ecc71",
+  ruby: "#e74c5e",
+  sapphire: "#3aa0e0",
+  steel: "#9aa7b8",
+};
+const CHART = {
+  text: "#e9e7e2",   // --text
+  muted: "#9a978f",  // --muted
+  faint: "#6b6963",  // --faint
+  panel2: "#1d1f24", // --panel-2
+  line: "rgba(255,255,255,.13)", // --line-2
+};
+
 // Enhanced Curve Chart with Meta Comparison
 function EnhancedCurveChart({ data }) {
   const [showMeta, setShowMeta] = useState(false);
@@ -21,10 +40,10 @@ function EnhancedCurveChart({ data }) {
   
   const archetypes = ['aggro', 'midrange', 'control', 'ramp'];
   const archetypeColors = {
-    aggro: '#ef4444',
-    midrange: '#3b82f6', 
-    control: '#8b5cf6',
-    ramp: '#10b981'
+    aggro: INK_HEX.ruby,
+    midrange: INK_HEX.sapphire,
+    control: INK_HEX.amethyst,
+    ramp: INK_HEX.emerald
   };
 
   return (
@@ -32,21 +51,23 @@ function EnhancedCurveChart({ data }) {
       {/* Controls */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
-          <input 
+          <input
             type="checkbox"
             id="show-meta"
             checked={showMeta}
             onChange={(e) => setShowMeta(e.target.checked)}
-            className="rounded bg-gray-800 border-white/10"
+            className="rounded"
+            style={{ accentColor: 'var(--sapphire)' }}
           />
-          <label htmlFor="show-meta" className="text-gray-300">Show meta curve</label>
+          <label htmlFor="show-meta" style={{ color: 'var(--muted)' }}>Show meta curve</label>
         </div>
-        
+
         {showMeta && (
-          <select 
+          <select
             value={selectedArchetype}
             onChange={(e) => setSelectedArchetype(e.target.value)}
-            className="bg-gray-800 rounded px-2 py-1 text-xs border border-white/10"
+            className="rounded px-2 py-1 text-xs border"
+            style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
           >
             {archetypes.map(arch => (
               <option key={arch} value={arch}>
@@ -60,20 +81,20 @@ function EnhancedCurveChart({ data }) {
       {/* Chart */}
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="cost" />
-          <YAxis allowDecimals={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART.line} />
+          <XAxis dataKey="cost" stroke={CHART.faint} tick={{ fill: CHART.faint, fontSize: 12 }} />
+          <YAxis allowDecimals={false} stroke={CHART.faint} tick={{ fill: CHART.faint, fontSize: 12 }} />
           <Tooltip content={({ active, payload, label }) => {
             if (active && payload && payload.length > 0) {
               const data = payload[0].payload;
               return (
-                <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-                  <p className="text-white font-semibold">Cost {label}</p>
-                  <p className="text-emerald-400">Inkable: {data.inkable}</p>
-                  <p className="text-amber-400">Uninkable: {data.uninkable}</p>
-                  <p className="text-gray-300">Total: {data.total}</p>
+                <div className="rounded-lg p-3 shadow-lg border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)' }}>
+                  <p className="font-semibold" style={{ color: 'var(--text)' }}>Cost {label}</p>
+                  <p style={{ color: 'var(--emerald)' }}>Inkable: {data.inkable}</p>
+                  <p style={{ color: 'var(--amber)' }}>Uninkable: {data.uninkable}</p>
+                  <p style={{ color: 'var(--muted)' }}>Total: {data.total}</p>
                   {showMeta && (
-                    <p className="text-blue-400 mt-1">
+                    <p className="mt-1" style={{ color: 'var(--sapphire)' }}>
                       Meta ({selectedArchetype}): {Math.round(data[`meta_${selectedArchetype}`] || 0)}
                     </p>
                   )}
@@ -82,9 +103,9 @@ function EnhancedCurveChart({ data }) {
             }
             return null;
           }} />
-          <Legend />
-          <Bar dataKey="inkable" stackId="deck" fill="#10b981" name="Inkable" />
-          <Bar dataKey="uninkable" stackId="deck" fill="#f59e0b" name="Uninkable" />
+          <Legend wrapperStyle={{ color: CHART.muted, fontSize: 12 }} />
+          <Bar dataKey="inkable" stackId="deck" fill={INK_HEX.emerald} name="Inkable" />
+          <Bar dataKey="uninkable" stackId="deck" fill={INK_HEX.amber} name="Uninkable" />
           {showMeta && (
             <Bar 
               dataKey={`meta_${selectedArchetype}`} 
@@ -99,7 +120,7 @@ function EnhancedCurveChart({ data }) {
       </ResponsiveContainer>
       
       {showMeta && (
-        <div className="text-xs text-gray-400 mt-2">
+        <div className="text-xs mt-2" style={{ color: 'var(--faint)' }}>
           Meta curve scaled to your deck size. Overlay shows ideal distribution for {selectedArchetype} archetype.
         </div>
       )}
@@ -277,16 +298,17 @@ function DrawProbabilityTool({ deck }) {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-gray-300 mb-3">
+      <div className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
         Calculate the probability of drawing a specific card by a target turn.
       </div>
-      
+
       <div className="grid md:grid-cols-2 gap-4">
         {/* Card Selection */}
         <div>
-          <label className="block text-xs uppercase text-gray-400 mb-1">Select Card</label>
-          <select 
-            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
+          <label className="block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>Select Card</label>
+          <select
+            className="w-full rounded px-2 py-1 text-sm border"
+            style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
             value={selectedCard}
             onChange={(e) => setSelectedCard(e.target.value)}
           >
@@ -301,9 +323,10 @@ function DrawProbabilityTool({ deck }) {
 
         {/* Turn Selection */}
         <div>
-          <label className="block text-xs uppercase text-gray-400 mb-1">Target Turn</label>
-          <select 
-            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
+          <label className="block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>Target Turn</label>
+          <select
+            className="w-full rounded px-2 py-1 text-sm border"
+            style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
             value={targetTurn}
             onChange={(e) => setTargetTurn(parseInt(e.target.value))}
           >
@@ -317,27 +340,29 @@ function DrawProbabilityTool({ deck }) {
       </div>
 
       {/* Mulligan Options */}
-      <div className="bg-gray-700 rounded-lg p-3">
+      <div className="rounded-lg p-3 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
         <div className="flex items-center gap-2 mb-3">
-          <input 
-            type="checkbox" 
-            id="mulligan" 
+          <input
+            type="checkbox"
+            id="mulligan"
             checked={withMulligan}
             onChange={(e) => setWithMulligan(e.target.checked)}
-            className="rounded bg-gray-800 border-white/10"
+            className="rounded"
+            style={{ accentColor: 'var(--sapphire)' }}
           />
-          <label htmlFor="mulligan" className="text-sm text-gray-300">
+          <label htmlFor="mulligan" className="text-sm" style={{ color: 'var(--muted)' }}>
             Include mulligan opportunity
           </label>
         </div>
-        
+
         {withMulligan && (
           <div>
-            <label className="block text-xs uppercase text-gray-400 mb-1">
+            <label className="block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>
               Cards to Mulligan
             </label>
-            <select 
-              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
+            <select
+              className="w-full rounded px-2 py-1 text-sm border"
+              style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
               value={mulliganCount}
               onChange={(e) => setMulliganCount(parseInt(e.target.value))}
             >
@@ -347,7 +372,7 @@ function DrawProbabilityTool({ deck }) {
                 </option>
               ))}
             </select>
-            <div className="text-xs text-gray-400 mt-1">
+            <div className="text-xs mt-1" style={{ color: 'var(--faint)' }}>
               Assumes optimal mulligan decision for target card
             </div>
           </div>
@@ -355,27 +380,29 @@ function DrawProbabilityTool({ deck }) {
       </div>
 
       {/* Monte Carlo Simulation Options */}
-      <div className="bg-gray-700 rounded-lg p-3">
+      <div className="rounded-lg p-3 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
         <div className="flex items-center gap-2 mb-3">
-          <input 
-            type="checkbox" 
-            id="monte-carlo" 
+          <input
+            type="checkbox"
+            id="monte-carlo"
             checked={useMonteCarloSim}
             onChange={(e) => setUseMonteCarloSim(e.target.checked)}
-            className="rounded bg-gray-800 border-white/10"
+            className="rounded"
+            style={{ accentColor: 'var(--sapphire)' }}
           />
-          <label htmlFor="monte-carlo" className="text-sm text-gray-300">
+          <label htmlFor="monte-carlo" className="text-sm" style={{ color: 'var(--muted)' }}>
             🎲 Use Monte Carlo simulation
           </label>
         </div>
-        
+
         {useMonteCarloSim && (
           <div>
-            <label className="block text-xs uppercase text-gray-400 mb-1">
+            <label className="block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>
               Number of Simulations
             </label>
-            <select 
-              className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
+            <select
+              className="w-full rounded px-2 py-1 text-sm border"
+              style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
               value={simulations}
               onChange={(e) => setSimulations(parseInt(e.target.value))}
             >
@@ -384,7 +411,7 @@ function DrawProbabilityTool({ deck }) {
               <option value={50000}>50,000 (Accurate)</option>
               <option value={100000}>100,000 (High Precision)</option>
             </select>
-            <div className="text-xs text-gray-400 mt-1">
+            <div className="text-xs mt-1" style={{ color: 'var(--faint)' }}>
               Higher simulation count = more accurate results but slower calculation
             </div>
           </div>
@@ -393,42 +420,42 @@ function DrawProbabilityTool({ deck }) {
 
       {/* Results */}
       {selectedCard && (
-        <div className="bg-gray-700 rounded-lg p-4 mt-4">
-          <h4 className="font-semibold mb-3 text-emerald-300">
+        <div className="rounded-lg p-4 mt-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+          <h4 className="font-display mb-3" style={{ fontWeight: 560, color: 'var(--emerald)' }}>
             Probability Results for "{selectedCard}" {useMonteCarloSim ? '🎲' : '🧮'}
           </h4>
-          <div className="text-xs text-gray-400 mb-3">
-            {useMonteCarloSim ? 
-              `Monte Carlo simulation with ${simulations.toLocaleString()} runs` : 
+          <div className="text-xs mb-3" style={{ color: 'var(--faint)' }}>
+            {useMonteCarloSim ?
+              `Monte Carlo simulation with ${simulations.toLocaleString()} runs` :
               'Hypergeometric probability calculation'
             }
           </div>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text)' }}>
                 {openingHandProb.toFixed(1)}%
               </div>
-              <div className="text-gray-400">Opening Hand</div>
+              <div style={{ color: 'var(--faint)' }}>Opening Hand</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text)' }}>
                 {targetTurnProb.toFixed(1)}%
               </div>
-              <div className="text-gray-400">By Turn {targetTurn}</div>
+              <div style={{ color: 'var(--faint)' }}>By Turn {targetTurn}</div>
             </div>
             {withMulligan && (
               <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-400">
+                <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--emerald)' }}>
                   {finalProb.toFixed(1)}%
                 </div>
-                <div className="text-gray-400">
+                <div style={{ color: 'var(--faint)' }}>
                   With Mulligan ({mulliganCount} cards)
                 </div>
               </div>
             )}
           </div>
-          
-          <div className="mt-3 text-xs text-gray-400">
+
+          <div className="mt-3 text-xs" style={{ color: 'var(--faint)' }}>
             <div>• Deck size: {deckSize} cards</div>
             <div>• Copies in deck: {cardCopies}</div>
             <div>• Cards drawn by turn {targetTurn}: {Math.min(7 + (targetTurn - 1), deckSize)}</div>
@@ -436,10 +463,10 @@ function DrawProbabilityTool({ deck }) {
               <div>• Mulligan strategy: Keep {7 - mulliganCount}, redraw {mulliganCount}</div>
             )}
           </div>
-          
+
           {/* Turn-by-Turn Probability Curve */}
-          <div className="mt-4 pt-4 border-t border-gray-600">
-            <h5 className="text-sm font-semibold mb-3 text-emerald-300">📈 Probability Curve (Turn 1-10)</h5>
+          <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--line)' }}>
+            <h5 className="text-sm font-display mb-3" style={{ fontWeight: 560, color: 'var(--emerald)' }}>📈 Probability Curve (Turn 1-10)</h5>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={(() => {
@@ -506,35 +533,35 @@ function DrawProbabilityTool({ deck }) {
                   }
                   return curveData;
                 })()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="turn" stroke="#9CA3AF" fontSize={12} />
-                  <YAxis stroke="#9CA3AF" fontSize={12} domain={[0, 100]} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#374151', border: 'none', borderRadius: '6px' }}
-                    labelStyle={{ color: '#E5E7EB' }}
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART.line} />
+                  <XAxis dataKey="turn" stroke={CHART.faint} fontSize={12} tick={{ fill: CHART.faint }} />
+                  <YAxis stroke={CHART.faint} fontSize={12} tick={{ fill: CHART.faint }} domain={[0, 100]} label={{ value: '%', angle: -90, position: 'insideLeft', fill: CHART.faint }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: CHART.panel2, border: `1px solid ${CHART.line}`, borderRadius: '6px' }}
+                    labelStyle={{ color: CHART.text }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="baseProb" 
-                    stroke="#60A5FA" 
+                  <Line
+                    type="monotone"
+                    dataKey="baseProb"
+                    stroke={INK_HEX.sapphire}
                     strokeWidth={2}
                     name="Base Probability"
-                    dot={{ fill: '#60A5FA', strokeWidth: 2, r: 3 }}
+                    dot={{ fill: INK_HEX.sapphire, strokeWidth: 2, r: 3 }}
                   />
                   {withMulligan && (
-                    <Line 
-                      type="monotone" 
-                      dataKey="withMulligan" 
-                      stroke="#10B981" 
+                    <Line
+                      type="monotone"
+                      dataKey="withMulligan"
+                      stroke={INK_HEX.emerald}
                       strokeWidth={2}
                       name={`With Mulligan (${mulliganCount} cards)`}
-                      dot={{ fill: '#10B981', strokeWidth: 2, r: 3 }}
+                      dot={{ fill: INK_HEX.emerald, strokeWidth: 2, r: 3 }}
                     />
                   )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <div className="text-xs text-gray-400 mt-2">
+            <div className="text-xs mt-2" style={{ color: 'var(--faint)' }}>
               Shows cumulative probability of drawing "{selectedCard}" by each turn
             </div>
           </div>
@@ -643,34 +670,36 @@ function DrawSimulator({ deck }) {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-gray-300 mb-3">
+      <div className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
         Simulate drawing cards turn by turn to analyze consistency and curve performance.
       </div>
-      
+
       {/* Controls */}
       <div className="grid md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs uppercase text-gray-400 mb-1">
+          <label className="block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>
             Simulate turns (1-{maxTurns})
           </label>
-          <input 
-            type="range" 
-            min="3" 
-            max="10" 
+          <input
+            type="range"
+            min="3"
+            max="10"
             value={maxTurns}
             onChange={(e) => setMaxTurns(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+            style={{ background: 'var(--panel-2)', accentColor: 'var(--sapphire)' }}
           />
         </div>
-        
+
         <div>
-          <label className="block text-xs uppercase text-gray-400 mb-1">
+          <label className="block text-[11px] uppercase tracking-[0.1em] font-semibold mb-1" style={{ color: 'var(--faint)' }}>
             Number of simulations
           </label>
-          <select 
+          <select
             value={numSimulations}
             onChange={(e) => setNumSimulations(parseInt(e.target.value))}
-            className="w-full bg-gray-800 rounded px-2 py-1 text-sm border border-white/10"
+            className="w-full rounded px-2 py-1 text-sm border"
+            style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
           >
             <option value={1}>1 (Preview)</option>
             <option value={10}>10 (Quick)</option>
@@ -678,12 +707,13 @@ function DrawSimulator({ deck }) {
             <option value={1000}>1000 (Precise)</option>
           </select>
         </div>
-        
+
         <div className="flex items-end">
           <button
             onClick={runSimulation}
             disabled={isSimulating || deckCards.length === 0}
-            className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white rounded-lg text-sm font-medium"
+            className="w-full px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40 transition hover:brightness-110"
+            style={{ background: 'var(--sapphire)', color: '#0b1620' }}
           >
             {isSimulating ? 'Simulating...' : 'Run Simulation'}
           </button>
@@ -695,8 +725,8 @@ function DrawSimulator({ deck }) {
         <div className="space-y-4">
           {numSimulations === 1 ? (
             // Single simulation - show detailed turn-by-turn
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h4 className="font-semibold mb-3 text-emerald-300">Detailed Simulation Result</h4>
+            <div className="rounded-lg p-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+              <h4 className="font-display mb-3" style={{ fontWeight: 560, color: 'var(--emerald)' }}>Detailed Simulation Result</h4>
               {/* 6-column turn table doesn't reflow to a single column sensibly
                   (each column is a different stat for the same turn), so it
                   scrolls horizontally in its own box on narrow viewports
@@ -704,29 +734,29 @@ function DrawSimulator({ deck }) {
               <div className="overflow-x-auto">
                 <div className="space-y-2 min-w-[480px]">
                   {simulationResults[0].map(turn => (
-                    <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm border-b border-gray-600 pb-2">
+                    <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm border-b pb-2" style={{ borderColor: 'var(--line)', color: 'var(--text)' }}>
                       <div className="text-center">
                         <div className="font-medium">Turn {turn.turn}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gray-400">Hand</div>
-                        <div>{turn.handSize}</div>
+                        <div style={{ color: 'var(--faint)' }}>Hand</div>
+                        <div className="tabular-nums">{turn.handSize}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gray-400">Playable</div>
-                        <div className="text-emerald-400">{turn.playableCards}</div>
+                        <div style={{ color: 'var(--faint)' }}>Playable</div>
+                        <div className="tabular-nums" style={{ color: 'var(--emerald)' }}>{turn.playableCards}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gray-400">Uninkable</div>
-                        <div className="text-amber-400">{turn.uninkableCards}</div>
+                        <div style={{ color: 'var(--faint)' }}>Uninkable</div>
+                        <div className="tabular-nums" style={{ color: 'var(--amber)' }}>{turn.uninkableCards}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gray-400">Curve Hits</div>
-                        <div className="text-blue-400">{turn.curveHits}</div>
+                        <div style={{ color: 'var(--faint)' }}>Curve Hits</div>
+                        <div className="tabular-nums" style={{ color: 'var(--sapphire)' }}>{turn.curveHits}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gray-400">Avg Cost</div>
-                        <div>{turn.averageCost}</div>
+                        <div style={{ color: 'var(--faint)' }}>Avg Cost</div>
+                        <div className="tabular-nums">{turn.averageCost}</div>
                       </div>
                     </div>
                   ))}
@@ -735,15 +765,15 @@ function DrawSimulator({ deck }) {
             </div>
           ) : (
             // Multiple simulations - show averages
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h4 className="font-semibold mb-3 text-emerald-300">
+            <div className="rounded-lg p-4 border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
+              <h4 className="font-display mb-3" style={{ fontWeight: 560, color: 'var(--emerald)' }}>
                 Average Results ({numSimulations} simulations)
               </h4>
               {/* Same rationale as the detailed table above: scrolls in its
                   own box on narrow viewports rather than breaking page layout. */}
               <div className="overflow-x-auto">
                 <div className="space-y-2 min-w-[480px]">
-                  <div className="grid grid-cols-6 gap-2 text-xs text-gray-400 border-b border-gray-600 pb-1">
+                  <div className="grid grid-cols-6 gap-2 text-[11px] uppercase tracking-[0.1em] font-semibold border-b pb-1" style={{ color: 'var(--faint)', borderColor: 'var(--line)' }}>
                     <div className="text-center">Turn</div>
                     <div className="text-center">Hand Size</div>
                     <div className="text-center">Playable</div>
@@ -752,21 +782,21 @@ function DrawSimulator({ deck }) {
                     <div className="text-center">Avg Cost</div>
                   </div>
                   {averageResults.map(turn => (
-                    <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm">
-                      <div className="text-center font-medium">{turn.turn}</div>
-                      <div className="text-center">{turn.avgHandSize}</div>
-                      <div className="text-center text-emerald-400">{turn.avgPlayable}</div>
-                      <div className="text-center text-amber-400">{turn.avgUninkable}</div>
-                      <div className="text-center text-blue-400">{turn.avgCurveHits}</div>
-                      <div className="text-center">{turn.avgCost}</div>
+                    <div key={turn.turn} className="grid grid-cols-6 gap-2 text-sm" style={{ color: 'var(--text)' }}>
+                      <div className="text-center font-medium tabular-nums">{turn.turn}</div>
+                      <div className="text-center tabular-nums">{turn.avgHandSize}</div>
+                      <div className="text-center tabular-nums" style={{ color: 'var(--emerald)' }}>{turn.avgPlayable}</div>
+                      <div className="text-center tabular-nums" style={{ color: 'var(--amber)' }}>{turn.avgUninkable}</div>
+                      <div className="text-center tabular-nums" style={{ color: 'var(--sapphire)' }}>{turn.avgCurveHits}</div>
+                      <div className="text-center tabular-nums">{turn.avgCost}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           )}
-          
-          <div className="text-xs text-gray-400">
+
+          <div className="text-xs" style={{ color: 'var(--faint)' }}>
             • <strong>Playable:</strong> Cards you can afford with current ink<br/>
             • <strong>Uninkable:</strong> Cards that can't be inked (actions/songs)<br/>
             • <strong>Curve Hits:</strong> Cards that cost exactly the current turn number
@@ -812,29 +842,31 @@ function HoverableStatLine({ label, value, cards }) {
   
   return (
     <>
-      <div 
-        className="cursor-pointer hover:bg-gray-800 rounded px-2 py-1 transition-colors"
+      <div
+        className="cursor-pointer hover:bg-[var(--panel-2)] rounded px-2 py-1 transition-colors"
         onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
         <strong>{label}:</strong> {value}
       </div>
-      
+
       {showTooltip && groupedCards.length > 0 && (
-        <div 
-          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg pointer-events-none"
+        <div
+          className="fixed z-50 border rounded-lg p-3 shadow-lg pointer-events-none"
           style={{
             left: tooltipPosition.x + 10,
             top: tooltipPosition.y - 10,
-            maxWidth: '300px'
+            maxWidth: '300px',
+            background: 'var(--panel-2)',
+            borderColor: 'var(--line-2)'
           }}
         >
-          <p className="text-white font-semibold mb-2">{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
+          <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
           <div>
-            <p className="text-gray-300 text-sm mb-1">Cards:</p>
+            <p className="text-sm mb-1" style={{ color: 'var(--muted)' }}>Cards:</p>
             {groupedCards.map(({ name, count }, index) => (
-              <p key={index} className="text-gray-400 text-xs">
+              <p key={index} className="text-xs" style={{ color: 'var(--faint)' }}>
                 {count > 1 ? `${count} - ${name}` : name}
               </p>
             ))}
@@ -879,30 +911,32 @@ function HoverableStatBox({ value, label, color, cards }) {
   
   return (
     <>
-      <div 
-        className="cursor-pointer hover:bg-gray-600 rounded p-2 transition-colors"
+      <div
+        className="cursor-pointer hover:bg-[var(--panel-2)] rounded p-2 transition-colors"
         onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
-        <div className={`text-2xl font-bold ${color}`}>{value}</div>
-        <div className="text-sm text-gray-400">{label}</div>
+        <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
+        <div className="text-sm" style={{ color: 'var(--faint)' }}>{label}</div>
       </div>
-      
+
       {showTooltip && groupedCards.length > 0 && (
-        <div 
-          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg pointer-events-none"
+        <div
+          className="fixed z-50 border rounded-lg p-3 shadow-lg pointer-events-none"
           style={{
             left: tooltipPosition.x + 10,
             top: tooltipPosition.y - 10,
-            maxWidth: '300px'
+            maxWidth: '300px',
+            background: 'var(--panel-2)',
+            borderColor: 'var(--line-2)'
           }}
         >
-          <p className="text-white font-semibold mb-2">{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
+          <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>{label}: {typeof value === 'string' && value.includes('%') ? cards.length : value} cards</p>
           <div>
-            <p className="text-gray-300 text-sm mb-1">Cards:</p>
+            <p className="text-sm mb-1" style={{ color: 'var(--muted)' }}>Cards:</p>
             {groupedCards.map(({ name, count }, index) => (
-              <p key={index} className="text-gray-400 text-xs">
+              <p key={index} className="text-xs" style={{ color: 'var(--faint)' }}>
                 {count > 1 ? `${count} - ${name}` : name}
               </p>
             ))}

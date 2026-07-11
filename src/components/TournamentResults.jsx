@@ -7,7 +7,7 @@ import { Section, Pill, WinRateBar } from "./ui";
 // OCR (tesseract.js) is heavy; load it on demand only when the image-import tab is opened.
 const StandingsImageImportLazy = lazy(() => import("./StandingsImageImport"));
 function StandingsImageImport(props) {
-  return React.createElement(Suspense, { fallback: React.createElement("div", { className: "p-4 text-sm text-gray-300" }, "Loading image importer…") }, React.createElement(StandingsImageImportLazy, props));
+  return React.createElement(Suspense, { fallback: React.createElement("div", { className: "p-4 text-sm", style: { color: "var(--muted)" } }, "Loading image importer…") }, React.createElement(StandingsImageImportLazy, props));
 }
 
 
@@ -184,7 +184,7 @@ function TournamentResultsSection({ deckId, deckName }) {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-2xl font-bold text-center mb-6 text-emerald-400">🎯 Tournament Results</h3>
+      <h3 className="text-2xl font-display text-center mb-6" style={{ fontWeight: 560, color: 'var(--text)' }}>🎯 Tournament Results</h3>
       
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -203,36 +203,40 @@ function TournamentResultsSection({ deckId, deckName }) {
             {tab === "quick" && (
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm text-gray-300">Event (optional)</label>
-                  <input 
-                    className="w-full border border-gray-500 bg-gray-600 text-gray-100 rounded-xl px-3 py-2 placeholder-gray-400" 
+                  <label className="text-sm" style={{ color: 'var(--muted)' }}>Event (optional)</label>
+                  <input
+                    className="w-full border rounded-xl px-3 py-2 placeholder:text-[var(--faint)]"
+                    style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                     placeholder="Set Champs @ Unplugged Games"
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-gray-300">Round (optional)</label>
-                  <input 
-                    className="w-full border border-gray-500 bg-gray-600 text-gray-100 rounded-xl px-3 py-2 placeholder-gray-400" 
+                  <label className="text-sm" style={{ color: 'var(--muted)' }}>Round (optional)</label>
+                  <input
+                    className="w-full border rounded-xl px-3 py-2 placeholder:text-[var(--faint)]"
+                    style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                     placeholder="1"
                     value={round}
                     onChange={(e) => setRound(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-gray-300">Opponent (optional)</label>
-                  <input 
-                    className="w-full border border-gray-500 bg-gray-600 text-gray-100 rounded-xl px-3 py-2 placeholder-gray-400" 
+                  <label className="text-sm" style={{ color: 'var(--muted)' }}>Opponent (optional)</label>
+                  <input
+                    className="w-full border rounded-xl px-3 py-2 placeholder:text-[var(--faint)]"
+                    style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                     placeholder="Player handle"
                     value={opponent}
                     onChange={(e) => setOpponent(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-gray-300">Opponent Deck (optional)</label>
-                  <input 
-                    className="w-full border border-gray-500 bg-gray-600 text-gray-100 rounded-xl px-3 py-2 placeholder-gray-400" 
+                  <label className="text-sm" style={{ color: 'var(--muted)' }}>Opponent Deck (optional)</label>
+                  <input
+                    className="w-full border rounded-xl px-3 py-2 placeholder:text-[var(--faint)]"
+                    style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                     placeholder="Amber/Steel Brooms"
                     value={opponentDeck}
                     onChange={(e) => setOpponentDeck(e.target.value)}
@@ -240,17 +244,18 @@ function TournamentResultsSection({ deckId, deckName }) {
                 </div>
 
                 <div className="col-span-full">
-                  <div className="text-sm text-gray-300 mb-2">Opponent Inks</div>
+                  <div className="text-sm mb-2" style={{ color: 'var(--muted)' }}>Opponent Inks</div>
                   <div className="flex flex-wrap gap-2">
                     {INK_COLORS.map((ink) => (
-                      <button 
-                        key={ink} 
+                      <button
+                        key={ink}
                         onClick={() => toggleInk(ink)}
-                        className={`px-3 py-1.5 rounded-full border text-sm ${
+                        className="px-3 py-1.5 rounded-full border text-sm transition hover:brightness-110"
+                        style={
                           selectedInks.includes(ink)
-                            ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-gray-600 text-gray-200 border-gray-500 hover:bg-gray-500"
-                        }`}
+                            ? { background: 'var(--sapphire)', color: '#0b1620', borderColor: 'var(--sapphire)' }
+                            : { background: 'var(--panel-2)', color: 'var(--text)', borderColor: 'var(--line-2)' }
+                        }
                       >
                         {ink}
                       </button>
@@ -259,61 +264,73 @@ function TournamentResultsSection({ deckId, deckName }) {
                 </div>
 
                 <div className="col-span-full flex items-center gap-2">
-                  <span className="text-sm text-gray-300">Play/Draw:</span>
-                  <button 
+                  <span className="text-sm" style={{ color: 'var(--muted)' }}>Play/Draw:</span>
+                  <button
                     onClick={() => setPlayDraw("first")}
-                    className={`px-3 py-1.5 rounded-full border text-sm ${
+                    className="px-3 py-1.5 rounded-full border text-sm transition hover:brightness-110"
+                    style={
                       playDraw === "first"
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : "bg-gray-600 text-gray-200 border-gray-500 hover:bg-gray-500"
-                    }`}
+                        ? { background: 'var(--sapphire)', color: '#0b1620', borderColor: 'var(--sapphire)' }
+                        : { background: 'var(--panel-2)', color: 'var(--text)', borderColor: 'var(--line-2)' }
+                    }
                   >
                     Went First
                   </button>
-                  <button 
+                  <button
                     onClick={() => setPlayDraw("second")}
-                    className={`px-3 py-1.5 rounded-full border text-sm ${
+                    className="px-3 py-1.5 rounded-full border text-sm transition hover:brightness-110"
+                    style={
                       playDraw === "second"
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : "bg-gray-600 text-gray-200 border-gray-500 hover:bg-gray-500"
-                    }`}
+                        ? { background: 'var(--sapphire)', color: '#0b1620', borderColor: 'var(--sapphire)' }
+                        : { background: 'var(--panel-2)', color: 'var(--text)', borderColor: 'var(--line-2)' }
+                    }
                   >
                     Went Second
                   </button>
-                  <button 
+                  <button
                     onClick={() => setPlayDraw("unknown")}
-                    className={`px-3 py-1.5 rounded-full border text-sm ${
+                    className="px-3 py-1.5 rounded-full border text-sm transition hover:brightness-110"
+                    style={
                       playDraw === "unknown"
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : "bg-gray-600 text-gray-200 border-gray-500 hover:bg-gray-500"
-                    }`}
+                        ? { background: 'var(--sapphire)', color: '#0b1620', borderColor: 'var(--sapphire)' }
+                        : { background: 'var(--panel-2)', color: 'var(--text)', borderColor: 'var(--line-2)' }
+                    }
                   >
                     Unknown
                   </button>
                 </div>
 
                 <div className="col-span-full flex flex-wrap gap-2 pt-2">
-                  <button 
+                  <button
                     onClick={() => setResult("win")}
-                    className={`px-4 py-2 rounded-xl ${
-                      result === "win" ? "bg-gradient-to-b from-violet-500 to-indigo-500 text-white shadow-[0_2px_10px_-2px_rgba(139,108,255,0.7)]" : "bg-gray-600 text-gray-200 hover:bg-gray-500"
-                    }`}
+                    className="px-4 py-2 rounded-xl transition hover:brightness-110"
+                    style={
+                      result === "win"
+                        ? { background: 'var(--sapphire)', color: '#0b1620' }
+                        : { background: 'var(--panel-2)', color: 'var(--text)' }
+                    }
                   >
                     Win
                   </button>
-                  <button 
+                  <button
                     onClick={() => setResult("loss")}
-                    className={`px-4 py-2 rounded-xl ${
-                      result === "loss" ? "bg-red-600 text-white" : "bg-gray-600 text-gray-200 hover:bg-gray-500"
-                    }`}
+                    className="px-4 py-2 rounded-xl transition hover:brightness-110"
+                    style={
+                      result === "loss"
+                        ? { background: 'var(--ruby)', color: '#fff' }
+                        : { background: 'var(--panel-2)', color: 'var(--text)' }
+                    }
                   >
                     Loss
                   </button>
-                  <button 
+                  <button
                     onClick={() => setResult("draw")}
-                    className={`px-4 py-2 rounded-xl ${
-                      result === "draw" ? "bg-gray-500 text-white" : "bg-gray-600 text-gray-200 hover:bg-gray-500"
-                    }`}
+                    className="px-4 py-2 rounded-xl transition hover:brightness-110"
+                    style={
+                      result === "draw"
+                        ? { background: 'var(--steel)', color: '#0b1620' }
+                        : { background: 'var(--panel-2)', color: 'var(--text)' }
+                    }
                   >
                     Draw
                   </button>
@@ -323,17 +340,18 @@ function TournamentResultsSection({ deckId, deckName }) {
 
             {tab === "paste" && (
               <div className="space-y-3">
-                <textarea 
-                  className="w-full h-36 border border-gray-500 bg-gray-600 text-gray-100 rounded-xl p-3 font-mono placeholder-gray-400" 
+                <textarea
+                  className="w-full h-36 border rounded-xl p-3 font-mono placeholder:text-[var(--faint)]"
+                  style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
                   placeholder={`Paste lines like:\nR1 W vs Ruby/Sapphire (first)\n2 L vs Amber Steel - flooded\nR3 D vs Amethyst/Emerald, second`}
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                 />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">
+                  <span className="text-sm" style={{ color: 'var(--muted)' }}>
                     {pasteText.split('\n').filter(line => line.trim()).length} line(s) detected
                   </span>
-                  <button className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">Import</button>
+                  <button className="px-3 py-1.5 rounded-xl font-semibold transition hover:brightness-110" style={{ background: 'var(--sapphire)', color: '#0b1620' }}>Import</button>
                 </div>
               </div>
             )}
@@ -353,51 +371,51 @@ function TournamentResultsSection({ deckId, deckName }) {
           </Section>
 
           <Section title="Logged Matches" subtitle="Recent entries for this deck (local to your browser).">
-            <div className="border border-gray-600 rounded-2xl overflow-auto">
+            <div className="border rounded-2xl overflow-auto" style={{ borderColor: 'var(--line)' }}>
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-600">
+                <thead style={{ background: 'var(--panel-2)' }}>
                   <tr>
-                    <th className="text-left px-3 py-2 text-gray-200">Date</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Rnd</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Res</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Opp Inks</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Play/Draw</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Event</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Notes</th>
-                    <th className="text-left px-3 py-2 text-gray-200">Actions</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Date</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Rnd</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Res</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Opp Inks</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Play/Draw</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Event</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Notes</th>
+                    <th className="text-left px-3 py-2 text-[11px] uppercase tracking-[0.1em] font-semibold" style={{ color: 'var(--faint)' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-3 py-8 text-center text-gray-400">
+                      <td colSpan="8" className="px-3 py-8 text-center" style={{ color: 'var(--muted)' }}>
                         No matches logged yet. Import some results to see them here!
                       </td>
                     </tr>
                   ) : (
                     records.map((record, i) => (
-                      <tr key={record.id || i} className="border-t border-gray-600">
-                        <td className="px-3 py-2 text-gray-200">
+                      <tr key={record.id || i} className="border-t" style={{ borderColor: 'var(--line)' }}>
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {new Date(record.dateISO).toLocaleDateString()}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {editingRecord === record.id ? (
                             <input
                               type="text"
                               value={editForm.round}
                               onChange={(e) => setEditForm(prev => ({ ...prev, round: e.target.value }))}
-                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              className="w-full rounded px-2 py-1 text-sm border" style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                             />
                           ) : (
                             record.round
                           )}
                         </td>
-                        <td className="px-3 py-2 font-semibold text-gray-200">
+                        <td className="px-3 py-2 font-semibold" style={{ color: 'var(--text)' }}>
                           {editingRecord === record.id ? (
                             <select
                               value={editForm.result}
                               onChange={(e) => setEditForm(prev => ({ ...prev, result: e.target.value }))}
-                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              className="w-full rounded px-2 py-1 text-sm border" style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                             >
                               <option value="W">W</option>
                               <option value="L">L</option>
@@ -407,25 +425,25 @@ function TournamentResultsSection({ deckId, deckName }) {
                             record.result
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {editingRecord === record.id ? (
                             <input
                               type="text"
                               value={editForm.opponentInks}
                               onChange={(e) => setEditForm(prev => ({ ...prev, opponentInks: e.target.value }))}
-                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              className="w-full rounded px-2 py-1 text-sm border" style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                               placeholder="e.g., Amber/Steel"
                             />
                           ) : (
                             record.opponentInks || 'Unknown'
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {editingRecord === record.id ? (
                             <select
                               value={editForm.playDraw}
                               onChange={(e) => setEditForm(prev => ({ ...prev, playDraw: e.target.value }))}
-                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              className="w-full rounded px-2 py-1 text-sm border" style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                             >
                               <option value="first">First</option>
                               <option value="second">Second</option>
@@ -435,42 +453,44 @@ function TournamentResultsSection({ deckId, deckName }) {
                             record.playDraw || 'Unknown'
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {editingRecord === record.id ? (
                             <input
                               type="text"
                               value={editForm.event}
                               onChange={(e) => setEditForm(prev => ({ ...prev, event: e.target.value }))}
-                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              className="w-full rounded px-2 py-1 text-sm border" style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                             />
                           ) : (
                             record.event || 'Unknown'
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {editingRecord === record.id ? (
                             <input
                               type="text"
                               value={editForm.notes}
                               onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
-                              className="w-full bg-gray-700 border border-gray-500 rounded px-2 py-1 text-gray-100 text-sm"
+                              className="w-full rounded px-2 py-1 text-sm border" style={{ background: 'var(--panel)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                             />
                           ) : (
                             record.notes || '-'
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-200">
+                        <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>
                           {editingRecord === record.id ? (
                             <div className="flex gap-1">
                               <button
                                 onClick={saveEdit}
-                                className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded"
+                                className="px-2 py-1 text-xs rounded transition hover:brightness-110"
+                                style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                               >
                                 ✓
                               </button>
                               <button
                                 onClick={cancelEdit}
-                                className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded"
+                                className="px-2 py-1 text-xs rounded border transition hover:brightness-110"
+                                style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
                               >
                                 ✕
                               </button>
@@ -479,13 +499,15 @@ function TournamentResultsSection({ deckId, deckName }) {
                             <div className="flex gap-1">
                               <button
                                 onClick={() => startEdit(record)}
-                                className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded"
+                                className="px-2 py-1 text-xs rounded transition hover:brightness-110"
+                                style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                               >
                                 ✏️
                               </button>
                               <button
                                 onClick={() => deleteRecord(record.id)}
-                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                                className="px-2 py-1 text-xs rounded transition hover:brightness-110"
+                                style={{ background: 'var(--ruby)', color: '#fff' }}
                               >
                                 🗑️
                               </button>
@@ -506,30 +528,30 @@ function TournamentResultsSection({ deckId, deckName }) {
           <Section title="Performance Summary" subtitle="At-a-glance stats for this deck.">
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-1">
-                <div className="text-xs text-gray-400">Games Played</div>
-                <div className="text-2xl font-bold text-emerald-300">{wr.played}</div>
-                <div className="text-xs text-gray-400">W {wr.W} / L {wr.L} / D {wr.D}</div>
+                <div className="text-xs text-[color:var(--faint)]">Games Played</div>
+                <div className="text-2xl font-bold text-[color:var(--emerald)]">{wr.played}</div>
+                <div className="text-xs text-[color:var(--faint)]">W {wr.W} / L {wr.L} / D {wr.D}</div>
               </div>
               <div className="col-span-1">
-                <div className="text-xs text-gray-400">WR (excl. draws)</div>
-                <div className="text-2xl font-bold text-emerald-300">{Math.round((wr.W / Math.max(1, wr.W + wr.L)) * 100)}%</div>
-                <div className="text-xs text-gray-400">Draws count as 0</div>
+                <div className="text-xs text-[color:var(--faint)]">WR (excl. draws)</div>
+                <div className="text-2xl font-bold text-[color:var(--emerald)]">{Math.round((wr.W / Math.max(1, wr.W + wr.L)) * 100)}%</div>
+                <div className="text-xs text-[color:var(--faint)]">Draws count as 0</div>
               </div>
               <div className="col-span-1">
-                <div className="text-xs text-gray-400">WR (½ draw)</div>
-                <div className="text-2xl font-bold text-emerald-300">{Math.round(((wr.W + wr.D * 0.5) / Math.max(1, wr.played)) * 100)}%</div>
-                <div className="text-xs text-gray-400">Draws count as ½</div>
+                <div className="text-xs text-[color:var(--faint)]">WR (½ draw)</div>
+                <div className="text-2xl font-bold text-[color:var(--emerald)]">{Math.round(((wr.W + wr.D * 0.5) / Math.max(1, wr.played)) * 100)}%</div>
+                <div className="text-xs text-[color:var(--faint)]">Draws count as ½</div>
               </div>
             </div>
 
             <div className="mt-5">
-              <div className="font-medium mb-2 text-gray-200">By Opponent Inks</div>
+              <div className="font-medium mb-2 text-[color:var(--text)]">By Opponent Inks</div>
               <div className="space-y-2">
                 {byInk.map((row) => (
                   <div key={row.k} className="flex items-center justify-between gap-4">
-                    <div className="w-40 truncate text-sm text-gray-200">{row.k}</div>
+                    <div className="w-40 truncate text-sm text-[color:var(--text)]">{row.k}</div>
                     <WinRateBar win={row.W} loss={row.L} />
-                    <div className="text-xs text-gray-400">{row.W + row.L} GP</div>
+                    <div className="text-xs text-[color:var(--faint)]">{row.W + row.L} GP</div>
                   </div>
                 ))}
               </div>
@@ -537,10 +559,10 @@ function TournamentResultsSection({ deckId, deckName }) {
           </Section>
 
           <Section title="Tips" subtitle="Quick ways to keep your data clean.">
-            <ul className="text-sm text-gray-300 list-disc pl-5 space-y-2">
-              <li>Use <span className="font-medium text-emerald-300">Quick Log</span> for live events; add inks & play/draw for better splits.</li>
-              <li>Bulk results? Paste your notes or Discord lines in <span className="font-medium text-emerald-300">Paste Text</span>.</li>
-              <li>Event standings screenshot? Try <span className="font-medium text-emerald-300">From Image</span> — OCR runs in your browser.</li>
+            <ul className="text-sm text-[color:var(--muted)] list-disc pl-5 space-y-2">
+              <li>Use <span className="font-medium text-[color:var(--emerald)]">Quick Log</span> for live events; add inks & play/draw for better splits.</li>
+              <li>Bulk results? Paste your notes or Discord lines in <span className="font-medium text-[color:var(--emerald)]">Paste Text</span>.</li>
+              <li>Event standings screenshot? Try <span className="font-medium text-[color:var(--emerald)]">From Image</span> — OCR runs in your browser.</li>
             </ul>
           </Section>
         </div>

@@ -13,12 +13,16 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.05] p-8 text-center">
-          <p className="text-red-300 font-medium mb-1">Something went wrong</p>
-          <p className="text-gray-500 text-sm mb-4">Try refreshing the page.</p>
+        <div
+          className="rounded-xl border p-8 text-center"
+          style={{ borderColor: 'color-mix(in srgb, var(--ruby) 30%, var(--line))', background: 'color-mix(in srgb, var(--ruby) 6%, var(--panel))' }}
+        >
+          <p className="font-display mb-1" style={{ fontWeight: 560, color: 'var(--ruby)' }}>Something went wrong</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Try refreshing the page.</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm hover:bg-red-500/20 transition-colors"
+            className="px-4 py-2 rounded-lg border text-sm transition-colors hover:brightness-110"
+            style={{ borderColor: 'color-mix(in srgb, var(--ruby) 40%, transparent)', background: 'color-mix(in srgb, var(--ruby) 12%, transparent)', color: 'var(--ruby)' }}
           >
             Refresh
           </button>
