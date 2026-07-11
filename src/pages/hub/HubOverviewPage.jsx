@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link, useParams } from 'react-router-dom';
+import HexGlyph from '../../components/ui/HexGlyph';
+import InkLedger from '../../components/ui/InkLedger';
+import Panel from '../../components/ui/Panel';
+import { getInks } from '../../lib/cardUtils';
 
 const EXAMPLE_QUESTIONS = [
   "What's our best-performing deck right now?",
@@ -81,6 +85,93 @@ function relTime(iso) {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
   return formatDate(iso);
+}
+
+// ---- team-deck ink derivation ---------------------------------------------
+// Decks come back from /api/hubs/:id/decks with an opaque `.data` blob. The
+// canonical shape is { entries: { key: { card, count } } } (see DeckStats), but
+// we read everything defensively and DEGRADE (skip / show "—") rather than throw
+// when a deck's shape or ink data can't be resolved.
+
+const INK_LIST = ['Amber', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Steel'];
+const INK_SET = new Set(INK_LIST.map((s) => s.toLowerCase()));
+
+// Real card entries (count > 0) out of a deck blob, whatever its shape.
+function liveEntriesOf(deck) {
+  const entries = deck?.data?.entries;
+  if (!entries || typeof entries !== 'object') return [];
+  return Object.values(entries).filter((e) => e && e.card && (e.count ?? 0) > 0);
+}
+
+// A card's primary ink, normalized to one of the six names, or null.
+function primaryInkOf(card) {
+  const inks = getInks(card) || [];
+  for (const raw of inks) {
+    const k = String(raw).toLowerCase();
+    if (INK_SET.has(k)) return k.charAt(0).toUpperCase() + k.slice(1);
+  }
+  return null;
+}
+
+// Inkable status honoring every shape we've seen in the wild.
+function inkableOf(card) {
+  return (
+    card?.inkable ??
+    card?._raw?.inkwell ??
+    card?._raw?.inkable ??
+    card?._raw?.can_be_ink ??
+    card?._raw?.Inkable ??
+    false
+  );
+}
+
+// The 1–2 inks that actually define a deck (most-played primary inks). Empty
+// array when we can't derive any (unknown blob shape / no ink data).
+function deckInkIdentity(deck) {
+  const tally = new Map();
+  for (const e of liveEntriesOf(deck)) {
+    const ink = primaryInkOf(e.card);
+    if (!ink) continue;
+    tally.set(ink, (tally.get(ink) || 0) + (e.count || 0));
+  }
+  return [...tally.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([ink]) => ink);
+}
+
+// One { ink, inkable } per card copy, for the InkLedger strip. Empty when the
+// deck's cards yield no resolvable inks.
+function ledgerEntriesOf(deck) {
+  const out = [];
+  for (const e of liveEntriesOf(deck)) {
+    const ink = primaryInkOf(e.card);
+    if (!ink) continue;
+    const inkable = !!inkableOf(e.card);
+    for (let i = 0; i < (e.count || 0); i++) out.push({ ink, inkable });
+  }
+  return out;
+}
+
+// Big ink hex with the deck-count overlaid — the gauntlet-coverage glyph.
+function CoverageHex({ ink, count }) {
+  const zero = count === 0;
+  return (
+    <div className="text-center flex-1">
+      <div className="relative mx-auto" style={{ width: 40, height: 47, lineHeight: 0 }}>
+        <HexGlyph ink={ink} hollow={zero} size={40} cutout="var(--panel)" />
+        <span
+          className="absolute inset-0 flex items-center justify-center tabular-nums font-semibold"
+          style={{ fontSize: 13, lineHeight: 1, zIndex: 1, color: zero ? 'var(--faint)' : '#0b0c0f' }}
+        >
+          {count}
+        </span>
+      </div>
+      <div className="mt-1.5 uppercase" style={{ fontSize: '10.5px', color: 'var(--faint)', letterSpacing: '.06em' }}>
+        {ink}
+      </div>
+    </div>
+  );
 }
 
 // Ink-colored type pill (the comp's activity vocabulary).
@@ -171,6 +262,8 @@ export default function HubOverviewPage() {
   const [events, setEvents] = useState([]);
   const [reports, setReports] = useState([]);
   const [games, setGames] = useState([]);
+  const [decks, setDecks] = useState([]);
+  const [decksLoading, setDecksLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const { id } = useParams();
   const { show: showBanner, dismiss: dismissBanner } = useOnboarding(hub, user);
@@ -218,6 +311,27 @@ export default function HubOverviewPage() {
       setGames(Array.isArray(g) ? g : []);
     }).finally(() => setLoading(false));
   }, [hub?.id]);
+
+  // Hub members' decks — feeds the gauntlet-coverage and team-decks panels.
+  useEffect(() => {
+    if (!hub?.id) return;
+    setDecksLoading(true);
+    fetch(`/api/hubs/${hub.id}/decks`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setDecks(Array.isArray(d) ? d : []))
+      .catch(() => setDecks([]))
+      .finally(() => setDecksLoading(false));
+  }, [hub?.id]);
+
+  // Decks-per-ink coverage across the hub (a deck counts toward each of its
+  // 1–2 identity inks). Decks whose inks can't be derived contribute nothing.
+  const coverage = Object.fromEntries(INK_LIST.map((ink) => [ink, 0]));
+  for (const deck of decks) {
+    for (const ink of deckInkIdentity(deck)) {
+      if (ink in coverage) coverage[ink] += 1;
+    }
+  }
+  const zeroInks = INK_LIST.filter((ink) => coverage[ink] === 0);
 
   const now = new Date();
   const nextPractice = practices.filter(p => new Date(p.startsAt) > now).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
@@ -393,6 +507,71 @@ export default function HubOverviewPage() {
           ) : <p className="text-sm" style={{ color: 'var(--faint)' }}>No reports yet.</p>}
         </SectionCard>
       </div>
+
+      {/* Gauntlet coverage — decks per ink */}
+      <Panel title="Gauntlet coverage">
+        {decksLoading ? (
+          <p className="text-sm animate-pulse" style={{ color: 'var(--muted)' }}>Reading the gauntlet…</p>
+        ) : decks.length === 0 ? (
+          <p className="text-sm" style={{ color: 'var(--faint)' }}>No team decks yet.</p>
+        ) : (
+          <>
+            <div
+              className="flex justify-between gap-1.5"
+              role="img"
+              aria-label={`Decks per ink: ${INK_LIST.map((ink) => `${ink} ${coverage[ink]}`).join(', ')}`}
+            >
+              {INK_LIST.map((ink) => (
+                <CoverageHex key={ink} ink={ink} count={coverage[ink]} />
+              ))}
+            </div>
+            {zeroInks.length > 0 && (
+              <p className="mt-3.5 pt-3 text-xs" style={{ color: 'var(--muted)', borderTop: '1px solid var(--line)' }}>
+                No decks currently cover{' '}
+                <span className="font-display italic" style={{ color: 'var(--text)' }}>
+                  {zeroInks.join(', ')}
+                </span>
+                {zeroInks.length === 1 ? ' — nobody is piloting it yet.' : ' — nobody is piloting them yet.'}
+              </p>
+            )}
+          </>
+        )}
+      </Panel>
+
+      {/* Team decks — the hub's decks with a per-deck ink-ledger strip */}
+      <Panel title="Team decks">
+        {decksLoading ? (
+          <p className="text-sm animate-pulse" style={{ color: 'var(--muted)' }}>Loading team decks…</p>
+        ) : decks.length === 0 ? (
+          <p className="text-sm" style={{ color: 'var(--faint)' }}>No decks have been built by this team yet.</p>
+        ) : (
+          <div className="grid gap-3">
+            {decks.map((deck) => {
+              const inks = deckInkIdentity(deck);
+              const ledger = ledgerEntriesOf(deck);
+              const owner = deck.user?.email || 'Unknown';
+              return (
+                <div
+                  key={deck.id}
+                  className="rounded-md border p-2.5"
+                  style={{ borderColor: 'var(--line)', background: 'var(--panel-2)' }}
+                >
+                  <p className="font-display truncate" style={{ fontWeight: 560, fontSize: '15px', color: 'var(--text)' }}>
+                    {deck.name || deck.title || 'Untitled deck'}
+                  </p>
+                  <p className="truncate" style={{ fontSize: '12px', color: 'var(--faint)' }}>
+                    {owner}
+                    {inks.length ? ` · ${inks.join(' / ')}` : ' · —'}
+                  </p>
+                  {ledger.length > 0 && (
+                    <InkLedger entries={ledger} hexSize={7} cutout="var(--panel-2)" className="mt-1.5" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
 
       <ActivityFeed games={games} reports={reports} practices={practices} events={events} />
     </div>
