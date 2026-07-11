@@ -2840,6 +2840,48 @@ function DeckManager({ isOpen, onClose, decks, currentDeckId, onSwitchDeck, onNe
 
 // Deck panel -----------------------------------------------------------------
 
+// --- Deck Lab comp primitives (design/comps/uninkable-deck-lab-comp.html) ---
+const HEX_CLIP = { clipPath: 'var(--hex)' };
+
+// The card's primary ink as a CSS token color (falls back to steel).
+function cardInkVar(card) {
+  const inks = (typeof getInks === 'function' ? getInks(card) : []) || [];
+  const first = String(inks[0] || '').toLowerCase();
+  const known = ['amber', 'amethyst', 'emerald', 'ruby', 'sapphire', 'steel'];
+  return known.includes(first) ? `var(--${first})` : 'var(--steel)';
+}
+
+function isCardInkable(card) {
+  return Boolean(
+    card.inkable ?? card._raw?.inkwell ?? card._raw?.inkable ?? card._raw?.can_be_ink ?? card._raw?.Inkable ?? false
+  );
+}
+
+// The signature element: one hex per card in the deck, colored by its ink,
+// hollow if uninkable. The whole deck's identity compressed into one glyph.
+function DeckInkLedger({ entries }) {
+  const hexes = [];
+  for (const e of entries) {
+    const v = cardInkVar(e.card);
+    const inkable = isCardInkable(e.card);
+    for (let i = 0; i < e.count; i++) hexes.push({ v, inkable, key: `${deckKey(e.card)}-${i}` });
+  }
+  if (!hexes.length) return null;
+  return (
+    <div className="flex flex-wrap gap-[3px]" aria-label={`${hexes.length} cards, hollow = uninkable`}>
+      {hexes.map((h) => (
+        <span
+          key={h.key}
+          className="relative"
+          style={{ width: 10, height: 12, ...HEX_CLIP, background: h.inkable ? h.v : `color-mix(in srgb, ${h.v} 72%, transparent)` }}
+        >
+          {!h.inkable && <span className="absolute" style={{ inset: 2, ...HEX_CLIP, background: 'var(--panel)' }} />}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
@@ -2888,7 +2930,7 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
     <div className="bg-[#0b0e15]/80 backdrop-blur border-l border-white/10 h-full flex flex-col">
       {/* Identity / count header */}
       <div className="p-4 border-b border-white/10 relative">
-        <div className="absolute inset-0 bg-[radial-gradient(80%_120%_at_0%_0%,rgba(139,108,255,0.14),transparent_55%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(80%_120%_at_0%_0%,rgba(58,160,224,0.13),transparent_55%)] pointer-events-none" />
         <div className="relative flex items-center justify-between mb-3">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-3xl font-bold leading-none">{deck.total}</span>
@@ -2917,6 +2959,15 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
           </div>
           <span className="text-gray-400 whitespace-nowrap">{inkableCounts.uninkable} not</span>
         </div>
+        {/* Signature: the ink ledger — one hex per card, hollow = uninkable. */}
+        {entries.length > 0 && (
+          <div className="relative mt-3">
+            <div className="text-[10px] uppercase tracking-[0.1em] mb-1.5" style={{ color: 'var(--faint)' }}>
+              Ink ledger · <span style={{ color: 'var(--muted)' }}>hollow = uninkable</span>
+            </div>
+            <DeckInkLedger entries={entries} />
+          </div>
+        )}
       </div>
 
       {/* Deck list grouped by cost */}
@@ -2948,85 +2999,72 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
 
 function DeckRow({ entry, onSetCount, onRemove }) {
   const c = entry.card;
-  const imgSrc = getCardImg(c);
+  const inkColor = cardInkVar(c);
+  const inkable = isCardInkable(c);
+  // Lorcana names read "Name - Version"; show the version in italic serif.
+  const [nm, ...verParts] = String(c.name || '').split(' - ');
+  const ver = verParts.join(' - ');
 
   return (
-    <div className="flex items-center gap-3 p-3">
-      {/* Card Image with Count Bubble - Fixed width to prevent overlap */}
-      <div className="relative w-16 flex-shrink-0">
-        {imgSrc ? (
-          <img 
-            src={imgSrc} 
-            alt={c.name} 
-            className="w-16 h-22 object-cover rounded-lg border border-white/10 hover:border-gray-600 transition-colors" 
-            onError={(e) => {
-              // Fallback to text display if image fails to load
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'flex';
-            }}
-          />
-        ) : null}
-        {/* Fallback display when no image */}
-        <div 
-          className={`w-16 h-22 bg-gray-800 rounded-lg border border-white/10 flex items-center justify-center ${
-            imgSrc ? 'hidden' : 'flex'
-          }`}
-        >
-          <div className="text-center text-gray-400">
-            <div className="text-xs mb-1">No image</div>
-            <div className="text-xs font-medium">{c.name}</div>
-          </div>
-        </div>
-        
-        {/* Rounded Count Bubble - positioned at top-right corner of image */}
-        <div className="absolute -top-2 -right-2 bg-gradient-to-b from-violet-500 to-indigo-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-violet-400/40 shadow-lg z-10">
-          {entry.count}
-        </div>
-      </div>
-      
-      {/* Card Info - Takes remaining space */}
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold truncate">{c.name}</div>
-        <div className="text-xs text-gray-400">
-          {c.set} • #{c.number} • Cost {getCost(c)} • {c.type} • {c.rarity}
-        </div>
-        {(c.franchise || c.lore > 0 || c.willpower > 0 || c.strength > 0) && (
-          <div className="text-xs text-gray-500 mt-1">
-            {c.franchise && <span className="mr-2">{c.franchise}</span>}
-            {c.lore > 0 && <span className="mr-2">Lore: {c.lore}</span>}
-            {c.willpower > 0 && <span className="mr-2">Will: {c.willpower}</span>}
-            {c.strength > 0 && <span className="mr-2">Str: {c.strength}</span>}
-          </div>
-        )}
-      </div>
-      
-      {/* Controls - Fixed width to prevent overlap */}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <input
-          className="w-10 text-center rounded-md bg-white/5 border border-white/10"
-          type="number"
-          value={entry.count}
-          onChange={(e) => onSetCount(parseInt(e.target.value || 0))}
-        />
+    <div className="group flex items-center gap-2.5 px-3 py-[5px] rounded-md hover:bg-[color:var(--panel-2)]">
+      {/* stepper */}
+      <div className="flex items-center gap-1 shrink-0">
         <button
-          className="w-6 h-6 rounded-md bg-white/5 border border-white/10 hover:bg-white/10"
+          className="w-[18px] h-[18px] grid place-items-center rounded border text-[color:var(--faint)] hover:text-[color:var(--text)] leading-none"
+          style={{ borderColor: 'var(--line-2)' }}
           onClick={() => onSetCount(Math.max(0, entry.count - 1))}
+          aria-label="Remove one"
         >
-          -
+          −
         </button>
+        <span className="w-5 text-center font-semibold text-[13px] tabular-nums">{entry.count}</span>
         <button
-          className="w-6 h-6 rounded-md bg-white/5 border border-white/10 hover:bg-white/10"
+          className="w-[18px] h-[18px] grid place-items-center rounded border text-[color:var(--faint)] hover:text-[color:var(--text)] leading-none"
+          style={{ borderColor: 'var(--line-2)' }}
           onClick={() => onSetCount(Math.min(DECK_RULES.MAX_COPIES, entry.count + 1))}
+          aria-label="Add one"
         >
           +
         </button>
-        <button
-          className="px-2 py-1 rounded-md bg-rose-500/15 border border-rose-400/40 hover:bg-rose-500/25 text-rose-200 text-xs"
-          onClick={onRemove}
-        >
-          Remove
-        </button>
       </div>
+
+      {/* cost hexagon in the card's ink */}
+      <span
+        className="relative grid place-items-center shrink-0"
+        style={{ width: 22, height: 25, ...HEX_CLIP, background: `color-mix(in srgb, ${inkColor} 80%, transparent)` }}
+      >
+        <span className="absolute" style={{ inset: 1.5, ...HEX_CLIP, background: 'var(--panel)' }} />
+        <b className="relative text-[11px] font-semibold tabular-nums">{getCost(c)}</b>
+      </span>
+
+      {/* name + italic-serif version */}
+      <div className="flex items-baseline gap-1.5 min-w-0 flex-1">
+        <span className="font-semibold text-[13.5px] truncate">{nm}</span>
+        {ver && (
+          <span className="font-display italic text-[13px] truncate" style={{ color: 'var(--muted)' }}>
+            — {ver}
+          </span>
+        )}
+      </div>
+
+      {/* uninkable well glyph */}
+      <span
+        title={inkable ? 'Inkable' : 'Uninkable'}
+        className="relative shrink-0"
+        style={{ width: 12, height: 14, ...HEX_CLIP, background: inkable ? 'var(--steel)' : `color-mix(in srgb, var(--steel) 80%, transparent)` }}
+      >
+        {!inkable && <span className="absolute" style={{ inset: 2.5, ...HEX_CLIP, background: 'var(--panel)' }} />}
+      </span>
+
+      {/* remove — appears on hover */}
+      <button
+        onClick={onRemove}
+        className="opacity-0 group-hover:opacity-100 text-[color:var(--faint)] hover:text-[color:var(--ruby)] text-xs shrink-0 leading-none"
+        title="Remove card"
+        aria-label="Remove card"
+      >
+        ✕
+      </button>
     </div>
   );
 }
