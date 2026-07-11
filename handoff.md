@@ -2,25 +2,26 @@
 
 **Branch:** `feature/uninkable-overhaul`
 
-## Session 3 — "finish everything" run, CUT SHORT by an API session limit (reset 10:50am ET)
-Launched 5 parallel Opus subagents + did UI myself. Then the account session limit hit: 3 subagents finished, 4 failed mid-work.
+## Session 3 — "finish everything" run — COMPLETE (hit a session limit midway; resumed after reset, finished all items)
 
-**DONE + committed this session (tests 159/159):**
-- `4b2fd50` — logged-out **landing page** + sapphire auth buttons (browser-verified).
-- `b683a70` — **Team Hub overview** restyled to the design system (HubOverviewPage).
-- `60bcfb4` — **JSZip decompression bound** (zip-bomb gap closed); **backlog** (insights case-insensitive, UTC time labels, CSV escaping, requireHubMember consolidation); **LLM gateway** (`api/_lib/anthropic.js`, 5 call sites consolidated, behavior-identical).
+Every outstanding item is now done + committed on `feature/uninkable-overhaul`. Suite: **154/154** (dropped from 159 only because the dead Toast tests were removed).
 
-**GROUNDWORK committed but NOT wired (`aba2d85`) — finish next:**
-- `api/_lib/rateLimit.js` — complete pluggable limiter, but NOT applied to any endpoint yet. TODO: wire into api/auth/{login,register,forgot-password}.js + api/hubs/join.js (limits: login 10/min, register 5/min, forgot 5/min, join 20/min). Add UPSTASH_* to env.example.
-- `prisma/schema.prisma` **Card model** — validates, additive, but NO ingest script / endpoint / cron and nothing reads it. TODO: `scripts/ingest-cards.mjs` + `api/cards/ingest.js` (cron-guarded) + `api/cards/index.js` (read) + vercel.json nightly cron + `db push`. (See the failed card-DB plan in this session's task #7.)
+**UI redesign surfaces (all committed):**
+- `4b2fd50` — logged-out **landing page** + sapphire auth buttons (fully browser-verified).
+- `b683a70` — **Team Hub overview** (HubOverviewPage) — tokens, Fraunces, ink pills, coach box.
+- `feat(P4) HubDetailLayout` — crest hexagon (six-ink conic), Fraunces title, invite chip, sapphire tab underline.
+- `feat(P4) DeckPresentationView` — Fraunces title, tabular stat blocks, InkCurve, ink pie/legend + **fixed empty-deck NaN and the broken pie legend**.
+- `feat(P4) Deck Lab re-skin` — remapped legacy violet/indigo→sapphire, purple→amethyst in tailwind.config (hex ramps so opacity works), flat --canvas background. **Browser-verified on /builder.**
 
-**NOT started (session limit):**
-- **HubDetailLayout** restyle (hub header/crest/roster/nav) — pattern to follow: HubOverviewPage.jsx idiom + design/comps/uninkable-team-hub-comp.html.
-- **DeckPresentationView** restyle + 2 bug fixes (empty-deck NaN ~L500/1078; broken pie legend HTML-in-SVG ~L1199) — comp: uninkable-deck-detail-comp.html.
-- **Deck Lab** (App.jsx builder) restyle — comp: uninkable-deck-lab-comp.html; monolith, /builder is logged-out accessible so it's browser-verifiable.
-- **Deck versioning** (DeckVersion/DeckCard + snapshot on api/decks POST) — not started.
+**Architecture / backend (all committed):**
+- **Rate limiting** wired into login/register/forgot-password/join (per-IP; Upstash-durable if env set, in-memory fallback; documented in env.example).
+- **Card DB**: Card model + `api/_lib/cardIngest.js` + `scripts/ingest-cards.mjs` + cron-guarded `api/cards/ingest.js` + read `api/cards/index.js` + nightly vercel cron. Live Lorcast shape verified. Frontend not yet wired.
+- **Deck versioning**: `DeckVersion` model; api/decks POST snapshots prior state in a transaction before overwrite; `GET api/decks/:id/versions` (owner-scoped).
+- **JSZip decompression bound**, **backlog** (insights case-insensitive, UTC time labels, CSV escaping, requireHubMember consolidation), **LLM gateway** (`api/_lib/anthropic.js`), **removed dead parallel Toast system**.
 
-**Verify note:** the safety classifier (opus-4-8) was down late in the session, blocking browser screenshots/navigation. HubOverviewPage restyle was NOT browser-verified (logged-in surface); it compiles + tests pass but eyeball it. Landing page WAS fully verified earlier.
+**REQUIRES `db push` before deploy** (four schema changes, none live yet): H1 owner cascade `Restrict`, `Pod.createdById`, `Card` model, `DeckVersion` model.
+
+**Verify caveats:** logged-in surfaces (Team Hub overview, HubDetailLayout, DeckPresentationView) compile + pass tests but were NOT visually verified (no test login) — eyeball after a `db push` + login. Landing page and Deck Lab canvas/accents WERE browser-verified. Card-DB and deck-versioning need a `db push` to exercise. Frontend is not yet wired to the card-DB read endpoint (future enhancement).
 
 ## Status
 - **Step 1 (post-mortem):** ✅ `POSTMORTEM.md`. 6 Opus readers; every CRITICAL/HIGH re-verified against real code.
