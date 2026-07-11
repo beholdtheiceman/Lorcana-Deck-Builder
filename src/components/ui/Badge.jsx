@@ -1,5 +1,5 @@
 const variants = {
-  default:   'bg-white/10 text-gray-300 border-white/20',
+  default:   'bg-white/10 text-[color:var(--muted)] border-line',
   good:      'bg-good/10 text-good border-good/30',
   warn:      'bg-warn/10 text-warn border-warn/30',
   bad:       'bg-bad/10 text-bad border-bad/30',

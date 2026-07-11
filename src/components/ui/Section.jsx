@@ -2,10 +2,10 @@
 // from App.jsx (H9).
 export default function Section({ title, subtitle, children }) {
   return (
-    <div className="p-4 md:p-5 rounded-2xl border border-gray-600 bg-gray-700 shadow-sm">
+    <div className="p-4 md:p-5 rounded-2xl border shadow-sm" style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}>
       <div className="mb-3">
-        <h3 className="text-base md:text-lg font-semibold text-emerald-300">{title}</h3>
-        {subtitle && <p className="text-sm text-gray-300 mt-1">{subtitle}</p>}
+        <h3 className="text-base md:text-lg font-semibold font-display" style={{ color: 'var(--text)' }}>{title}</h3>
+        {subtitle && <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>{subtitle}</p>}
       </div>
       {children}
     </div>

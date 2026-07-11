@@ -23,11 +23,11 @@ const TOOL_LABELS = {
 function MarkdownText({ text }) {
   const lines = text.split('\n');
   return (
-    <div className="space-y-2 text-sm text-gray-200 leading-relaxed">
+    <div className="space-y-1.5 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
       {lines.map((line, i) => {
-        if (line.startsWith('## ')) return <h3 key={i} className="text-base font-semibold text-violet-300 mt-4 first:mt-0">{line.slice(3)}</h3>;
-        if (line.startsWith('### ')) return <h4 key={i} className="text-sm font-semibold text-gray-100 mt-3">{line.slice(4)}</h4>;
-        if (line.startsWith('- ') || line.startsWith('* ')) return <p key={i} className="pl-3 border-l-2 border-violet-500/30">{line.slice(2)}</p>;
+        if (line.startsWith('## ')) return <p key={i} className="font-display mt-4 first:mt-0" style={{ fontWeight: 560, color: 'var(--text)' }}>{line.slice(3)}</p>;
+        if (line.startsWith('### ')) return <p key={i} className="font-display mt-3" style={{ fontWeight: 560, fontSize: '13px', color: 'var(--text)' }}>{line.slice(4)}</p>;
+        if (line.startsWith('- ') || line.startsWith('* ')) return <p key={i} className="pl-3" style={{ borderLeft: '2px solid var(--line-2)', color: 'var(--muted)' }}>{line.slice(2)}</p>;
         if (line.trim() === '') return <div key={i} className="h-1" />;
         return <p key={i}>{line}</p>;
       })}
@@ -83,33 +83,35 @@ export default function AskAiPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-white mb-0.5">Ask AI</h1>
-        <p className="text-sm text-gray-400">
+        <h1 className="font-display text-lg mb-0.5" style={{ fontWeight: 560, color: 'var(--text)' }}>Ask AI</h1>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
           Ask about cards, decks, meta, or team stats — anywhere in the app. It can look up card text, your saved
           decks, and (if you pick a hub below) that team's practice results, reviews, primers, and reports.
         </p>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+      <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
         <div className="flex flex-col sm:flex-row gap-3">
-          <label className="flex-1 text-xs text-gray-400">
+          <label className="flex-1 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
             Team Hub context (optional)
             <select
               value={hubId}
               onChange={(e) => setHubId(e.target.value)}
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-white/10 bg-gray-800 text-sm text-white focus:border-violet-400/60 focus:outline-none"
+              className="mt-1 w-full px-3 py-2 rounded-md border text-sm normal-case tracking-normal focus:outline-none"
+              style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
             >
               <option value="">No hub — cards &amp; my decks only</option>
               {hubs.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
           </label>
 
-          <label className="flex-1 text-xs text-gray-400">
+          <label className="flex-1 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
             Attach a deck (optional)
             <select
               value={deckMode}
               onChange={(e) => setDeckMode(e.target.value)}
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-white/10 bg-gray-800 text-sm text-white focus:border-violet-400/60 focus:outline-none"
+              className="mt-1 w-full px-3 py-2 rounded-md border text-sm normal-case tracking-normal focus:outline-none"
+              style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
             >
               <option value="none">None</option>
               <option value="saved">One of my saved decks</option>
@@ -122,7 +124,8 @@ export default function AskAiPage() {
           <select
             value={selectedDeckId}
             onChange={(e) => setSelectedDeckId(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-white/10 bg-gray-800 text-sm text-white focus:border-violet-400/60 focus:outline-none"
+            className="w-full px-3 py-2 rounded-md border text-sm focus:outline-none"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           >
             <option value="">Choose a deck…</option>
             {myDecks.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
@@ -135,7 +138,8 @@ export default function AskAiPage() {
             onChange={(e) => setPastedDeck(e.target.value)}
             placeholder={'4 Elsa - Snow Queen\n2 Be Prepared\n...'}
             rows={4}
-            className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm resize-none focus:border-violet-500 focus:outline-none"
+            className="w-full p-3 rounded-md border text-sm resize-none focus:outline-none"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           />
         )}
       </div>
@@ -148,15 +152,17 @@ export default function AskAiPage() {
           placeholder="Ask anything about cards, decks, meta, or team stats…"
           rows={3}
           disabled={loading}
-          className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm resize-none focus:border-violet-500 focus:outline-none disabled:opacity-50"
+          className="w-full p-3 rounded-md border text-sm resize-none focus:outline-none disabled:opacity-50"
+          style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{error}</p>}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <p className="text-xs text-gray-500 order-2 sm:order-1">Press Enter to send · Shift+Enter for new line</p>
+          <p className="text-xs order-2 sm:order-1" style={{ color: 'var(--faint)' }}>Press Enter to send · Shift+Enter for new line</p>
           <button
             type="submit"
             disabled={loading || !question.trim()}
-            className="order-1 sm:order-2 w-full sm:w-auto px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            className="order-1 sm:order-2 w-full sm:w-auto px-4 py-2 rounded-md text-sm font-semibold hover:brightness-110 disabled:opacity-40 transition"
+            style={{ background: 'var(--sapphire)', color: '#0b1620' }}
           >
             {loading ? 'Thinking…' : 'Ask'}
           </button>
@@ -165,13 +171,14 @@ export default function AskAiPage() {
 
       {history.length === 0 && !loading && (
         <div>
-          <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">Try asking</p>
+          <p className="text-[11px] uppercase tracking-[0.1em] mb-2 font-semibold" style={{ color: 'var(--faint)' }}>Try asking</p>
           <div className="flex flex-wrap gap-2">
             {EXAMPLE_QUESTIONS.map((q) => (
               <button
                 key={q}
                 onClick={() => ask(q)}
-                className="text-xs px-3 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/[0.06] text-violet-300 hover:bg-violet-500/[0.12] transition-colors"
+                className="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
               >
                 {q}
               </button>
@@ -181,32 +188,32 @@ export default function AskAiPage() {
       )}
 
       {loading && (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-gray-400 animate-pulse">
+        <div className="rounded-xl border p-5 text-sm animate-pulse" style={{ borderColor: 'var(--line)', background: 'var(--panel)', color: 'var(--muted)' }}>
           Looking into it…
         </div>
       )}
 
       {history.map((item, i) => (
         <div key={i} className="space-y-3">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">Question</p>
-            <p className="text-sm text-gray-200">{item.question}</p>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
+            <p className="text-[11px] uppercase tracking-[0.1em] mb-1 font-semibold" style={{ color: 'var(--faint)' }}>Question</p>
+            <p className="text-sm" style={{ color: 'var(--text)' }}>{item.question}</p>
           </div>
-          <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
-            <p className="text-xs text-violet-400 mb-3 uppercase tracking-wide font-medium">Answer</p>
+          <div className="rounded-xl border p-5" style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 30%, var(--line))', background: 'var(--panel)' }}>
+            <p className="text-[11px] uppercase tracking-[0.1em] mb-3 font-semibold" style={{ color: 'var(--sapphire)' }}>Answer</p>
             <MarkdownText text={item.answer} />
             {item.toolsUsed?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-4 pt-3 border-t border-white/10">
-                <span className="text-xs text-gray-500">Looked up:</span>
+              <div className="flex flex-wrap gap-1.5 mt-4 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
+                <span className="text-xs" style={{ color: 'var(--faint)' }}>Looked up:</span>
                 {item.toolsUsed.map(t => (
-                  <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/10">
+                  <span key={t} className="text-xs px-2 py-0.5 rounded-full border" style={{ background: 'var(--panel-2)', color: 'var(--faint)', borderColor: 'var(--line-2)' }}>
                     {TOOL_LABELS[t] || t}
                   </span>
                 ))}
               </div>
             )}
             {item.deckWarnings?.length > 0 && (
-              <p className="text-xs text-amber-400 mt-2">{item.deckWarnings.join(' · ')}</p>
+              <p className="text-xs mt-2" style={{ color: 'var(--amber)' }}>{item.deckWarnings.join(' · ')}</p>
             )}
           </div>
         </div>

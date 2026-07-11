@@ -179,22 +179,39 @@ const HubListPage = () => {
     finally { setTransferring(false); }
   };
 
-  const inputCls = 'w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none transition-colors text-sm';
-  const cancelBtn = 'px-4 py-2 rounded-lg border border-white/10 bg-white/[0.04] text-gray-300 hover:bg-white/[0.08] text-sm transition-colors';
-  const primaryBtn = 'px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm font-medium transition-colors';
+  // ---- token-styled primitives (idiom: src/pages/hub/HubOverviewPage.jsx) ----
+  const inputCls = 'w-full px-3 py-2 rounded-md border text-sm focus:outline-none transition-colors placeholder:text-[color:var(--faint)]';
+  const inputStyle = { borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' };
+
+  const cancelBtnCls = 'px-4 py-2 rounded-md border text-sm font-semibold transition-colors hover:brightness-125';
+  const cancelBtnStyle = { borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' };
+
+  const primaryBtnCls = 'px-4 py-2 rounded-md text-sm font-semibold disabled:opacity-40 transition shrink-0 hover:brightness-110';
+  const primaryBtnStyle = { background: 'var(--sapphire)', color: '#0b1620' };
+
+  const errorBoxCls = 'px-3 py-2 rounded-md border text-sm';
+  const errorBoxStyle = {
+    background: 'color-mix(in srgb, var(--ruby) 12%, transparent)',
+    borderColor: 'color-mix(in srgb, var(--ruby) 40%, transparent)',
+    color: 'var(--ruby)',
+  };
+
+  const modalCardStyle = { background: 'var(--panel)', borderColor: 'var(--line)' };
+  const modalHeadingStyle = { fontWeight: 560, color: 'var(--text)' };
 
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-white">Team Hub</h1>
+        <h1 className="font-display text-2xl" style={{ fontWeight: 560, color: 'var(--text)' }}>Team Hub</h1>
         <div className="flex gap-3">
-          <button onClick={() => setShowCreateModal(true)} className={primaryBtn}>
+          <button onClick={() => setShowCreateModal(true)} className={primaryBtnCls} style={primaryBtnStyle}>
             Create Hub
           </button>
           <button
             onClick={() => setShowJoinModal(true)}
-            className="px-4 py-2 rounded-lg border border-white/10 bg-white/[0.06] text-gray-200 hover:bg-white/[0.1] text-sm font-medium transition-colors"
+            className={cancelBtnCls}
+            style={cancelBtnStyle}
           >
             Join Hub
           </button>
@@ -202,7 +219,7 @@ const HubListPage = () => {
       </div>
 
       {error && (
-        <div className="mb-4 px-3 py-2 rounded-lg bg-red-900/50 border border-red-700 text-red-200 text-sm">
+        <div className={`mb-4 ${errorBoxCls}`} style={errorBoxStyle}>
           {error}
         </div>
       )}
@@ -218,23 +235,24 @@ const HubListPage = () => {
       ) : (
         <div className="space-y-4">
           {hubs.map(hub => (
-            <div key={hub.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div key={hub.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
               <div className="flex justify-between items-start mb-4 gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">{hub.name}</h3>
-                  <p className="text-gray-400 text-sm">
+                  <h3 className="font-display text-lg" style={{ fontWeight: 560, color: 'var(--text)' }}>{hub.name}</h3>
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>
                     {hub.members.length + 1} member{hub.members.length !== 0 ? 's' : ''}
                     {hub.owner.id === user.id ? ' · You own this hub' : ` · Owner: ${hub.owner.email}`}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-gray-500 text-xs">Code:</span>
-                    <span className="font-mono text-gray-300 text-sm tracking-widest">{hub.inviteCode}</span>
+                    <span className="text-xs" style={{ color: 'var(--faint)' }}>Code:</span>
+                    <span className="font-mono text-sm tracking-widest tabular-nums" style={{ color: 'var(--text)' }}>{hub.inviteCode}</span>
                     <button
                       onClick={() => {
                         const url = `${window.location.origin}/join?code=${hub.inviteCode}`;
                         navigator.clipboard.writeText(url);
                       }}
-                      className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                      className="text-xs transition-colors hover:brightness-110"
+                      style={{ color: 'var(--sapphire)' }}
                       title="Copy invite link"
                     >
                       Copy link
@@ -246,13 +264,15 @@ const HubListPage = () => {
                     <>
                       <button
                         onClick={() => regenerateInviteCode(hub.id)}
-                        className="px-3 py-1 rounded text-xs font-medium border border-white/10 bg-white/[0.04] text-gray-300 hover:bg-white/[0.08] transition-colors"
+                        className="px-3 py-1 rounded-md text-xs font-semibold border transition-colors hover:brightness-125"
+                        style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' }}
                       >
                         Regenerate Code
                       </button>
                       <button
                         onClick={() => setHubToDelete(hub) || setShowDeleteConfirm(true)}
-                        className="px-3 py-1 rounded text-xs font-medium bg-red-900/40 border border-red-700/40 text-red-300 hover:bg-red-900/70 transition-colors"
+                        className="px-3 py-1 rounded-md text-xs font-semibold border transition-colors hover:brightness-125"
+                        style={{ color: 'var(--ruby)', background: 'color-mix(in srgb, var(--ruby) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--ruby) 40%, transparent)' }}
                       >
                         Delete Hub
                       </button>
@@ -260,7 +280,8 @@ const HubListPage = () => {
                   )}
                   <button
                     onClick={() => navigate(`/team-hub/${hub.id}/roster`)}
-                    className="px-3 py-1 bg-violet-600 text-white rounded text-xs font-medium hover:bg-violet-700 transition-colors"
+                    className="px-3 py-1 rounded-md text-xs font-semibold transition hover:brightness-110"
+                    style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                   >
                     View Hub
                   </button>
@@ -268,17 +289,21 @@ const HubListPage = () => {
               </div>
 
               <div className="mt-3">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Members</p>
+                <p className="text-[11px] uppercase tracking-[0.1em] font-semibold mb-2" style={{ color: 'var(--faint)' }}>Members</p>
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between rounded-lg px-3 py-2 bg-violet-500/10 border border-violet-500/20">
-                    <span className="text-violet-200 text-sm font-medium">
+                  <div
+                    className="flex items-center justify-between rounded-md px-3 py-2 border"
+                    style={{ borderColor: 'color-mix(in srgb, var(--sapphire) 30%, var(--line))', background: 'color-mix(in srgb, var(--sapphire) 8%, transparent)' }}
+                  >
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
                       {hub.owner.email}
-                      <span className="ml-2 text-xs text-violet-400/60 font-normal">Owner</span>
+                      <span className="ml-2 text-xs font-normal" style={{ color: 'var(--sapphire)' }}>Owner</span>
                     </span>
                     {hub.owner.id === user.id && hub.members.length > 0 && (
                       <button
                         onClick={() => { setHubToTransfer(hub); setShowTransferModal(true); }}
-                        className="px-2 py-1 rounded text-xs border border-white/10 bg-white/[0.04] text-gray-300 hover:bg-white/[0.08] transition-colors"
+                        className="px-2 py-1 rounded-md text-xs border transition-colors hover:brightness-125"
+                        style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' }}
                       >
                         Transfer
                       </button>
@@ -286,18 +311,19 @@ const HubListPage = () => {
                   </div>
 
                   {hub.members.map(member => (
-                    <div key={member.id} className="flex items-center justify-between rounded-lg px-3 py-2 bg-white/[0.03] border border-white/10">
-                      <span className="text-gray-200 text-sm">
+                    <div key={member.id} className="flex items-center justify-between rounded-md px-3 py-2 border" style={{ borderColor: 'var(--line)', background: 'var(--panel-2)' }}>
+                      <span className="text-sm" style={{ color: 'var(--text)' }}>
                         {member.displayName || member.user.email}
                         {member.displayName && (
-                          <span className="ml-1.5 text-xs text-gray-500">{member.user.email}</span>
+                          <span className="ml-1.5 text-xs" style={{ color: 'var(--faint)' }}>{member.user.email}</span>
                         )}
                       </span>
                       <div className="flex gap-2">
                         {hub.owner.id === user.id && (
                           <button
                             onClick={() => removeMember(hub.id, member.user.id)}
-                            className="px-2 py-1 rounded text-xs bg-red-900/40 border border-red-700/40 text-red-300 hover:bg-red-900/70 transition-colors"
+                            className="px-2 py-1 rounded-md text-xs border transition-colors hover:brightness-125"
+                            style={{ color: 'var(--ruby)', background: 'color-mix(in srgb, var(--ruby) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--ruby) 40%, transparent)' }}
                           >
                             Remove
                           </button>
@@ -305,7 +331,8 @@ const HubListPage = () => {
                         {member.user.id === user.id && (
                           <button
                             onClick={() => leaveHub(hub.id)}
-                            className="px-2 py-1 rounded text-xs border border-white/10 bg-white/[0.04] text-gray-300 hover:bg-white/[0.08] transition-colors"
+                            className="px-2 py-1 rounded-md text-xs border transition-colors hover:brightness-125"
+                            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--muted)' }}
                           >
                             Leave
                           </button>
@@ -323,19 +350,19 @@ const HubListPage = () => {
       {/* Create Hub Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-950 rounded-xl border border-white/10 p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-white mb-4">Create New Hub</h2>
+          <div className="rounded-xl border p-6 w-full max-w-md" style={modalCardStyle}>
+            <h2 className="font-display text-xl mb-4" style={modalHeadingStyle}>Create New Hub</h2>
             <form onSubmit={createHub} className="space-y-3">
               {createError && (
-                <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">{createError}</div>
+                <div className={errorBoxCls} style={errorBoxStyle}>{createError}</div>
               )}
               <input
                 type="text" placeholder="Hub Name" value={hubName}
-                onChange={(e) => setHubName(e.target.value)} className={inputCls} required
+                onChange={(e) => setHubName(e.target.value)} className={inputCls} style={inputStyle} required
               />
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => { setShowCreateModal(false); setCreateError(''); }} className={cancelBtn}>Cancel</button>
-                <button type="submit" disabled={loading} className={primaryBtn}>{loading ? 'Creating...' : 'Create Hub'}</button>
+                <button type="button" onClick={() => { setShowCreateModal(false); setCreateError(''); }} className={cancelBtnCls} style={cancelBtnStyle}>Cancel</button>
+                <button type="submit" disabled={loading} className={primaryBtnCls} style={primaryBtnStyle}>{loading ? 'Creating...' : 'Create Hub'}</button>
               </div>
             </form>
           </div>
@@ -345,21 +372,22 @@ const HubListPage = () => {
       {/* Join Hub Modal */}
       {showJoinModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-950 rounded-xl border border-white/10 p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-white mb-4">Join Hub</h2>
+          <div className="rounded-xl border p-6 w-full max-w-md" style={modalCardStyle}>
+            <h2 className="font-display text-xl mb-4" style={modalHeadingStyle}>Join Hub</h2>
             <form onSubmit={joinHub} className="space-y-3">
               {joinError && (
-                <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">{joinError}</div>
+                <div className={errorBoxCls} style={errorBoxStyle}>{joinError}</div>
               )}
               <input
                 type="text" placeholder="Invite Code (8 characters)" value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 className={`${inputCls} font-mono uppercase tracking-widest text-center text-base`}
+                style={inputStyle}
                 maxLength={8} required
               />
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => { setShowJoinModal(false); setJoinError(''); }} className={cancelBtn}>Cancel</button>
-                <button type="submit" disabled={loading} className={primaryBtn}>{loading ? 'Joining...' : 'Join Hub'}</button>
+                <button type="button" onClick={() => { setShowJoinModal(false); setJoinError(''); }} className={cancelBtnCls} style={cancelBtnStyle}>Cancel</button>
+                <button type="submit" disabled={loading} className={primaryBtnCls} style={primaryBtnStyle}>{loading ? 'Joining...' : 'Join Hub'}</button>
               </div>
             </form>
           </div>
@@ -369,15 +397,20 @@ const HubListPage = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && hubToDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-950 rounded-xl border border-white/10 p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-white mb-4">Delete Team Hub</h2>
-            <p className="text-gray-300 text-sm mb-6">
-              Are you sure you want to delete <strong className="text-white">"{hubToDelete.name}"</strong>?
+          <div className="rounded-xl border p-6 w-full max-w-md" style={modalCardStyle}>
+            <h2 className="font-display text-xl mb-4" style={modalHeadingStyle}>Delete Team Hub</h2>
+            <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
+              Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>"{hubToDelete.name}"</strong>?
               This action cannot be undone and will remove all associated data.
             </p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => { setShowDeleteConfirm(false); setHubToDelete(null); }} className={cancelBtn} disabled={deleting}>Cancel</button>
-              <button onClick={handleDeleteHub} disabled={deleting} className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:opacity-50 text-sm font-medium transition-colors">
+              <button onClick={() => { setShowDeleteConfirm(false); setHubToDelete(null); }} className={cancelBtnCls} style={cancelBtnStyle} disabled={deleting}>Cancel</button>
+              <button
+                onClick={handleDeleteHub}
+                disabled={deleting}
+                className="px-4 py-2 rounded-md border text-sm font-semibold disabled:opacity-40 transition-colors hover:brightness-125"
+                style={{ color: 'var(--ruby)', background: 'color-mix(in srgb, var(--ruby) 14%, transparent)', borderColor: 'color-mix(in srgb, var(--ruby) 45%, transparent)' }}
+              >
                 {deleting ? 'Deleting...' : 'Delete Hub'}
               </button>
             </div>
@@ -388,20 +421,20 @@ const HubListPage = () => {
       {/* Post-Join Display Name Modal */}
       {showDisplayNameModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-950 rounded-xl border border-white/10 p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-white mb-1">Welcome to the hub!</h2>
-            <p className="text-gray-400 text-sm mb-5">Set a display name so your teammates know who you are. You can update this later from the Roster tab.</p>
+          <div className="rounded-xl border p-6 w-full max-w-md" style={modalCardStyle}>
+            <h2 className="font-display text-xl mb-1" style={modalHeadingStyle}>Welcome to the hub!</h2>
+            <p className="text-sm mb-5" style={{ color: 'var(--muted)' }}>Set a display name so your teammates know who you are. You can update this later from the Roster tab.</p>
             <form onSubmit={saveDisplayName} className="space-y-3">
               {displayNameError && (
-                <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">{displayNameError}</div>
+                <div className={errorBoxCls} style={errorBoxStyle}>{displayNameError}</div>
               )}
               <input
                 type="text" placeholder="Your display name (e.g. Larry)" value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)} maxLength={80} className={inputCls} autoFocus
+                onChange={(e) => setDisplayName(e.target.value)} maxLength={80} className={inputCls} style={inputStyle} autoFocus
               />
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => { setShowDisplayNameModal(false); navigate(`/team-hub/${joinedHubId}/roster`); }} className={cancelBtn}>Skip for now</button>
-                <button type="submit" disabled={savingDisplayName || !displayName.trim()} className={primaryBtn}>
+                <button type="button" onClick={() => { setShowDisplayNameModal(false); navigate(`/team-hub/${joinedHubId}/roster`); }} className={cancelBtnCls} style={cancelBtnStyle}>Skip for now</button>
+                <button type="submit" disabled={savingDisplayName || !displayName.trim()} className={primaryBtnCls} style={primaryBtnStyle}>
                   {savingDisplayName ? 'Saving...' : 'Save & Enter Hub'}
                 </button>
               </div>
@@ -413,12 +446,12 @@ const HubListPage = () => {
       {/* Transfer Ownership Modal */}
       {showTransferModal && hubToTransfer && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-950 rounded-xl border border-white/10 p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-white mb-4">Transfer Ownership</h2>
-            <p className="text-gray-300 text-sm mb-4">Transfer ownership of <strong className="text-white">"{hubToTransfer.name}"</strong> to another member.</p>
+          <div className="rounded-xl border p-6 w-full max-w-md" style={modalCardStyle}>
+            <h2 className="font-display text-xl mb-4" style={modalHeadingStyle}>Transfer Ownership</h2>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Transfer ownership of <strong style={{ color: 'var(--text)' }}>"{hubToTransfer.name}"</strong> to another member.</p>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Select New Owner</label>
-              <select value={selectedNewOwner} onChange={(e) => setSelectedNewOwner(e.target.value)} className={inputCls} disabled={transferring}>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted)' }}>Select New Owner</label>
+              <select value={selectedNewOwner} onChange={(e) => setSelectedNewOwner(e.target.value)} className={inputCls} style={inputStyle} disabled={transferring}>
                 <option value="">Choose a member...</option>
                 {hubToTransfer.members.map(member => (
                   <option key={member.user.id} value={member.user.id}>
@@ -428,8 +461,8 @@ const HubListPage = () => {
               </select>
             </div>
             <div className="flex justify-end gap-3">
-              <button onClick={() => { setShowTransferModal(false); setHubToTransfer(null); setSelectedNewOwner(''); }} className={cancelBtn} disabled={transferring}>Cancel</button>
-              <button onClick={transferOwnership} disabled={!selectedNewOwner || transferring} className={primaryBtn}>
+              <button onClick={() => { setShowTransferModal(false); setHubToTransfer(null); setSelectedNewOwner(''); }} className={cancelBtnCls} style={cancelBtnStyle} disabled={transferring}>Cancel</button>
+              <button onClick={transferOwnership} disabled={!selectedNewOwner || transferring} className={primaryBtnCls} style={primaryBtnStyle}>
                 {transferring ? 'Transferring...' : 'Transfer Ownership'}
               </button>
             </div>

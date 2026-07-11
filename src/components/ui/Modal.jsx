@@ -13,18 +13,19 @@ export default function Modal({ open, onClose, title, children, footer, size = "
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`bg-[#11151f] border border-white/10 rounded-2xl ${sizeClasses[size]} shadow-2xl`}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <div className="text-lg font-semibold font-display">{title}</div>
+      <div className={`border rounded-2xl ${sizeClasses[size]} shadow-2xl`} style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--line)' }}>
+          <div className="text-lg font-semibold font-display" style={{ color: 'var(--text)' }}>{title}</div>
           <button
-            className="px-2.5 py-1 rounded-md text-sm bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 transition"
+            className="px-2.5 py-1 rounded-md text-sm border transition hover:brightness-110"
+            style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)', color: 'var(--text)' }}
             onClick={onClose}
           >
             Close
           </button>
         </div>
         <div className="p-4 overflow-y-auto overflow-x-hidden max-h-[calc(95vh-120px)]">{children}</div>
-        {footer && <div className="px-4 py-3 border-t border-white/10">{footer}</div>}
+        {footer && <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--line)' }}>{footer}</div>}
       </div>
     </div>
   )

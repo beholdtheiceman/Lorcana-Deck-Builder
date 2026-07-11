@@ -25,15 +25,12 @@ function useDeckResults(deckId) {
   };
   
   const bulkAdd = (newRecords) => {
-    console.log('[useDeckResults] bulkAdd called with records:', newRecords);
     const stamped = newRecords.map(record => ({
       ...record,
       id: record.id || `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       dateISO: record.dateISO || new Date().toISOString(),
       deckId
     }));
-    console.log('[useDeckResults] bulkAdd - new records after stamping:', stamped);
-    console.log('[useDeckResults] bulkAdd - all records after adding:', [...stamped, ...records]);
     persist([...stamped, ...records]);
     return stamped.length;
   };
@@ -197,12 +194,7 @@ export default function StandingsImageImport({
   deckName,
   onRecordsUpdated,
 }) {
-  console.log('[StandingsImageImport] Component initialized with deckId:', deckId, 'deckName:', deckName);
-  
   const { bulkAdd, count, records, persist } = useDeckResults(deckId);
-  console.log('[StandingsImageImport] useDeckResults returned:', { bulkAdd: !!bulkAdd, count, records: records.length, persist: !!persist });
-  console.log('[StandingsImageImport] bulkAdd type:', typeof bulkAdd);
-  console.log('[StandingsImageImport] bulkAdd function:', bulkAdd);
 
   const [file, setFile] = useState();
   const [imgUrl, setImgUrl] = useState("");
@@ -218,112 +210,82 @@ export default function StandingsImageImport({
 
   // Load preview URL
   useEffect(() => {
-    console.log('[StandingsImageImport] File useEffect triggered, file:', file ? { name: file.name, type: file.type, size: file.size } : 'none');
     if (!file) {
-      console.log('[StandingsImageImport] No file, returning early');
       setShowImportButton(false);
       return;
     }
-    console.log('[StandingsImageImport] Creating object URL for file');
     const url = URL.createObjectURL(file);
-    console.log('[StandingsImageImport] Setting imgUrl to:', url);
     setImgUrl(url);
     setShowImportButton(true); // Show import button immediately when file is loaded
-    console.log('[StandingsImageImport] showImportButton set to true');
     return () => {
-      console.log('[StandingsImageImport] Cleaning up object URL');
       URL.revokeObjectURL(url);
     };
   }, [file]);
 
   // Render preprocessed crop into canvas for visual feedback and auto-run OCR
   useEffect(() => {
-    console.log('[StandingsImageImport] Image processing useEffect triggered, imgUrl:', imgUrl, 'crop:', crop);
     const img = imgRef.current;
-    console.log('[StandingsImageImport] Image ref:', img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : 'null');
     if (!img || !imgUrl) {
-      console.log('[StandingsImageImport] Image ref or imgUrl missing, returning early');
       return;
     }
-    
+
     // Wait for image to be fully loaded
     if (!img.complete || img.naturalWidth === 0) {
-      console.log('[StandingsImageImport] Image not fully loaded yet, waiting...');
       const handleLoad = () => {
-        console.log('[StandingsImageImport] Image loaded, processing...');
         processImage();
       };
       img.addEventListener('load', handleLoad);
       return () => img.removeEventListener('load', handleLoad);
     }
-    
+
     processImage();
-    
+
     function processImage() {
-    console.log('[StandingsImageImport] Preprocessing image with mode:', preprocessingMode);
     const c = preprocess(img, crop, 1600, preprocessingMode);
     const ctx = (canvasRef.current || (canvasRef.current = document.createElement("canvas"))).getContext("2d");
     const canvas = canvasRef.current;
     canvas.width = c.width;
     canvas.height = c.height;
     ctx.drawImage(c, 0, 0);
-    console.log('[StandingsImageImport] Canvas updated, dimensions:', c.width, 'x', c.height);
-    
+
       // Auto-run OCR when image is loaded and processed
       if (imgUrl && !ocrText && !isProcessing) {
-        console.log('[StandingsImageImport] Auto-running OCR, imgUrl exists and no ocrText yet');
         doOCR();
-      } else {
-        console.log('[StandingsImageImport] Not running OCR - imgUrl:', !!imgUrl, 'ocrText:', !!ocrText, 'isProcessing:', isProcessing);
       }
     }
   }, [imgUrl, crop, preprocessingMode]);
 
   const onDrop = (e) => {
-    console.log('[StandingsImageImport] onDrop triggered');
     e.preventDefault();
     const f = e.dataTransfer.files?.[0];
-    console.log('[StandingsImageImport] Dropped file:', f ? { name: f.name, type: f.type, size: f.size } : 'none');
     if (f && f.type.startsWith("image/")) {
-      console.log('[StandingsImageImport] Setting file state');
       setFile(f);
       setIsProcessing(false);
       setOcrText("");
       setRows([]);
       setShowImportButton(false); // Will be set to true in useEffect when file is processed
-    } else {
-      console.log('[StandingsImageImport] File rejected - not an image');
     }
   };
 
   const doOCR = async () => {
-    console.log('[StandingsImageImport] doOCR function called');
     if (isProcessing) {
-      console.log('[StandingsImageImport] OCR already processing, skipping');
       return;
     }
     const img = imgRef.current;
-    console.log('[StandingsImageImport] Image ref in doOCR:', img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : 'null');
     if (!img) {
-      console.log('[StandingsImageImport] No image ref, returning early');
       return;
     }
-    console.log('[StandingsImageImport] Starting OCR process');
     setIsProcessing(true);
     setProgress(0);
     setOcrText("");
     setRows([]);
 
     // get preprocessed canvas
-    console.log('[StandingsImageImport] Preprocessing image for OCR with mode:', preprocessingMode);
     const processed = preprocess(img, crop, 1600, preprocessingMode);
-    console.log('[StandingsImageImport] Preprocessed canvas dimensions:', processed.width, 'x', processed.height);
-    
+
     // Enhanced Tesseract configuration for better number recognition
-    console.log('[StandingsImageImport] Starting Tesseract recognition');
     const { data } = await Tesseract.recognize(processed, "eng", {
       logger: (m) => {
-        console.log('[StandingsImageImport] Tesseract progress:', m.status, m.progress);
         if (m.status === "recognizing text" && m.progress != null) {
           setProgress(Math.round(m.progress * 100));
         }
@@ -333,35 +295,27 @@ export default function StandingsImageImport({
       tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK, // Treat as single text block
       tessedit_ocr_engine_mode: Tesseract.OEM.LSTM_ONLY, // Use LSTM engine for better accuracy
     });
-    
+
     const text = data.text || "";
-    console.log('[StandingsImageImport] OCR completed, text length:', text.length);
-    console.log('[StandingsImageImport] OCR text:', text);
     setOcrText(text);
-    
-    console.log('[StandingsImageImport] Parsing standings text');
+
     const parsed = parseStandingsText(text);
-    console.log('[StandingsImageImport] Parsed rows:', parsed);
     setRows(parsed);
     setIsProcessing(false);
   };
 
   const importRows = () => {
-    console.log('[StandingsImageImport] importRows called with rows:', rows);
     if (!rows.length) {
-      console.log('[StandingsImageImport] No rows to import, returning early');
       return;
     }
-    console.log('[StandingsImageImport] Mapping rows to match records');
-    
+
     const mapped = [];
-    
+
     rows.forEach(r => {
       // Parse record like "2-3-0" into individual matches
       if (r.record) {
         const [wins, losses, draws] = r.record.split('-').map(Number);
-        console.log('[StandingsImageImport] Parsing record:', r.record, '->', { wins, losses, draws });
-        
+
         // Add wins
         for (let i = 0; i < wins; i++) {
           mapped.push({
@@ -414,23 +368,16 @@ export default function StandingsImageImport({
       }
     });
     
-    console.log('[StandingsImageImport] Mapped records:', mapped);
-    console.log('[StandingsImageImport] Calling bulkAdd');
     if (typeof bulkAdd !== 'function') {
-      console.error('[StandingsImageImport] bulkAdd is not a function:', bulkAdd);
       return;
     }
     const added = bulkAdd(mapped);
-    console.log('[StandingsImageImport] bulkAdd completed, added:', added, 'records');
-    
+
     // Notify parent component that records were updated
     if (onRecordsUpdated) {
-      console.log('[StandingsImageImport] Calling onRecordsUpdated callback');
       onRecordsUpdated();
-    } else {
-      console.log('[StandingsImageImport] onRecordsUpdated callback not provided');
     }
-    
+
     // Hide import button after successful import
     setShowImportButton(false);
     
@@ -441,44 +388,38 @@ export default function StandingsImageImport({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Import Standings from Image{deckName ? ` — ${deckName}` : ""}</h3>
-          <p className="text-sm text-gray-600">Upload a screenshot/photo of the STANDINGS table. Enhanced preprocessing handles colored text and numbers better. OCR runs automatically when the image loads.</p>
+          <h3 className="font-display text-lg" style={{ fontWeight: 560, color: 'var(--text)' }}>Import Standings from Image{deckName ? ` — ${deckName}` : ""}</h3>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Upload a screenshot/photo of the STANDINGS table. Enhanced preprocessing handles colored text and numbers better. OCR runs automatically when the image loads.</p>
         </div>
-        <div className="text-sm text-gray-500">Current entries: {count}</div>
+        <div className="text-sm tabular-nums" style={{ color: 'var(--faint)' }}>Current entries: {count}</div>
       </div>
 
       {/* Drop zone / picker */}
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
-        className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-gray-50"
+        className="border-2 border-dashed rounded-lg p-4 text-center"
+        style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)' }}
       >
         <input
           key={file ? 'has-file' : 'no-file'}
           type="file"
           accept="image/*"
           onChange={e => {
-            console.log('[StandingsImageImport] File input onChange triggered');
             const f = e.target.files?.[0];
-            console.log('[StandingsImageImport] Selected file:', f ? { name: f.name, type: f.type, size: f.size } : 'none');
             if (f && f.type.startsWith("image/")) {
-              console.log('[StandingsImageImport] Setting file state');
               setFile(f);
               setIsProcessing(false);
               setOcrText("");
               setRows([]);
               setShowImportButton(false); // Will be set to true in useEffect when file is processed
-            } else if (f) {
-              console.log('[StandingsImageImport] File rejected - not an image:', f.type);
-            } else {
-              console.log('[StandingsImageImport] No file selected (input cleared)');
             }
           }}
           className="hidden"
           id="standings-file"
         />
-        <label htmlFor="standings-file" className="cursor-pointer block">
-          {file ? <strong>{file.name}</strong> : "Drag & drop an image here, or click to choose a file"}
+        <label htmlFor="standings-file" className="cursor-pointer block" style={{ color: 'var(--muted)' }}>
+          {file ? <strong style={{ color: 'var(--text)' }}>{file.name}</strong> : "Drag & drop an image here, or click to choose a file"}
         </label>
       </div>
 
@@ -492,45 +433,50 @@ export default function StandingsImageImport({
               alt="Uploaded"
               onLoad={() => { /* trigger preprocess render via effect */ }}
               className="w-full border rounded"
+              style={{ borderColor: 'var(--line)' }}
             />
             <div className="grid grid-cols-2 gap-2 text-sm">
               <label className="flex flex-col">
-                <span className="text-gray-600">Crop top ({crop.top}%)</span>
-                <input 
-                  type="range" 
-                  min={0} 
-                  max={40} 
+                <span className="tabular-nums" style={{ color: 'var(--muted)' }}>Crop top ({crop.top}%)</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={40}
                   value={crop.top}
+                  style={{ accentColor: 'var(--sapphire)' }}
                   onChange={e => setCrop(c => ({ ...c, top: Number(e.target.value) }))}
                 />
               </label>
               <label className="flex flex-col">
-                <span className="text-gray-600">Crop bottom ({crop.bottom}%)</span>
-                <input 
-                  type="range" 
-                  min={0} 
-                  max={40} 
+                <span className="tabular-nums" style={{ color: 'var(--muted)' }}>Crop bottom ({crop.bottom}%)</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={40}
                   value={crop.bottom}
+                  style={{ accentColor: 'var(--sapphire)' }}
                   onChange={e => setCrop(c => ({ ...c, bottom: Number(e.target.value) }))}
                 />
               </label>
               <label className="flex flex-col">
-                <span className="text-gray-600">Crop left ({crop.left}%)</span>
-                <input 
-                  type="range" 
-                  min={0} 
-                  max={40} 
+                <span className="tabular-nums" style={{ color: 'var(--muted)' }}>Crop left ({crop.left}%)</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={40}
                   value={crop.left}
+                  style={{ accentColor: 'var(--sapphire)' }}
                   onChange={e => setCrop(c => ({ ...c, left: Number(e.target.value) }))}
                 />
               </label>
               <label className="flex flex-col">
-                <span className="text-gray-600">Crop right ({crop.right}%)</span>
-                <input 
-                  type="range" 
-                  min={0} 
-                  max={40} 
+                <span className="tabular-nums" style={{ color: 'var(--muted)' }}>Crop right ({crop.right}%)</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={40}
                   value={crop.right}
+                  style={{ accentColor: 'var(--sapphire)' }}
                   onChange={e => setCrop(c => ({ ...c, right: Number(e.target.value) }))}
                 />
               </label>
@@ -538,29 +484,30 @@ export default function StandingsImageImport({
             
             {/* Preprocessing Mode Selector */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600">Preprocessing Mode:</label>
+              <label className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Preprocessing Mode:</label>
               <select
                 value={preprocessingMode}
                 onChange={e => setPreprocessingMode(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none"
+                style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
               >
                 <option value="auto">Auto (Recommended)</option>
                 <option value="colored-text">Colored Text (for colored numbers/backgrounds)</option>
                 <option value="high-contrast">High Contrast (for dark text on light backgrounds)</option>
               </select>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs" style={{ color: 'var(--faint)' }}>
                 {preprocessingMode === 'colored-text' && "Best for colored numbers on colored backgrounds"}
                 {preprocessingMode === 'high-contrast' && "Best for dark text on light backgrounds"}
                 {preprocessingMode === 'auto' && "Automatically detects and adjusts for different image types"}
               </p>
             </div>
-            
-            {!!progress && progress < 100 && <div className="text-sm text-gray-600">Recognizing… {progress}%</div>}
+
+            {!!progress && progress < 100 && <div className="text-sm tabular-nums" style={{ color: 'var(--muted)' }}>Recognizing… {progress}%</div>}
           </div>
 
           <div className="space-y-2">
-            <div className="text-sm text-gray-600">Preprocessed Preview</div>
-            <canvas ref={canvasRef} className="w-full border rounded" />
+            <div className="text-sm" style={{ color: 'var(--muted)' }}>Preprocessed Preview</div>
+            <canvas ref={canvasRef} className="w-full border rounded" style={{ borderColor: 'var(--line)' }} />
           </div>
         </div>
       )}
@@ -569,9 +516,10 @@ export default function StandingsImageImport({
       {ocrText && (
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <div className="text-sm font-medium">Recognized Text (editable)</div>
+            <div className="text-sm font-medium" style={{ color: 'var(--text)' }}>Recognized Text (editable)</div>
             <textarea
-              className="w-full h-48 border rounded p-2 font-mono"
+              className="w-full h-48 border rounded p-2 font-mono text-sm focus:outline-none"
+              style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
               value={ocrText}
               onChange={e => {
                 setOcrText(e.target.value);
@@ -581,41 +529,41 @@ export default function StandingsImageImport({
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Parsed Rows</div>
-              {console.log('[StandingsImageImport] Rendering button section - showImportButton:', showImportButton, 'rows.length:', rows.length)}
+              <div className="text-sm font-medium" style={{ color: 'var(--text)' }}>Parsed Rows</div>
               {showImportButton && (
                 <button
                   onClick={importRows}
                   disabled={!rows.length}
-                  className={`px-3 py-1.5 rounded border ${rows.length ? "bg-black text-white" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                  className="px-3 py-1.5 rounded text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-110"
+                  style={{ background: 'var(--sapphire)', color: '#0b1620' }}
                 >
                   Import {rows.length} row(s) to deck
                 </button>
               )}
             </div>
-            <div className="overflow-auto border rounded">
+            <div className="overflow-auto border rounded" style={{ borderColor: 'var(--line)' }}>
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left px-2 py-1">Rank</th>
-                    <th className="text-left px-2 py-1">Player</th>
-                    <th className="text-left px-2 py-1">Points</th>
-                    <th className="text-left px-2 py-1">Record</th>
+                  <tr style={{ background: 'var(--panel-2)' }}>
+                    <th className="text-left px-2 py-1 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>Rank</th>
+                    <th className="text-left px-2 py-1 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>Player</th>
+                    <th className="text-left px-2 py-1 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>Points</th>
+                    <th className="text-left px-2 py-1 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>Record</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="px-2 py-1">{r.rank}</td>
-                      <td className="px-2 py-1">{r.player}</td>
-                      <td className="px-2 py-1">{r.points ?? ""}</td>
-                      <td className="px-2 py-1">{r.record ?? ""}</td>
+                    <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
+                      <td className="px-2 py-1 tabular-nums" style={{ color: 'var(--text)' }}>{r.rank}</td>
+                      <td className="px-2 py-1" style={{ color: 'var(--text)' }}>{r.player}</td>
+                      <td className="px-2 py-1 tabular-nums" style={{ color: 'var(--muted)' }}>{r.points ?? ""}</td>
+                      <td className="px-2 py-1 tabular-nums" style={{ color: 'var(--muted)' }}>{r.record ?? ""}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs" style={{ color: 'var(--faint)' }}>
               Tip: For best accuracy, upload a crisp screenshot of the standings area (not a zoomed-out full page). Use the crop sliders to isolate the table.
             </p>
           </div>
@@ -626,32 +574,33 @@ export default function StandingsImageImport({
       {records.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-lg font-semibold">Stored Match Records ({records.length})</h4>
+            <h4 className="font-display text-lg tabular-nums" style={{ fontWeight: 560, color: 'var(--text)' }}>Stored Match Records ({records.length})</h4>
             <button
               onClick={() => {
                 if (confirm('Clear all stored match records for this deck?')) {
                   persist([]);
                 }
               }}
-              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+              className="px-3 py-1 text-sm rounded font-semibold transition hover:brightness-110"
+              style={{ background: 'var(--ruby)', color: '#0b1620' }}
             >
               Clear All
             </button>
           </div>
-          
-          <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
+
+          <div className="rounded-lg p-4 max-h-64 overflow-y-auto" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
             <div className="space-y-2">
               {records.map((record, index) => (
-                <div key={record.id} className="bg-white p-3 rounded border">
+                <div key={record.id} className="p-3 rounded border" style={{ background: 'var(--panel-2)', borderColor: 'var(--line)' }}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium" style={{ color: 'var(--text)' }}>
                         Round {record.round}: vs {record.opponent}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm" style={{ color: 'var(--muted)' }}>
                         Result: {record.result} • {record.notes}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs tabular-nums" style={{ color: 'var(--faint)' }}>
                         {new Date(record.dateISO).toLocaleString()}
                       </div>
                     </div>
@@ -662,7 +611,8 @@ export default function StandingsImageImport({
                           persist(updated);
                         }
                       }}
-                      className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                      className="ml-2 px-2 py-1 text-xs rounded transition"
+                      style={{ color: 'var(--ruby)', background: 'color-mix(in srgb, var(--ruby) 15%, transparent)' }}
                     >
                       Delete
                     </button>
@@ -671,9 +621,9 @@ export default function StandingsImageImport({
               ))}
             </div>
           </div>
-          
-          <div className="text-xs text-gray-500">
-            💡 Tip: Match records are stored in localStorage and persist between sessions. 
+
+          <div className="text-xs" style={{ color: 'var(--faint)' }}>
+            💡 Tip: Match records are stored in localStorage and persist between sessions.
             You can edit the opponent name and notes by clicking on them after importing.
           </div>
         </div>

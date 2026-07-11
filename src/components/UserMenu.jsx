@@ -16,16 +16,21 @@ export default function UserMenu() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-md border transition-colors hover:brightness-125"
+        style={{ background: 'var(--panel-2)', borderColor: 'var(--line-2)' }}
       >
-        <div className="w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+        <div
+          className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium"
+          style={{ background: 'var(--emerald)', color: '#0b1620' }}
+        >
           {user.email.charAt(0).toUpperCase()}
         </div>
-        <span className="text-gray-300 text-sm hidden sm:block">
+        <span className="text-sm hidden sm:block" style={{ color: 'var(--muted)' }}>
           {user.email}
         </span>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          style={{ color: 'var(--faint)' }}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -35,15 +40,16 @@ export default function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-lg border border-gray-800 shadow-lg z-50">
+        <div className="absolute right-0 mt-2 w-48 rounded-md border shadow-lg z-50" style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}>
           <div className="py-2">
-            <div className="px-4 py-2 border-b border-gray-800">
-              <p className="text-sm text-gray-300">Signed in as</p>
-              <p className="text-sm font-medium text-white truncate">{user.email}</p>
+            <div className="px-4 py-2 border-b" style={{ borderColor: 'var(--line)' }}>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Signed in as</p>
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{user.email}</p>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+              className="w-full text-left px-4 py-2 text-sm transition-colors hover:bg-[color:var(--panel-2)]"
+              style={{ color: 'var(--muted)' }}
             >
               Sign out
             </button>

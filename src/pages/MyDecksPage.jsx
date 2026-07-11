@@ -8,12 +8,12 @@ import { useToasts } from '../contexts/ToastContext.jsx'
 import DeckPresentationView from '../components/DeckPresentationView.jsx'
 
 const INK_COLORS = {
-  Amber: '#F59E0B',
-  Amethyst: '#8B5CF6',
-  Emerald: '#10B981',
-  Ruby: '#EF4444',
-  Sapphire: '#3B82F6',
-  Steel: '#6B7280',
+  Amber: 'var(--amber)',
+  Amethyst: 'var(--amethyst)',
+  Emerald: 'var(--emerald)',
+  Ruby: 'var(--ruby)',
+  Sapphire: 'var(--sapphire)',
+  Steel: 'var(--steel)',
 }
 
 function getCardInks(card) {
@@ -45,8 +45,8 @@ function formatDate(ts) {
 function InkBadge({ ink, small }) {
   return (
     <span
-      className={`rounded-full font-medium text-white ${small ? 'text-xs px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}
-      style={{ backgroundColor: INK_COLORS[ink] ?? '#6B7280' }}
+      className={`rounded-full font-medium ${small ? 'text-xs px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}
+      style={{ backgroundColor: INK_COLORS[ink] ?? 'var(--steel)', color: '#0b0c0f' }}
     >
       {ink}
     </span>
@@ -120,11 +120,12 @@ export default function MyDecksPage() {
   if (decks.length === 0) {
     return (
       <div className="text-center py-24">
-        <p className="text-gray-300 text-lg mb-2">No decks yet.</p>
-        <p className="text-gray-500 text-sm mb-6">Head to the Deck Lab to build and save your first deck.</p>
+        <p className="text-lg mb-2" style={{ color: 'var(--text)' }}>No decks yet.</p>
+        <p className="text-sm mb-6" style={{ color: 'var(--faint)' }}>Head to the Deck Lab to build and save your first deck.</p>
         <button
           onClick={() => navigate('/builder')}
-          className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-5 py-2 rounded-md text-sm font-semibold hover:brightness-110 transition"
+          style={{ background: 'var(--sapphire)', color: '#0b1620' }}
         >
           Open Deck Lab
         </button>
@@ -139,7 +140,7 @@ export default function MyDecksPage() {
           fixed-width column squeezed beside it — there's no room for
           side-by-side at mobile widths. */}
       <div className={selectedDeck ? 'lg:w-72 lg:shrink-0' : 'w-full'}>
-        <h1 className="text-xl font-bold text-white mb-4">My Decks</h1>
+        <h1 className="font-display text-xl mb-4" style={{ fontWeight: 560, color: 'var(--text)' }}>My Decks</h1>
         <div
           className={
             selectedDeck
@@ -155,24 +156,24 @@ export default function MyDecksPage() {
               <button
                 key={deck.id}
                 onClick={() => setSelectedId(isSelected ? null : deck.id)}
-                className={`text-left rounded-xl border p-4 transition-all ${
+                className={`text-left rounded-xl border p-4 transition-colors ${
                   selectedDeck ? 'w-48 shrink-0 lg:w-full' : ''
-                } ${
-                  isSelected
-                    ? 'border-violet-500 bg-violet-900/20'
-                    : 'border-gray-800 bg-gray-900/60 hover:border-gray-600 hover:bg-gray-900'
                 }`}
+                style={{
+                  borderColor: isSelected ? 'color-mix(in srgb, var(--sapphire) 55%, var(--line))' : 'var(--line)',
+                  background: isSelected ? 'color-mix(in srgb, var(--sapphire) 10%, var(--panel))' : 'var(--panel-2)',
+                }}
               >
-                <div className="font-semibold text-white text-sm truncate mb-1">
+                <div className="font-display text-sm truncate mb-1" style={{ fontWeight: 560, color: 'var(--text)' }}>
                   {deck.name || 'Untitled Deck'}
                 </div>
-                <div className="text-xs text-gray-400 mb-2">{deck.total ?? 0} cards</div>
+                <div className="text-xs mb-2 tabular-nums" style={{ color: 'var(--muted)' }}>{deck.total ?? 0} cards</div>
                 {inks.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">
                     {inks.map(ink => <InkBadge key={ink} ink={ink} small />)}
                   </div>
                 )}
-                {date && <div className="text-xs text-gray-500">{date}</div>}
+                {date && <div className="text-xs tabular-nums" style={{ color: 'var(--faint)' }}>{date}</div>}
               </button>
             )
           })}
@@ -183,11 +184,14 @@ export default function MyDecksPage() {
           Lab's docked panel, shown inline here instead of a thinner summary. */}
       {selectedDeck && (
         <div className="flex-1 min-w-0">
-          <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">
+          <div className="rounded-xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
             <div className="flex justify-end mb-3">
               <button
                 onClick={() => setSelectedId(null)}
-                className="px-3 py-2 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg text-sm transition-colors"
+                className="px-3 py-2 border rounded-md text-sm transition-colors"
+                style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--faint)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--line-2)' }}
               >
                 Close
               </button>
@@ -198,7 +202,7 @@ export default function MyDecksPage() {
                 re-resolve fresh image URLs for the PNG download) can arrive
                 a beat later without blocking the view. */}
             {loadingCards && (
-              <div className="text-xs text-gray-500 mb-2">Loading card catalog for image export…</div>
+              <div className="text-xs mb-2" style={{ color: 'var(--faint)' }}>Loading card catalog for image export…</div>
             )}
             <DeckPresentationView
               deck={selectedDeck}
@@ -211,9 +215,9 @@ export default function MyDecksPage() {
 
             {/* Notes */}
             {selectedDeck.notes && (
-              <div className="mt-5 pt-4 border-t border-gray-800">
-                <p className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Notes</p>
-                <p className="text-sm text-gray-300 whitespace-pre-wrap">{selectedDeck.notes}</p>
+              <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
+                <p className="text-[11px] uppercase tracking-[0.1em] mb-1 font-semibold" style={{ color: 'var(--faint)' }}>Notes</p>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--muted)' }}>{selectedDeck.notes}</p>
               </div>
             )}
           </div>

@@ -22,8 +22,8 @@ import { Button, EmptyState } from './ui';
  *   onReviewCreated(review) - optional callback fired after a review is generated
  *   onReplayUploaded(replay) - optional callback fired after a replay is parsed
  */
-const ACCENT = '#8b5cf6'; // violet-500
-const ACCENT_2 = '#6366f1'; // indigo-500
+const ACCENT = 'var(--sapphire)'; // "you" series
+const ACCENT_2 = 'var(--amethyst)'; // "opponent" series
 
 function normalizeGames(parsed) {
   if (!parsed) return [];
@@ -138,12 +138,13 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
-        className={[
-          'cursor-pointer rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors',
-          dragging
-            ? 'border-violet-400 bg-violet-500/10'
-            : 'border-white/10 bg-white/[0.03] hover:border-white/20',
-        ].join(' ')}
+        className="cursor-pointer rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors"
+        style={{
+          borderColor: dragging ? 'var(--sapphire)' : 'var(--line-2)',
+          background: dragging
+            ? 'color-mix(in srgb, var(--sapphire) 10%, transparent)'
+            : 'var(--panel-2)',
+        }}
         role="button"
         tabIndex={0}
       >
@@ -154,38 +155,39 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
           className="hidden"
           onChange={(e) => upload(e.target.files?.[0])}
         />
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-violet-500 to-indigo-500">
-          <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--sapphire)' }}>
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#0b1620' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
           </svg>
         </div>
         {uploading ? (
-          <p className="text-sm text-violet-300">Parsing replay…</p>
+          <p className="text-sm" style={{ color: 'var(--sapphire)' }}>Parsing replay…</p>
         ) : (
           <>
-            <p className="text-sm font-medium text-white">
-              Drag a <span className="text-violet-300">.zip · .gz · .json</span> replay here
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+              Drag a <span style={{ color: 'var(--sapphire)' }}>.zip · .gz · .json</span> replay here
             </p>
-            <p className="mt-1 text-xs text-gray-400">or click to browse</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--faint)' }}>or click to browse</p>
           </>
         )}
       </div>
 
-      {error && <p className="text-bad text-sm">{error}</p>}
+      {error && <p className="text-sm" style={{ color: 'var(--ruby)' }}>{error}</p>}
 
       {/* Optional primer selector — if skipped the agent auto-generates matchup context */}
       {primers.length > 0 && (
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
             Primer{' '}
-            <span className="font-normal normal-case text-gray-500">
+            <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--faint)' }}>
               — optional, auto-generated if skipped
             </span>
           </label>
           <select
             value={selectedPrimerId}
             onChange={(e) => setSelectedPrimerId(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-200 focus:border-violet-500/50 focus:outline-none"
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--panel-2)', color: 'var(--text)' }}
           >
             <option value="">— auto-generate from matchup —</option>
             {primers.map((p) => (
@@ -202,10 +204,10 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
       {replay && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--faint)' }}>
               Parsed games
             </h3>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs" style={{ color: 'var(--faint)' }}>
               {replay.source ? `${replay.source} • ` : ''}
               {replay.matchScore || ''}
             </span>
@@ -226,32 +228,34 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
               return (
                 <div
                   key={key}
-                  className="rounded-xl border border-white/10 bg-[#11151f] p-4"
+                  className="rounded-xl border p-4"
+                  style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-white">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
                         Game {gameNumber}
                         {game.result ? (
                           <span
-                            className={[
-                              'ml-2 rounded px-1.5 py-0.5 text-xs font-medium',
-                              game.result === 'W'
-                                ? 'bg-emerald-500/15 text-emerald-300'
-                                : 'bg-red-500/15 text-red-300',
-                            ].join(' ')}
+                            className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium"
+                            style={{
+                              color: game.result === 'W' ? 'var(--emerald)' : 'var(--ruby)',
+                              background: game.result === 'W'
+                                ? 'color-mix(in srgb, var(--emerald) 15%, transparent)'
+                                : 'color-mix(in srgb, var(--ruby) 15%, transparent)',
+                            }}
                           >
                             {game.result}
                           </span>
                         ) : null}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>
                         {(game.deckArchetype || game.deck || 'You')} vs{' '}
                         {game.vsArchetype || game.opponentDeck || 'Opponent'}
                       </p>
                     </div>
                     {done ? (
-                      <span className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-sm font-medium text-emerald-300">
+                      <span className="rounded-lg px-3 py-1.5 text-sm font-medium" style={{ color: 'var(--emerald)', background: 'color-mix(in srgb, var(--emerald) 15%, transparent)' }}>
                         Review created ✓
                       </span>
                     ) : (
@@ -269,20 +273,20 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
                     <div className="h-44 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={series} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
                           <XAxis
                             dataKey="turn"
-                            stroke="rgba(255,255,255,0.4)"
+                            stroke="var(--faint)"
                             tick={{ fontSize: 11 }}
-                            label={{ value: 'Turn', position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                            label={{ value: 'Turn', position: 'insideBottom', offset: -2, fill: 'var(--faint)', fontSize: 11 }}
                           />
-                          <YAxis stroke="rgba(255,255,255,0.4)" tick={{ fontSize: 11 }} />
+                          <YAxis stroke="var(--faint)" tick={{ fontSize: 11 }} />
                           <Tooltip
                             contentStyle={{
-                              background: '#11151f',
-                              border: '1px solid rgba(255,255,255,0.1)',
+                              background: 'var(--panel)',
+                              border: '1px solid var(--line-2)',
                               borderRadius: 8,
-                              color: '#fff',
+                              color: 'var(--text)',
                               fontSize: 12,
                             }}
                           />
@@ -293,7 +297,7 @@ const ReplayUpload = ({ hubId, primers = [], onReviewCreated, onReplayUploaded }
                       </ResponsiveContainer>
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-500">No lore curve data for this game.</p>
+                    <p className="text-xs" style={{ color: 'var(--faint)' }}>No lore curve data for this game.</p>
                   )}
                 </div>
               );

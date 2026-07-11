@@ -48,7 +48,7 @@ export default function JoinPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading…</p>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
       </div>
     )
   }
@@ -58,17 +58,18 @@ export default function JoinPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-sm w-full text-center space-y-4">
           <p className="text-2xl">👥</p>
-          <h1 className="text-xl font-semibold text-white">Join a Hub</h1>
-          <p className="text-sm text-gray-400">Sign in or create an account to join this hub.</p>
+          <h1 className="font-display text-xl" style={{ fontWeight: 560, color: 'var(--text)' }}>Join a Hub</h1>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Sign in or create an account to join this hub.</p>
           {searchParams.get('code') && (
-            <p className="text-xs text-gray-500">
-              Invite code: <span className="font-mono text-gray-300">{searchParams.get('code')}</span>
+            <p className="text-xs" style={{ color: 'var(--faint)' }}>
+              Invite code: <span className="font-mono" style={{ color: 'var(--text)' }}>{searchParams.get('code')}</span>
             </p>
           )}
           <div className="flex gap-3 justify-center pt-2">
             <Link
               to={`/?join=${searchParams.get('code') || ''}`}
-              className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700"
+              className="px-4 py-2 rounded-md text-sm font-semibold transition hover:brightness-110"
+              style={{ background: 'var(--sapphire)', color: '#0b1620' }}
             >
               Sign in
             </Link>
@@ -83,8 +84,8 @@ export default function JoinPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-2">
           <p className="text-3xl">✓</p>
-          <p className="text-white font-medium">You've joined the hub!</p>
-          <p className="text-sm text-gray-400">Redirecting…</p>
+          <p className="font-medium" style={{ color: 'var(--text)' }}>You've joined the hub!</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Redirecting…</p>
         </div>
       </div>
     )
@@ -95,8 +96,8 @@ export default function JoinPage() {
       <div className="max-w-sm w-full space-y-6">
         <div className="text-center">
           <p className="text-2xl mb-2">👥</p>
-          <h1 className="text-xl font-semibold text-white">Join a Hub</h1>
-          <p className="text-sm text-gray-400 mt-1">Enter the 8-character invite code from your team.</p>
+          <h1 className="font-display text-xl" style={{ fontWeight: 560, color: 'var(--text)' }}>Join a Hub</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Enter the 8-character invite code from your team.</p>
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); handleJoin() }} className="space-y-3">
@@ -106,20 +107,24 @@ export default function JoinPage() {
             placeholder="XXXXXXXX"
             maxLength={8}
             disabled={joining}
-            className="w-full px-4 py-3 text-center text-lg font-mono tracking-widest rounded-xl border border-white/10 bg-white/[0.03] text-white placeholder-gray-600 focus:border-violet-400/60 focus:outline-none disabled:opacity-50"
+            className="w-full px-4 py-3 text-center text-lg font-mono tracking-widest rounded-xl focus:outline-none disabled:opacity-50"
+            style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
           />
-          {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+          {error && <p className="text-sm text-center" style={{ color: 'var(--ruby)' }}>{error}</p>}
           <button
             type="submit"
             disabled={joining || code.trim().length !== 8}
-            className="w-full py-2.5 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-40 transition-colors"
+            className="w-full py-2.5 rounded-md font-semibold transition hover:brightness-110 disabled:opacity-40"
+            style={{ background: 'var(--sapphire)', color: '#0b1620' }}
           >
             {joining ? 'Joining…' : 'Join Hub'}
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-500">
-          <Link to="/team-hub" className="text-violet-400 hover:text-violet-300">Go to your hubs →</Link>
+        <p className="text-center text-xs" style={{ color: 'var(--faint)' }}>
+          <Link to="/team-hub" className="font-semibold" style={{ color: 'var(--sapphire)' }}>Go to your hubs →</Link>
         </p>
       </div>
     </div>

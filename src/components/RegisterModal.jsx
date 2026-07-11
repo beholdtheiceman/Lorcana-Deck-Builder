@@ -49,12 +49,15 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 grid place-items-center p-4"
          onClick={handleBackdropClick}>
        <div className="w-full max-w-md">
-        <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 border border-gray-800" onClick={(e) => e.stopPropagation()}>
+        <div className="rounded-xl p-6 w-full max-w-md mx-4 border" style={{ background: 'var(--panel)', borderColor: 'var(--line)' }} onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Create Account</h2>
+            <h2 className="font-display text-2xl" style={{ fontWeight: 560, color: 'var(--text)' }}>Create Account</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="transition-colors"
+              style={{ color: 'var(--muted)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
             >
               ✕
             </button>
@@ -62,13 +65,13 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
 
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
             {error && (
-              <div className="bg-red-900 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">
+              <div className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--panel-2)', border: '1px solid color-mix(in srgb, var(--ruby) 40%, var(--line-2))', color: 'var(--ruby)' }}>
                 {error}
               </div>
             )}
 
             <div>
-              <label htmlFor="register-email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="register-email" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted)' }}>
                 Email
               </label>
               <input
@@ -77,7 +80,10 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
                 placeholder="Enter your email"
                 autoComplete="email"
                 required
@@ -85,7 +91,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
             </div>
 
             <div>
-              <label htmlFor="register-password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="register-password" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted)' }}>
                 Password
               </label>
               <input
@@ -94,16 +100,19 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
                 placeholder="Create a password"
                 autoComplete="new-password"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>At least 8 characters</p>
             </div>
 
             <div>
-              <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="register-confirm-password" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted)' }}>
                 Confirm Password
               </label>
               <input
@@ -112,7 +121,10 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
                 placeholder="Confirm your password"
                 autoComplete="new-password"
                 required
@@ -122,18 +134,20 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-violet-800 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
+              className="w-full font-semibold py-2 px-4 rounded-md transition hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: 'var(--sapphire)', color: '#0b1620' }}
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>
               Already have an account?{' '}
               <button
                 onClick={onSwitchToLogin}
-                className="text-violet-400 hover:text-violet-300 transition-colors"
+                className="font-semibold transition-colors"
+                style={{ color: 'var(--sapphire)' }}
               >
                 Sign in
               </button>

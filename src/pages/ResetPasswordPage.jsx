@@ -24,9 +24,9 @@ export default function ResetPasswordPage() {
   if (!token) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-full max-w-md bg-gray-900 rounded-xl border border-gray-800 p-8 text-center">
-          <p className="text-red-400 font-medium">Invalid reset link.</p>
-          <p className="text-gray-500 text-sm mt-2">Request a new one from the forgot password page.</p>
+        <div className="w-full max-w-md rounded-xl border p-8 text-center" style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}>
+          <p className="font-medium" style={{ color: 'var(--ruby)' }}>Invalid reset link.</p>
+          <p className="text-sm mt-2" style={{ color: 'var(--faint)' }}>Request a new one from the forgot password page.</p>
         </div>
       </div>
     );
@@ -61,23 +61,23 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="w-full max-w-md bg-gray-900 rounded-xl border border-gray-800 p-8">
-        <h1 className="text-2xl font-bold text-white mb-2">Set new password</h1>
-        <p className="text-gray-400 text-sm mb-6">Choose a strong password for your account.</p>
+      <div className="w-full max-w-md rounded-xl border p-8" style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}>
+        <h1 className="font-display text-2xl mb-2" style={{ fontWeight: 560, color: 'var(--text)' }}>Set new password</h1>
+        <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>Choose a strong password for your account.</p>
 
         {success ? (
-          <div className="bg-violet-900/40 border border-violet-700 text-violet-200 px-4 py-3 rounded-lg text-sm">
+          <div className="px-4 py-3 rounded-lg text-sm" style={{ background: 'color-mix(in srgb, var(--sapphire) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--sapphire) 40%, var(--line-2))', color: 'var(--text)' }}>
             Password updated! You're now logged in. Redirecting…
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-900/50 border border-red-700 text-red-200 px-3 py-2 rounded-lg text-sm">
+              <div className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--panel-2)', border: '1px solid color-mix(in srgb, var(--ruby) 40%, var(--line-2))', color: 'var(--ruby)' }}>
                 {error}
               </div>
             )}
             <div>
-              <label htmlFor="rp-password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="rp-password" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted)' }}>
                 New password
               </label>
               <input
@@ -85,15 +85,18 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
                 placeholder="At least 8 characters"
                 minLength={8}
                 required
               />
-              <p className="text-gray-500 text-xs mt-1">At least 8 characters</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>At least 8 characters</p>
             </div>
             <div>
-              <label htmlFor="rp-confirm" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="rp-confirm" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted)' }}>
                 Confirm password
               </label>
               <input
@@ -101,7 +104,10 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:border-violet-500 focus:outline-none transition-colors"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                style={{ background: 'var(--panel-2)', border: '1px solid var(--line-2)', color: 'var(--text)' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
                 placeholder="Repeat your password"
                 required
               />
@@ -109,7 +115,8 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-b from-violet-500 to-indigo-500 hover:brightness-110 disabled:opacity-60 text-white font-medium py-2 px-4 rounded-lg transition"
+              className="w-full font-semibold py-2 px-4 rounded-md transition hover:brightness-110 disabled:opacity-60"
+              style={{ background: 'var(--sapphire)', color: '#0b1620' }}
             >
               {loading ? 'Updating…' : 'Update password'}
             </button>

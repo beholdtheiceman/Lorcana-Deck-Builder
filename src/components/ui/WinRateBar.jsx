@@ -4,10 +4,10 @@ export default function WinRateBar({ win = 0, loss = 0 }) {
   const winPct = (win / total) * 100
   return (
     <div className="flex items-center gap-3">
-      <div className="h-2 w-48 bg-gray-600 rounded overflow-hidden">
-        <div className="h-full bg-emerald-500" style={{ width: `${winPct}%` }} />
+      <div className="h-2 w-48 rounded overflow-hidden" style={{ background: 'var(--panel-2)' }}>
+        <div className="h-full" style={{ width: `${winPct}%`, background: 'var(--emerald)' }} />
       </div>
-      <div className="text-xs text-gray-300 w-12 text-right">{Math.round(winPct)}%</div>
+      <div className="text-xs w-12 text-right" style={{ color: 'var(--muted)' }}>{Math.round(winPct)}%</div>
     </div>
   )
 }
