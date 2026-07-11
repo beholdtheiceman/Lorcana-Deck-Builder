@@ -56,7 +56,7 @@ import {
   HoverableStatBox,
 } from "./deckCharts.jsx";
 import { TournamentResultsSection } from "./TournamentResults.jsx";
-import { InkCurve, inkVar } from "./ui/index.js";
+import { InkCurve, InkLedger, CostHex, InkSplitBar, inkVar } from "./ui/index.js";
 
 // Ink name → design token for the six Lorcana inks, plus a Dual-Ink accent.
 // HTML surfaces resolve colors through inkVar() (CSS var() works inline); this
@@ -540,6 +540,44 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
   const sortedByCost = entries.sort((a, b) => getCost(b.card) - getCost(a.card));
   const mostExpensive = sortedByCost[0];
   const cheapest = sortedByCost[sortedByCost.length - 1];
+
+  // Ink-ledger entries — ONE item per card copy for the hero's <InkLedger>.
+  // Each copy takes its card's primary ink (getInks()[0]; Steel when no ink is
+  // detectable) and an inkability flag via the same fallback chain used for the
+  // Inkable/Uninkable totals above. InkLedger regroups by ink, so order here is
+  // irrelevant (safe despite the in-place sort of `entries` on the line above).
+  const ledgerEntries = entries.flatMap((e) => {
+    const inks = getInks(e.card);
+    const ink = inks.length >= 1 ? inks[0] : 'Steel';
+    const inkable = Boolean(
+      e.card.inkable ??
+      e.card._raw?.inkwell ??
+      e.card._raw?.inkable ??
+      e.card._raw?.can_be_ink ??
+      e.card._raw?.Inkable ??
+      false
+    );
+    return Array.from({ length: e.count }, () => ({ ink, inkable }));
+  });
+
+  // Signature card for the hero art crop — the deck's highest-cost card. Resolve
+  // its art exactly like the card grid does; if the deck is empty (no card) the
+  // panel is skipped so an empty deck never breaks the hero.
+  const signatureCard = mostExpensive?.card || null;
+  const signatureImg = signatureCard
+    ? (signatureCard.image_url || signatureCard._imageFromAPI || FALLBACK_IMG)
+    : null;
+  const signatureName = (() => {
+    if (!signatureCard) return '';
+    const variant =
+      signatureCard.title ||
+      signatureCard.version ||
+      signatureCard._raw?.version ||
+      signatureCard._raw?.Version ||
+      signatureCard.subname ||
+      null;
+    return variant ? `${signatureCard.name} — ${variant}` : signatureCard.name;
+  })();
   
   
   // Helper function to draw fallback card content
@@ -603,47 +641,114 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
     <div className="space-y-6">
       {showCardsSection && (
         <>
-        {/* Header with Deck Name Edit */}
-        <div className="text-center">
-          <div className="mb-4">
-            <label
-              className="block text-[11px] uppercase tracking-[0.14em] font-semibold mb-2"
-              style={{ color: 'var(--faint)' }}
-            >
-              Deck Name
-            </label>
-            <input
-              type="text"
-              value={deckName}
-              onChange={(e) => setDeckName(e.target.value)}
-              className="font-display px-4 py-2 rounded-lg border focus:outline-none text-center text-3xl"
-              style={{
-                background: 'var(--panel)',
-                borderColor: 'var(--line-2)',
-                color: 'var(--text)',
-                fontWeight: 560,
-                letterSpacing: '-0.01em',
-              }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
-              onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
-              placeholder="Enter deck name..."
-            />
+        {/* Deck hero — editable title, quick stats, and the signature ink-ledger
+            on the left; a card-art crop of the deck's signature card on the
+            right (design/comps/uninkable-deck-detail-comp.html: .hero). */}
+        <div
+          className="rounded-lg border overflow-hidden p-7 grid gap-8 md:grid-cols-[1.25fr_.9fr]"
+          style={{
+            borderColor: 'var(--line)',
+            background:
+              'radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--ink-a) 9%, transparent), transparent 55%), radial-gradient(120% 160% at 100% 100%, color-mix(in srgb, var(--ink-b) 10%, transparent), transparent 55%), var(--panel)',
+          }}
+        >
+          <div>
+            <div className="mb-4">
+              <label
+                className="block text-[11px] uppercase tracking-[0.14em] font-semibold mb-2"
+                style={{ color: 'var(--faint)' }}
+              >
+                Deck Name
+              </label>
+              <input
+                type="text"
+                value={deckName}
+                onChange={(e) => setDeckName(e.target.value)}
+                className="font-display w-full px-4 py-2 rounded-lg border focus:outline-none text-3xl"
+                style={{
+                  background: 'var(--panel)',
+                  borderColor: 'var(--line-2)',
+                  color: 'var(--text)',
+                  fontWeight: 560,
+                  letterSpacing: '-0.01em',
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sapphire)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
+                placeholder="Enter deck name..."
+              />
+            </div>
+            <p className="font-display italic mt-2" style={{ color: 'var(--muted)' }}>A Lorcana Deck</p>
+            {onEditInLab && (
+              <button
+                type="button"
+                onClick={onEditInLab}
+                className="mt-2 text-sm underline underline-offset-2 transition-colors"
+                style={{ color: 'var(--sapphire)' }}
+              >
+                Edit in Deck Lab
+              </button>
+            )}
+            {deck.updatedAt && (
+              <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>
+                Last saved: {new Date(deck.updatedAt).toLocaleString()}
+              </p>
+            )}
+
+            {/* Quick stats — mirror the comp hero's statrow. Reads the existing
+                computed values (unchanged), just surfaced up here too. */}
+            <div className="flex flex-wrap gap-7 mt-6">
+              {[
+                { k: 'Cards', v: totalCards },
+                { k: 'Uninkable', v: totalUninkable },
+                { k: 'Avg cost', v: averageCost.toFixed(1) },
+              ].map((s) => (
+                <div key={s.k}>
+                  <div className="font-display tabular-nums" style={{ fontSize: 22, fontWeight: 560, color: 'var(--text)' }}>{s.v}</div>
+                  <div className="text-[11px] uppercase tracking-[0.1em] mt-0.5" style={{ color: 'var(--faint)' }}>{s.k}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Signature element: the ink ledger — one hex per card copy, colored
+                by ink, hollow when uninkable (comp .ledger / .strip). */}
+            {ledgerEntries.length > 0 && (
+              <div className="mt-6">
+                <div className="text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: 'var(--faint)' }}>
+                  Ink ledger · <b style={{ color: 'var(--muted)', fontWeight: 600 }}>hollow = uninkable</b>
+                </div>
+                <InkLedger entries={ledgerEntries} />
+              </div>
+            )}
           </div>
-          <p className="font-display italic mt-2" style={{ color: 'var(--muted)' }}>A Lorcana Deck</p>
-          {onEditInLab && (
-            <button
-              type="button"
-              onClick={onEditInLab}
-              className="mt-2 text-sm underline underline-offset-2 transition-colors"
-              style={{ color: 'var(--sapphire)' }}
+
+          {/* Signature card art crop (comp .art). Skipped entirely when there's
+              no card to feature, so an empty deck never renders a broken panel. */}
+          {signatureCard && (
+            <div
+              className="relative rounded-md overflow-hidden min-h-[300px] border"
+              style={{ borderColor: 'var(--line-2)', background: '#0b0c0f' }}
             >
-              Edit in Deck Lab
-            </button>
-          )}
-          {deck.updatedAt && (
-            <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>
-              Last saved: {new Date(deck.updatedAt).toLocaleString()}
-            </p>
+              <img
+                src={signatureImg}
+                alt={signatureName}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="lazy"
+              />
+              <div
+                className="absolute inset-x-0 bottom-0 flex items-baseline justify-between gap-3 p-4"
+                style={{ background: 'linear-gradient(to top, rgba(11,12,15,.85), transparent 90%)' }}
+              >
+                <div
+                  className="font-display"
+                  style={{ fontSize: 17, fontWeight: 560, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.6)' }}
+                >
+                  {signatureName}
+                </div>
+                <div className="text-[10.5px] uppercase tracking-[0.12em] whitespace-nowrap" style={{ color: 'rgba(255,255,255,.75)' }}>
+                  Signature card
+                </div>
+              </div>
+            </div>
           )}
         </div>
         
@@ -724,9 +829,12 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                             );
                           })()}
                           
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
+                          {/* Card type + cost — cost hex tinted by the card's ink */}
+                          <div className="mt-1 flex items-center justify-center gap-1.5">
+                            <CostHex cost={getCost(e.card)} ink={getInks(e.card)[0] || 'Steel'} size={20} />
+                            <span className="text-xs line-clamp-1 leading-tight" style={{ color: 'var(--muted)' }}>
+                              {normalizedType(e.card)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -811,9 +919,12 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                             );
                           })()}
                           
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
+                          {/* Card type + cost — cost hex tinted by the card's ink */}
+                          <div className="mt-1 flex items-center justify-center gap-1.5">
+                            <CostHex cost={getCost(e.card)} ink={getInks(e.card)[0] || 'Steel'} size={20} />
+                            <span className="text-xs line-clamp-1 leading-tight" style={{ color: 'var(--muted)' }}>
+                              {normalizedType(e.card)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -898,9 +1009,12 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                             );
                           })()}
                           
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
+                          {/* Card type + cost — cost hex tinted by the card's ink */}
+                          <div className="mt-1 flex items-center justify-center gap-1.5">
+                            <CostHex cost={getCost(e.card)} ink={getInks(e.card)[0] || 'Steel'} size={20} />
+                            <span className="text-xs line-clamp-1 leading-tight" style={{ color: 'var(--muted)' }}>
+                              {normalizedType(e.card)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -985,9 +1099,12 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                             );
                           })()}
                           
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
+                          {/* Card type + cost — cost hex tinted by the card's ink */}
+                          <div className="mt-1 flex items-center justify-center gap-1.5">
+                            <CostHex cost={getCost(e.card)} ink={getInks(e.card)[0] || 'Steel'} size={20} />
+                            <span className="text-xs line-clamp-1 leading-tight" style={{ color: 'var(--muted)' }}>
+                              {normalizedType(e.card)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1072,9 +1189,12 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
                             );
                           })()}
                           
-                          {/* Card type and cost info */}
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1 leading-tight">
-                            {normalizedType(e.card)} • {getCost(e.card)} cost
+                          {/* Card type + cost — cost hex tinted by the card's ink */}
+                          <div className="mt-1 flex items-center justify-center gap-1.5">
+                            <CostHex cost={getCost(e.card)} ink={getInks(e.card)[0] || 'Steel'} size={20} />
+                            <span className="text-xs line-clamp-1 leading-tight" style={{ color: 'var(--muted)' }}>
+                              {normalizedType(e.card)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1179,6 +1299,12 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
 
             {Object.keys(inkDistribution).length > 0 ? (
               <>
+                {/* Ink split — each ink's share as one quiet token-colored bar
+                    (comp .split), above the detailed pie/legend. */}
+                <InkSplitBar
+                  className="mb-4"
+                  segments={Object.entries(inkDistribution).map(([ink, count]) => ({ ink, count }))}
+                />
                 {/* Recharts pie: SVG <Cell> fills can't resolve CSS var(), so
                     drive them from the tokens' hex values (INK_TOKEN_HEX). */}
                 <ResponsiveContainer width="100%" height={220}>
