@@ -62,7 +62,6 @@ export async function runAgent({ question, userId, hubHint }) {
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      temperature: 0.3,
       system,
       tools: TOOL_SPECS,
       messages,

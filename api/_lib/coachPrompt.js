@@ -22,6 +22,10 @@
 // the persona, modes, keyword reference, and tone below stay identical.
 
 // Model copied from the Console agent config.
+// NOTE: claude-sonnet-5 (like Opus 4.7/4.8) REJECTS the `temperature` sampling
+// parameter with a 400 ("`temperature` is deprecated for this model"). All
+// messages.create() calls in this app must omit temperature/top_p/top_k — steer
+// with prompting instead. Do not reintroduce a temperature on any Sonnet-5 call.
 export const COACH_MODEL = "claude-sonnet-5";
 
 // System prompt copied verbatim from the Console agent config (v2).

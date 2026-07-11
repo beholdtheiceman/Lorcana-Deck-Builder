@@ -83,7 +83,6 @@ export default withAuth(async (req, res, session) => {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    temperature: 0.4,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userInstruction }],
   });
