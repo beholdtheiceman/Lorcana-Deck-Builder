@@ -4,7 +4,9 @@ import { gunzipSync } from "node:zlib";
 // Cap decompression output to guard against gzip bombs (compressed member bytes
 // expanding to exhaust memory). Node's zlib throws a RangeError when the
 // decompressed output would exceed `maxOutputLength`.
-const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024; // 64 MB
+const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024; // 64 MB — per gzip member / per zip member
+const MAX_ARCHIVE_TOTAL_BYTES = 256 * 1024 * 1024; // 256 MB — summed across all zip members
+const MAX_ZIP_MEMBERS = 200; // reject pathological member counts before decompressing anything
 
 /** gunzip with a hard output-size cap; converts the cap RangeError into a clean error. */
 function gunzipCapped(input) {
@@ -16,6 +18,38 @@ function gunzipCapped(input) {
     }
     throw err;
   }
+}
+
+/**
+ * Decompress a single zip member with a size bound.
+ *
+ * PRAGMATIC POST-HOC BOUND: JSZip's `.async()` has no streaming/output cap, so
+ * we cannot stop decompression mid-stream the way zlib's `maxOutputLength` does
+ * for gzip. Instead we measure the decompressed result AFTER `.async()` returns
+ * and reject anything that expanded past the per-member cap, while accumulating
+ * a running total across the archive to reject the aggregate (many mid-sized
+ * members) case. `budget` is a shared `{ total }` object threaded through every
+ * member read of one archive. This does not prevent a single oversized member's
+ * allocation, but combined with the MAX_ZIP_MEMBERS count cap (checked BEFORE
+ * the read loop) it bounds the damage a zip bomb can do. JSZip does expose an
+ * internal `entry._data.uncompressedSize`, but that is an undocumented internal
+ * and is deliberately NOT relied upon here.
+ *
+ * @param {import("jszip").JSZipObject} entry
+ * @param {"string"|"nodebuffer"} kind
+ * @param {{ total: number }} budget  running decompressed-byte total for the archive
+ */
+async function readZipMemberCapped(entry, kind, budget) {
+  const out = await entry.async(kind);
+  const size = typeof out === "string" ? Buffer.byteLength(out, "utf8") : out.length;
+  if (size > MAX_DECOMPRESSED_BYTES) {
+    throw new Error("Replay archive too large to decompress");
+  }
+  budget.total += size;
+  if (budget.total > MAX_ARCHIVE_TOTAL_BYTES) {
+    throw new Error("Replay archive too large to decompress");
+  }
+  return out;
 }
 
 /**
@@ -70,12 +104,25 @@ export async function parseReplayZip(buffer) {
   if (!buffer) throw new Error("parseReplayZip: empty buffer");
   const zip = await JSZip.loadAsync(buffer);
 
+  // Cap member count BEFORE decompressing anything. JSZip exposes the entry
+  // list without touching member bodies, so this is the one bound we can apply
+  // up front (see readZipMemberCapped for why the rest is measured post-hoc).
+  if (Object.keys(zip.files).length > MAX_ZIP_MEMBERS) {
+    throw new Error("Replay archive too large to decompress");
+  }
+
   const matchFile = zip.file("match.json");
   if (!matchFile) throw new Error("parseReplayZip: match.json not found in archive");
 
+  // Running decompressed-byte total shared across every member read below.
+  const budget = { total: 0 };
+
+  // Read (bounded) outside the JSON try/catch so a size-limit error propagates
+  // instead of being misreported as "not valid JSON".
+  const matchRaw = await readZipMemberCapped(matchFile, "string", budget);
   let match;
   try {
-    match = JSON.parse(await matchFile.async("string"));
+    match = JSON.parse(matchRaw);
   } catch {
     throw new Error("parseReplayZip: match.json is not valid JSON");
   }
@@ -84,7 +131,7 @@ export async function parseReplayZip(buffer) {
     throw new Error(`parseReplayZip: unsupported format "${match.format ?? "unknown"}"`);
   }
 
-  return summarizeMatchZip(zip, match);
+  return summarizeMatchZip(zip, match, budget);
 }
 
 // -------------------------------------------------------------------
@@ -205,7 +252,7 @@ function wrapMatchObject(match) {
 // .match-replay.zip internals
 // -------------------------------------------------------------------
 
-async function summarizeMatchZip(zip, match) {
+async function summarizeMatchZip(zip, match, budget = { total: 0 }) {
   const myNum = match.perspective ?? 1;
   const oppNum = myNum === 1 ? 2 : 1;
   const pNames = match.playerNames || {};
@@ -224,7 +271,9 @@ async function summarizeMatchZip(zip, match) {
   const matchGamesMeta = match.games || [];
   const games = [];
   for (let i = 0; i < gameEntries.length; i++) {
-    const gz = await gameEntries[i].entry.async("nodebuffer");
+    // Bounded read outside the try/catch so a size-limit error aborts the whole
+    // archive rather than being swallowed by the "skip malformed game" continue.
+    const gz = await readZipMemberCapped(gameEntries[i].entry, "nodebuffer", budget);
     let gameData;
     try {
       gameData = JSON.parse(gunzipCapped(gz).toString("utf8"));

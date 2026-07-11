@@ -8,15 +8,15 @@
 // over everything at once, and lets it reach for card data, personal decks,
 // or team data as the question calls for it.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { TOOL_SPECS, runTool } from "./agentTools.js";
 import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
+import { getAnthropicClient, COACH_MAX_TOKENS } from "./anthropic.js";
 
 export const MODEL = COACH_MODEL;
 // Deck builds, matchup breakdowns, and multi-part answers need real room — a
 // 60-card list with role notes + strategy + key cards easily runs 2–3k tokens,
 // and adaptive thinking shares this budget. 1200 truncated everything.
-const MAX_TOKENS = 6000;
+const MAX_TOKENS = COACH_MAX_TOKENS;
 // Deck building often needs several card lookups before it can write the list;
 // 6 iterations ran out mid-research and returned the "out of budget" fallback.
 const MAX_ITERATIONS = 10;
@@ -50,7 +50,7 @@ const BASE_SYSTEM_PROMPT =
  * @returns {Promise<{answer: string, usage: {input_tokens:number, output_tokens:number}, toolLog: Array, hubIdsTouched: string[]}>}
  */
 export async function runAgent({ question, userId, hubHint }) {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
   const ctx = { userId };
 
   let system = BASE_SYSTEM_PROMPT;

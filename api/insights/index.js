@@ -42,7 +42,7 @@ export default withAuth(async (req, res, session) => {
   const reviews = await prisma.review.findMany({
     where: {
       hubId,
-      ...(player ? { player } : {}),
+      ...(player ? { player: { contains: player, mode: "insensitive" } } : {}),
     },
     select: { vsArchetype: true, leakTags: true },
   });

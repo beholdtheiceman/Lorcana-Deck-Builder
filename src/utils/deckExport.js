@@ -43,12 +43,29 @@ export function generateSimpleTextExport(deck) {
     .join('\n');
 }
 
+function csvField(value) {
+  let str = String(value ?? '');
+  // Neutralize spreadsheet formula injection: prefix a single quote if the
+  // field starts with a formula trigger character.
+  if (/^[=+\-@]/.test(str)) str = `'${str}`;
+  // Escape embedded quotes by doubling them, then wrap in quotes.
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
 export function generateCSVExport(deck) {
   const lines = ['Name,Set,Number,Cost,Type,Rarity,Count'];
   Object.values(deck.entries)
     .filter(e => e.count > 0)
     .forEach(({ card, count }) => {
-      lines.push(`"${card.name}","${card.set}","${card.number}","${getCost(card)}","${card.type}","${card.rarity}","${count}"`);
+      lines.push([
+        card.name,
+        card.set,
+        card.number,
+        getCost(card),
+        card.type,
+        card.rarity,
+        count,
+      ].map(csvField).join(','));
     });
   return lines.join('\n');
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
+import { requireHubMember } from "../_lib/hubAuth.js";
 
 /**
  * Tournament result sync (M5).
@@ -36,8 +37,7 @@ export default withAuth(async (req, res, session) => {
   if (req.method === "GET") {
     const hubId = req.query.hubId;
     if (!hubId) return res.status(400).json({ error: "hubId is required" });
-    await assertHubMember(hubId, userId, res);
-    if (res.writableEnded) return;
+    if (!(await requireHubMember(hubId, userId, res))) return;
 
     const results = await prisma.tournamentResult.findMany({
       where: { hubId },
@@ -57,8 +57,7 @@ export default withAuth(async (req, res, session) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
   const { hubId, results } = parsed.data;
 
-  await assertHubMember(hubId, userId, res);
-  if (res.writableEnded) return;
+  if (!(await requireHubMember(hubId, userId, res))) return;
 
   const withExternalId = [];
   const plainInserts = [];
@@ -100,12 +99,3 @@ export default withAuth(async (req, res, session) => {
   const imported = withExternalId.length + plainInserts.length;
   return res.status(201).json({ imported, skipped: 0 });
 });
-
-/** Writes a 403 response if the user is not owner/member of the hub. */
-async function assertHubMember(hubId, userId, res) {
-  const hub = await prisma.hub.findFirst({
-    where: { id: hubId, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-    select: { id: true },
-  });
-  if (!hub) res.status(403).json({ error: "Forbidden" });
-}

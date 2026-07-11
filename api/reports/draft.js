@@ -1,14 +1,14 @@
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
 import { requireHubMember } from "../_lib/hubAuth.js";
 import { getBudgetStatus, recordUsage } from "../_lib/llmBudget.js";
 import { COACH_MODEL } from "../_lib/coachPrompt.js";
+import { getAnthropicClient, COACH_MAX_TOKENS } from "../_lib/anthropic.js";
 
 const MODEL = COACH_MODEL;
-const MAX_TOKENS = 6000;
+const MAX_TOKENS = COACH_MAX_TOKENS;
 const MAX_CONTEXT_CHARS = 40000;
 
 const DraftSchema = z.object({
@@ -79,7 +79,7 @@ export default withAuth(async (req, res, session) => {
     `Use the team data below as your primary source. Start with a markdown title (# …) then the report body.\n\n` +
     `=== TEAM DATA ===\n${context}`;
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,

@@ -54,7 +54,7 @@ export default withAuth(async (req, res, session) => {
   prisma.hub.findUnique({ where: { id: hubId }, select: { name: true, discordWebhookUrl: true } })
     .then(hub => {
       const dateStr = practice.startsAt
-        ? new Date(practice.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        ? new Date(practice.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' UTC'
         : 'TBD';
       return postDiscord(hub?.discordWebhookUrl, `📅 **New practice in ${hub?.name}**: ${practice.title} · ${dateStr}`);
     })

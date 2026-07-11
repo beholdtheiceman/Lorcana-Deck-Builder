@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
+import { requireHubMember } from "../_lib/hubAuth.js";
 import { postDiscord } from "../_lib/discord.js";
 
 const CreateSchema = z.object({
@@ -21,8 +22,7 @@ export default withAuth(async (req, res, session) => {
   if (req.method === "GET") {
     const hubId = req.query.hubId;
     if (!hubId) return res.status(400).json({ error: "hubId is required" });
-    await assertHubMember(hubId, userId, res);
-    if (res.writableEnded) return;
+    if (!(await requireHubMember(hubId, userId, res))) return;
 
     const events = await prisma.event.findMany({
       where: { hubId },
@@ -72,7 +72,7 @@ export default withAuth(async (req, res, session) => {
   });
 
   // Fire-and-forget Discord notification (never blocks/breaks the response).
-  const when = event.startsAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  const when = event.startsAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";
   const lines = [
     `📅 **New event in ${hub.name}: ${event.title}**`,
     `🕒 ${when}`,
@@ -83,12 +83,3 @@ export default withAuth(async (req, res, session) => {
 
   return res.status(201).json(event);
 });
-
-/** Writes a 403 response if the user is not owner/member of the hub. */
-async function assertHubMember(hubId, userId, res) {
-  const hub = await prisma.hub.findFirst({
-    where: { id: hubId, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-    select: { id: true },
-  });
-  if (!hub) res.status(403).json({ error: "Forbidden" });
-}

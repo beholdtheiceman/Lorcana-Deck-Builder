@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
+import {
+  COACH_MAX_TOKENS,
+  PRIMER_MAX_TOKENS as SHARED_PRIMER_MAX_TOKENS,
+} from "./anthropic.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const KNOWLEDGE_DIR = join(__dirname, "../../src/data/agent-knowledge");
@@ -11,9 +15,9 @@ export const MODEL = COACH_MODEL;
 export const MAX_CONTEXT_CHARS = 60000;
 // The review JSON (recap + up to 4 decision points + leak tags) plus adaptive
 // thinking needs real room; 2000 truncated the JSON and failed the parse.
-export const MAX_TOKENS = 6000;
+export const MAX_TOKENS = COACH_MAX_TOKENS;
 // A useful primer (gameplan + must-kill + 3–6 key cards) needs more than 800.
-export const PRIMER_MAX_TOKENS = 1500;
+export const PRIMER_MAX_TOKENS = SHARED_PRIMER_MAX_TOKENS;
 
 // The canonical Lorcana Coach persona (mirrored from the Console agent), pinned
 // to POST-GAME REVIEW mode. This runtime is tool-less: everything the model

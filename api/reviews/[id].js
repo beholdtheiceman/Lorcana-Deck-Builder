@@ -1,5 +1,4 @@
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "../_lib/db.js";
 import { withAuth } from "../_lib/withAuth.js";
 import { readJson } from "../_lib/http.js";
@@ -13,6 +12,7 @@ import {
   truncateContext,
 } from "../_lib/reviewLlm.js";
 import { summarizeDecklist, renderCompactDeckList, collectOpponentRevealed } from "../_lib/deckContext.js";
+import { getAnthropicClient } from "../_lib/anthropic.js";
 
 // Per-review actions:
 //   GET    /api/reviews/:id                          -> fetch one review (hub-member)
@@ -91,7 +91,7 @@ export default withAuth(async (req, res, session) => {
     });
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
   const totalUsage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u) => {
     totalUsage.input_tokens += u?.input_tokens ?? 0;
