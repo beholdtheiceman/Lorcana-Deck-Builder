@@ -13,8 +13,13 @@ import { TOOL_SPECS, runTool } from "./agentTools.js";
 import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
 
 export const MODEL = COACH_MODEL;
-const MAX_TOKENS = 1200;
-const MAX_ITERATIONS = 6;
+// Deck builds, matchup breakdowns, and multi-part answers need real room — a
+// 60-card list with role notes + strategy + key cards easily runs 2–3k tokens,
+// and adaptive thinking shares this budget. 1200 truncated everything.
+const MAX_TOKENS = 6000;
+// Deck building often needs several card lookups before it can write the list;
+// 6 iterations ran out mid-research and returned the "out of budget" fallback.
+const MAX_ITERATIONS = 10;
 const MAX_TOOL_RESULT_CHARS = 8000;
 
 // The canonical Lorcana Coach persona (mirrored from the Console agent) plus an
@@ -62,7 +67,10 @@ export async function runAgent({ question, userId, hubHint }) {
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      thinking: { type: "disabled" },
+      // Adaptive thinking materially improves deck building, matchup reads, and
+      // sequencing advice. Safe here because MAX_TOKENS gives it headroom and
+      // this path returns prose (no strict-JSON contract to truncate).
+      thinking: { type: "adaptive" },
       system,
       tools: TOOL_SPECS,
       messages,

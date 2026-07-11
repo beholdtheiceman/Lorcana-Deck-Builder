@@ -8,7 +8,7 @@ import { getBudgetStatus, recordUsage } from "../_lib/llmBudget.js";
 import { COACH_MODEL } from "../_lib/coachPrompt.js";
 
 const MODEL = COACH_MODEL;
-const MAX_TOKENS = 3000;
+const MAX_TOKENS = 6000;
 const MAX_CONTEXT_CHARS = 40000;
 
 const DraftSchema = z.object({
@@ -83,7 +83,9 @@ export default withAuth(async (req, res, session) => {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    thinking: { type: "disabled" },
+    // Meta reports are prose (no JSON contract); adaptive thinking improves the
+    // analysis and the large MAX_TOKENS budget leaves room for it.
+    thinking: { type: "adaptive" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userInstruction }],
   });

@@ -22,13 +22,18 @@
 // the persona, modes, keyword reference, and tone below stay identical.
 
 // Model copied from the Console agent config.
-// TWO Sonnet-5 gotchas the app's messages.create() calls must respect:
+// Sonnet-5 rules the app's messages.create() calls must respect:
 //   1. It REJECTS `temperature`/`top_p`/`top_k` with a 400 ("`temperature` is
 //      deprecated for this model") — omit them; steer with prompting instead.
-//   2. Adaptive thinking is ON by default (Sonnet 4.6 ran thinking-off by
-//      omission). Left on, it eats the max_tokens budget and truncates output,
-//      breaking the strict-JSON review/primer contracts. Every call therefore
-//      passes `thinking: { type: "disabled" }`. Don't reintroduce either param.
+//   2. Thinking + budget must be balanced. Adaptive thinking shares the
+//      max_tokens budget, so an under-sized budget truncates output (this broke
+//      the strict-JSON review with the old 2000-token cap). Policy:
+//        • Ask AI, review, report — adaptive thinking ON (quality-critical,
+//          reasoning-heavy) WITH a generous max_tokens (~6000) so nothing
+//          truncates. The review also has an invalid-JSON retry as a backstop.
+//        • Auto-primer — thinking OFF (fast structured step on the review's
+//          critical path; marginal quality gain isn't worth the latency).
+//      If you shrink any max_tokens, re-check its thinking setting.
 export const COACH_MODEL = "claude-sonnet-5";
 
 // System prompt copied verbatim from the Console agent config (v2).

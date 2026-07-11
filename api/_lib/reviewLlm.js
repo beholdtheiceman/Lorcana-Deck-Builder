@@ -9,8 +9,11 @@ const KNOWLEDGE_DIR = join(__dirname, "../../src/data/agent-knowledge");
 
 export const MODEL = COACH_MODEL;
 export const MAX_CONTEXT_CHARS = 60000;
-export const MAX_TOKENS = 2000;
-export const PRIMER_MAX_TOKENS = 800;
+// The review JSON (recap + up to 4 decision points + leak tags) plus adaptive
+// thinking needs real room; 2000 truncated the JSON and failed the parse.
+export const MAX_TOKENS = 6000;
+// A useful primer (gameplan + must-kill + 3–6 key cards) needs more than 800.
+export const PRIMER_MAX_TOKENS = 1500;
 
 // The canonical Lorcana Coach persona (mirrored from the Console agent), pinned
 // to POST-GAME REVIEW mode. This runtime is tool-less: everything the model
@@ -61,7 +64,10 @@ export async function callModel(client, userInstruction) {
   const resp = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    thinking: { type: "disabled" },
+    // Adaptive thinking makes the review analysis substantially better; the
+    // large MAX_TOKENS budget + the invalid-JSON retry below keep the strict
+    // JSON contract safe from truncation.
+    thinking: { type: "adaptive" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userInstruction }],
   });
@@ -168,6 +174,9 @@ export async function autoGeneratePrimer({ deckArchetype, vsArchetype, deckList,
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: PRIMER_MAX_TOKENS,
+      // Kept thinking-off: the primer is a fast, structured context-gen step on
+      // the review's critical path — quality gain from thinking is marginal here
+      // and not worth doubling latency of every review generation.
       thinking: { type: "disabled" },
       system: PRIMER_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
