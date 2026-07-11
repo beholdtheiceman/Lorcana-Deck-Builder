@@ -3,28 +3,32 @@
 **Branch:** `feature/uninkable-overhaul`
 
 ## Status
-- **Step 1 (post-mortem):** ✅ `POSTMORTEM.md`. 6 Opus readers; every CRITICAL/HIGH re-verified against real code. Baseline 152/22 green.
+- **Step 1 (post-mortem):** ✅ `POSTMORTEM.md`. 6 Opus readers; every CRITICAL/HIGH re-verified against real code.
 - **Step 2 (plans):** ✅ `PLANS.md` — P0–P4, each task tiered OPUS_SAFE vs FABLE_SUPERVISED.
-- **Step 3 (execute):** 🔶 P0 security cluster landed (below); P1–P4 pending.
+- **Step 3 (execute):** 🔶 ALL CRITICAL + HIGH fixed & committed (P0–P2 hardening). Tests 152/152 throughout. P3 (architecture) + P4 (UI redesign) NOT started.
 
-## Just completed (P0 — done directly, security-critical) — tests 152/152 ✅
-- **C1 arbitrary deck deletion** — `api/hubs/[id]/decks.js` DELETE now scopes to hub members (owner) / own decks (member). Closes platform-wide IDOR.
-- **H1 team-wipe cascade** — `prisma/schema.prisma:73` `Hub.owner` `onDelete: Cascade → Restrict`. `prisma validate` ✅. **NOT pushed to any DB** — needs `db push`/migration at deploy time.
+## Completed & committed on `feature/uninkable-overhaul` (tests green each step)
+- `6360d9f` — **C1** arbitrary deck deletion (IDOR) scoped to hub members; **H1** owner-delete cascade `Cascade→Restrict`.
+- `26aba17` — **C2** dead `user` key → `useAuth()`; **H8** `refreshUser`→`checkAuth`; **H2** digest `playTestGame`→`playtestGame`; **H3** Discord review write DISABLED (per Larry's decision — reject until identity linking exists).
+- `e8abb80` — **C3** text-import ReferenceError fixed; **H4** imports resolve against full catalog (`window.getAllCards`).
+- `b276901` — **H6** removed duplicate inner `ImageCacheProvider`.
+- `cf70136` — **H7** replay list bounded (`take:200`, drops `parsed`) + 64MB gunzip cap; deck POST zod+512KB validation; reset tokens SHA-256 hashed; `RESEND_FROM_EMAIL` guarded; env.example documents 3 vars.
 
-## Next (priority order, per PLANS.md)
-1. **H3 Discord injection** — BLOCKED ON YOUR DECISION (see below).
-2. **P1 OPUS_SAFE batch** → Opus: C2 dead `user` key (`HubDetailLayout.jsx:25`→`useAuth().user`), H8 `refreshUser`→`checkAuth` (`ResetPasswordPage.jsx`), H2 digest typo (`digest.js:16`).
-3. **P1 FABLE:** C3+H4 text import (monolith).
-4. P2 hardening → P3 architecture → P4 UI redesign (approved comps).
+## Still open (NOT done)
+- **H5** stale-closure keyboard shortcuts (`App.jsx` keydown effect `deps:[]`) — FABLE, monolith.
+- **H9** circular import: `DeckPresentationView.jsx` imports 14 symbols from `App.jsx` — prereq for any monolith split (P3.2).
+- **P2 remainder:** pod delete guard (needs `Pod.createdById` schema field), rate limiting (BLOCKED — needs Upstash creds, see prior handoff §1), dead-code removal (`DeckViewModal.jsx`, `TeamHub.jsx` vs `HubListPage`, `savedLorcanaDecks` section, `/api/results` wire-or-delete), MEDIUM/LOW backlog in `POSTMORTEM.md §3-5`.
+- **JSZip zip-member decompression** still unbounded in `replayParse.js` (no simple cap API) — follow-up.
+- **P3 architecture:** LLM gateway (P3.1, first CONFIRM `claude-sonnet-5`+`adaptive` thinking are valid for the installed SDK — `POSTMORTEM.md §8`), resolve H9, single `tokens.css`, card-DB + deck-versioning (large — spec separately).
+- **P4 UI redesign:** three approved comps (deck detail, Team Hub, Deck Lab) — build on P3 tokens.
 
 ## Open questions / judgment calls
-- **H3 (Discord):** anyone with a hub invite code can file reviews into it; no Discord-user→member link exists in the data model, so a correct check needs a product decision — (a) disable Discord write until identity linking exists, (b) require a second per-hub secret, or (c) accept + document. **Need your call.**
-- **Deploy:** everything is on the feature branch; schema change isn't live until a DB push. No prod deploy without your explicit "deploy".
-- **Cost:** session is ~$78+ (the 6 Opus readers were the bulk). P1–P4 remain large — confirm how far to push in one session.
+- **Deploy:** everything is on the feature branch; the schema change (H1) isn't live until a DB `db push`/migration. No prod deploy without Larry's explicit "deploy".
+- **Cost:** session reached ~$142 (6 Opus post-mortem readers + 2 Opus fix batches were the bulk). Paused before P3/P4 pending Larry's call on how far to push — those are realistically multi-session efforts.
 
 ## Notes
-- Rate limiting (P2.6) matches the still-open Upstash item in the prior handoff below.
 - Commit per cluster, explicit pathspecs (never `git add -A`), author `sportlarry@gmail.com`. Keep `.claude/` untracked.
+- Live-fire test recommended for text import (parser paths thinly covered) and for the coach LLM path (needs `ANTHROPIC_API_KEY`).
 
 ---
 
