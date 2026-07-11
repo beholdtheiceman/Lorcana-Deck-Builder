@@ -512,10 +512,10 @@ export default function HubOverviewPage() {
       <Panel title="Gauntlet coverage">
         {decksLoading ? (
           <p className="text-sm animate-pulse" style={{ color: 'var(--muted)' }}>Reading the gauntlet…</p>
-        ) : decks.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--faint)' }}>No team decks yet.</p>
         ) : (
           <>
+            {/* Always show all six inks (hollow at zero) — the coverage grid IS
+                the panel, even before any decks exist (comp behavior). */}
             <div
               className="flex justify-between gap-1.5"
               role="img"
