@@ -1,5 +1,6 @@
 import { prisma } from "../_lib/db.js";
 import { readJson } from "../_lib/http.js";
+import { rateLimit, clientIp } from "../_lib/rateLimit.js";
 import { Resend } from "resend";
 import crypto from "crypto";
 import { z } from "zod";
@@ -10,6 +11,13 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
     return res.status(501).json({ error: "Email not configured" });
+  }
+
+  // Throttle reset-email spam / user enumeration (per IP).
+  const rl = await rateLimit(`forgot:${clientIp(req)}`, { limit: 5, windowMs: 60_000 });
+  if (!rl.ok) {
+    res.setHeader("Retry-After", Math.ceil(rl.retryAfterMs / 1000));
+    return res.status(429).json({ error: "Too many attempts, try again shortly" });
   }
 
   const body = await readJson(req);

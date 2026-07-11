@@ -1,5 +1,6 @@
 import { prisma } from '../_lib/db.js';
 import { withAuth } from '../_lib/withAuth.js';
+import { rateLimit, clientIp } from '../_lib/rateLimit.js';
 import { z } from 'zod';
 
 const joinHubSchema = z.object({
@@ -13,6 +14,13 @@ const HUB_INCLUDE = {
 
 export default withAuth(async (req, res, session) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Throttle invite-code guessing (per IP).
+  const rl = await rateLimit(`join:${clientIp(req)}`, { limit: 20, windowMs: 60_000 });
+  if (!rl.ok) {
+    res.setHeader('Retry-After', Math.ceil(rl.retryAfterMs / 1000));
+    return res.status(429).json({ error: 'Too many attempts, try again shortly' });
+  }
 
   const { inviteCode } = joinHubSchema.parse(req.body);
   const userId = session.uid;
