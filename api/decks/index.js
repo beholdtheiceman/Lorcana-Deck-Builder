@@ -1,6 +1,17 @@
 import { prisma } from "../_lib/db.js";
 import { readJson } from "../_lib/http.js";
 import { withAuth } from "../_lib/withAuth.js";
+import { z } from "zod";
+
+// `data` is an intentionally opaque deck blob — validate only its presence/type,
+// not its internal card shape. Size is bounded separately after parsing.
+const DeckSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(1).max(200),
+  data: z.any(),
+});
+
+const MAX_DECK_BYTES = 512 * 1024; // 512 KB serialized deck blob
 
 export default withAuth(async (req, res, sess) => {
   if (req.method === "GET") {
@@ -13,7 +24,15 @@ export default withAuth(async (req, res, sess) => {
   }
 
   if (req.method === "POST") {
-    const { id, title, data } = await readJson(req);
+    const body = await readJson(req);
+    const parsed = DeckSchema.safeParse(body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+
+    const { id, title, data } = parsed.data;
+
+    if (JSON.stringify(data ?? {}).length > MAX_DECK_BYTES) {
+      return res.status(413).json({ error: "Deck too large" });
+    }
 
     if (id) {
       // updateMany scopes by userId so a user can only modify their own deck.

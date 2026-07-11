@@ -1,6 +1,23 @@
 import JSZip from "jszip";
 import { gunzipSync } from "node:zlib";
 
+// Cap decompression output to guard against gzip bombs (compressed member bytes
+// expanding to exhaust memory). Node's zlib throws a RangeError when the
+// decompressed output would exceed `maxOutputLength`.
+const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024; // 64 MB
+
+/** gunzip with a hard output-size cap; converts the cap RangeError into a clean error. */
+function gunzipCapped(input) {
+  try {
+    return gunzipSync(input, { maxOutputLength: MAX_DECOMPRESSED_BYTES });
+  } catch (err) {
+    if (err instanceof RangeError) {
+      throw new Error("Replay archive too large to decompress");
+    }
+    throw err;
+  }
+}
+
 /**
  * Lorcana replay parser — supports multiple input formats:
  *   .match-replay.zip  — zip containing match.json + game-NN_*.replay.gz files
@@ -92,7 +109,7 @@ function sniffFormat(buf) {
 function parseSingleGameGz(buf) {
   let json;
   try {
-    json = gunzipSync(buf).toString("utf8");
+    json = gunzipCapped(buf).toString("utf8");
   } catch {
     throw new Error("parseSingleGameGz: failed to decompress — not a valid gzip file");
   }
@@ -210,7 +227,7 @@ async function summarizeMatchZip(zip, match) {
     const gz = await gameEntries[i].entry.async("nodebuffer");
     let gameData;
     try {
-      gameData = JSON.parse(gunzipSync(gz).toString("utf8"));
+      gameData = JSON.parse(gunzipCapped(gz).toString("utf8"));
     } catch {
       continue;
     }

@@ -8,7 +8,9 @@ const Schema = z.object({ email: z.string().email() });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
-  if (!process.env.RESEND_API_KEY) return res.status(501).json({ error: "Email not configured" });
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+    return res.status(501).json({ error: "Email not configured" });
+  }
 
   const body = await readJson(req);
   const parsed = Schema.safeParse(body);
@@ -24,10 +26,14 @@ export default async function handler(req, res) {
   });
 
   const token = crypto.randomBytes(32).toString("hex");
+  // Store only a SHA-256 hash so a DB read can't yield usable reset tokens.
+  // The raw token is emailed; reset-password.js hashes the incoming token the
+  // same way to look the record up.
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
   await prisma.passwordResetToken.create({
-    data: { userId: user.id, token, expiresAt },
+    data: { userId: user.id, token: tokenHash, expiresAt },
   });
 
   const host = process.env.RESEND_FROM_EMAIL

@@ -87,7 +87,23 @@ export default withAuth(async (req, res, session) => {
     const replays = await prisma.replay.findMany({
       where: { hubId },
       orderBy: { createdAt: "desc" },
-      include: { uploader: { select: { id: true, email: true } } },
+      take: 200,
+      // Exclude the heavy `parsed` JSON blob from the list response; the list
+      // only renders denormalized meta columns. Detail/parsed is served by the
+      // POST-create response when a replay is uploaded.
+      select: {
+        id: true,
+        hubId: true,
+        source: true,
+        matchId: true,
+        format: true,
+        playerName: true,
+        opponentName: true,
+        matchResult: true,
+        matchScore: true,
+        createdAt: true,
+        uploader: { select: { id: true, email: true } },
+      },
     });
 
     return res.status(200).json(replays);

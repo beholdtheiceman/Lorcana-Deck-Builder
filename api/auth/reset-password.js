@@ -2,6 +2,7 @@ import { prisma } from "../_lib/db.js";
 import { readJson } from "../_lib/http.js";
 import { setSession } from "../_lib/auth.js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { z } from "zod";
 
 const Schema = z.object({
@@ -18,8 +19,12 @@ export default async function handler(req, res) {
 
   const { token, password } = parsed.data;
 
+  // Tokens are stored as SHA-256 hashes (see forgot-password.js). Hash the raw
+  // token from the URL the same way to find the record.
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
   const record = await prisma.passwordResetToken.findUnique({
-    where: { token },
+    where: { token: tokenHash },
     include: { user: { select: { id: true, email: true } } },
   });
 
