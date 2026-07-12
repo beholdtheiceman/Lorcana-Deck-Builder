@@ -2882,7 +2882,7 @@ function DeckInkLedger({ entries }) {
   );
 }
 
-function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
+function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onSave }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
     () => groupBy(entries, (e) => getCost(e.card)),
@@ -2940,6 +2940,15 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport }) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {onSave && (
+              <button
+                className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition text-sm"
+                onClick={() => onSave()}
+                title="Save deck (Ctrl+S)"
+              >
+                Save
+              </button>
+            )}
             <button
               className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 transition text-sm"
               onClick={onImport}
@@ -4791,6 +4800,7 @@ useEffect(() => {
         onRemove={handleRemove}
         onExport={() => setExportOpen(true)}
         onImport={() => setImportOpen(true)}
+        onSave={handleSaveDeck}
       />
       <DeckStatistics
         entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}
