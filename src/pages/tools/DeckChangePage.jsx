@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { averageCost, buildCostCurve, buildInkSplit } from '../../components/DeckStats'
 import DeckPasteImport from '../../components/tools/DeckPasteImport'
-import { diff } from '../../lib/deckDiff'
+import { diff, inkDeltas } from '../../lib/deckDiff'
 import { useIncomingDeck } from '../../lib/deckPayload'
 import { fetchAllCards } from '../../lib/cardsApi'
 
@@ -36,10 +36,6 @@ function deckEntries(payload, index) {
     const card = (item.cardId && index.byId.get(String(item.cardId))) || index.byName.get(normalizeName(item.name))
     return card ? [{ card, count: item.count }] : []
   })
-}
-
-function inkCounts(entries) {
-  return Object.fromEntries(buildInkSplit(entries).segments.map(({ ink, count }) => [ink, count]))
 }
 
 function signed(value) {
@@ -79,10 +75,9 @@ function ShiftSummary({ current, target, cards }) {
   const bEntries = useMemo(() => deckEntries(target, index), [target, index])
   const aCurve = buildCostCurve(aEntries)
   const bCurve = buildCostCurve(bEntries)
-  const aInks = inkCounts(aEntries)
-  const bInks = inkCounts(bEntries)
+  const inks = inkDeltas(buildInkSplit(aEntries).segments, buildInkSplit(bEntries).segments)
   const curveChanges = aCurve.map((count, cost) => ({ cost, delta: bCurve[cost] - count })).filter(({ delta }) => delta)
-  const inkChanges = INKS.map((ink) => ({ ink, delta: (bInks[ink] || 0) - (aInks[ink] || 0) })).filter(({ delta }) => delta)
+  const inkChanges = INKS.map((ink) => ({ ink, delta: inks[ink] || 0 })).filter(({ delta }) => delta)
   const resolved = aEntries.length + bEntries.length
   const avgShift = averageCost(bEntries) - averageCost(aEntries)
 
