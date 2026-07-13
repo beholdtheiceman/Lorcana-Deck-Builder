@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diff } from '../lib/deckDiff'
+import { diff, inkDeltas } from '../lib/deckDiff'
 
 describe('deck diff', () => {
   it('reports count deltas in both directions', () => {
@@ -43,5 +43,21 @@ describe('deck diff', () => {
 
     expect(result.cuts).toEqual([{ name: 'Mickey Mouse', from: 4, to: 2, delta: -2 }])
     expect(result.adds).toEqual([])
+  })
+})
+
+describe('ink deltas', () => {
+  it('aggregates the deck-change repro by normalized ink name', () => {
+    const current = [
+      { ink: 'Steel', count: 4 },
+      { ink: 'Ruby', count: 2 },
+    ]
+    const target = [
+      { ink: 'steel', count: 2 },
+      { ink: 'ruby', count: 4 },
+      { ink: 'Ruby', count: 1 },
+    ]
+
+    expect(inkDeltas(current, target)).toEqual({ steel: -2, ruby: 3 })
   })
 })

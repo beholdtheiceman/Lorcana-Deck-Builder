@@ -22,6 +22,26 @@ function indexedCards(payload) {
 }
 
 /**
+ * Aggregate target-minus-current copy deltas from ink-split segments.
+ * Ink names are normalized because card sources and callers may use different
+ * casing for the same ink.
+ */
+export function inkDeltas(currentSegments, targetSegments) {
+  const deltas = {}
+
+  for (const [direction, segments] of [[-1, currentSegments], [1, targetSegments]]) {
+    for (const segment of segments || []) {
+      const ink = String(segment?.ink || '').trim().toLowerCase()
+      const count = Number(segment?.count)
+      if (!ink || !Number.isFinite(count)) continue
+      deltas[ink] = (deltas[ink] || 0) + (direction * count)
+    }
+  }
+
+  return Object.fromEntries(Object.entries(deltas).filter(([, delta]) => delta !== 0))
+}
+
+/**
  * Compare two DeckPayload objects by normalized card name.
  * curveShift is the signed copy movement used by the UI after resolving card
  * metadata (cost and ink are intentionally not part of DeckPayload).
