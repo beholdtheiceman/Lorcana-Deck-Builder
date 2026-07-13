@@ -5,6 +5,7 @@ import { exportDeck, generateTextExport, generateSimpleTextExport, generateCSVEx
 import { fetchAllCards, normalizeAbilityToken, ABILITIES_CANON } from "./lib/cardsApi.js";
 import { IMG_CACHE_CAP, tryLoadImage, tryLoadImageWithCORSFallback, tryLoadImageWithBetterCORS, getWorkingImageUrl, getCardImageUrl, generateLocalCardImage, createSimpleCardImage, getCORSProxyUrl, getAlternativeCORSProxyUrl, createCanvasImage, generateLorcastURL, generateAlternativeImageUrls, resetFailedImageCache } from "./lib/images.js";
 import { generateDeckImagePNG } from "./lib/deckImage.js";
+import { toPayload } from "./lib/deckPayload.js";
 
 // React & ecosystem -----------------------------------------------------------
 import React, {
@@ -20,7 +21,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 // Auth context
 import { useAuth } from './contexts/AuthContext';
@@ -2882,7 +2883,7 @@ function DeckInkLedger({ entries }) {
   );
 }
 
-function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onSave }) {
+function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onSave, onAnalyze }) {
   const entries = Object.values(deck.entries || {}).filter((e) => e.count > 0);
   const groupedByCost = useMemo(
     () => groupBy(entries, (e) => getCost(e.card)),
@@ -2940,6 +2941,24 @@ function DeckPanel({ deck, onSetCount, onRemove, onExport, onImport, onSave }) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {onAnalyze && (
+              <select
+                defaultValue=""
+                className="max-w-[150px] px-2 py-1.5 rounded-lg bg-gray-950 border border-white/10 text-gray-200 hover:bg-white/10 transition text-sm"
+                aria-label="Analyze this deck"
+                onChange={(event) => {
+                  onAnalyze(event.target.value);
+                  event.target.value = "";
+                }}
+              >
+                <option value="" disabled>Analyze this deck ▸</option>
+                <option value="hypergeometric">Hypergeometric</option>
+                <option value="swiss">Swiss simulator</option>
+                <option value="deck-change">Deck change</option>
+                <option value="proxy">Proxy creator</option>
+                <option value="performance">Performance</option>
+              </select>
+            )}
             {onSave && (
               <button
                 className="px-3 py-1.5 rounded-lg bg-gradient-to-b from-violet-500 to-indigo-500 border border-violet-400/40 text-white shadow-[0_3px_12px_-3px_rgba(139,108,255,0.7)] hover:brightness-110 transition text-sm"
@@ -3358,10 +3377,15 @@ function PrintableSheet({ deck, onClose }) {
 
 // Root App -------------------------------------------------------------------
 
+export function getDeckPayload(deckState) {
+  return toPayload(deckState);
+}
+
 function AppInner() {
   console.log('[App] AppInner component starting up...');
   const { addToast } = useToasts();
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   
   // Deck presentation image download. The heavy canvas/layout logic lives in
   // src/lib/deckImage.js as a pure function; this wrapper just owns the
@@ -4801,6 +4825,7 @@ useEffect(() => {
         onExport={() => setExportOpen(true)}
         onImport={() => setImportOpen(true)}
         onSave={handleSaveDeck}
+        onAnalyze={(tool) => navigate(`/tools/${tool}`, { state: { deck: getDeckPayload(deck) } })}
       />
       <DeckStatistics
         entries={Object.values(deck?.entries || {}).filter(e => e.count > 0)}

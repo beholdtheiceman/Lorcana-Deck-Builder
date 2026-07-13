@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, Navigate } from 'react-router-dom'
 import AuthButton from './components/AuthButton'
 import DeckBuilderApp from './App.jsx'
@@ -21,7 +21,18 @@ import JoinPage from './pages/JoinPage'
 import MyDecksPage from './pages/MyDecksPage'
 import AskAiPage from './pages/AskAiPage'
 import LandingPage from './pages/LandingPage'
+import ToolsHubPage from './pages/tools/ToolsHubPage'
 import { useAuth } from './contexts/AuthContext'
+
+const HypergeometricPage = lazy(() => import('./pages/tools/HypergeometricPage'))
+const SwissPage = lazy(() => import('./pages/tools/SwissPage'))
+const DeckChangePage = lazy(() => import('./pages/tools/DeckChangePage'))
+const ProxyPage = lazy(() => import('./pages/tools/ProxyPage'))
+const PerformancePage = lazy(() => import('./pages/tools/PerformancePage'))
+
+function LazyTool({ children }) {
+  return <Suspense fallback={<div className="py-20 text-center text-[color:var(--muted)]">Loading tool…</div>}>{children}</Suspense>
+}
 
 function TopNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -39,6 +50,7 @@ function TopNav() {
     { to: '/team-hub', label: 'Team Hub' },
     { to: '/builder', label: 'Deck Lab' },
     { to: '/my-decks', label: 'My Decks' },
+    { to: '/tools', label: 'Tools' },
     { to: '/ask', label: 'Ask AI' },
   ]
 
@@ -165,6 +177,12 @@ export default function RouterApp() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join" element={<JoinPage />} />
           <Route path="/my-decks" element={<MyDecksPage />} />
+          <Route path="/tools" element={<ToolsHubPage />} />
+          <Route path="/tools/hypergeometric" element={<LazyTool><HypergeometricPage /></LazyTool>} />
+          <Route path="/tools/swiss" element={<LazyTool><SwissPage /></LazyTool>} />
+          <Route path="/tools/deck-change" element={<LazyTool><DeckChangePage /></LazyTool>} />
+          <Route path="/tools/proxy" element={<LazyTool><ProxyPage /></LazyTool>} />
+          <Route path="/tools/performance" element={<LazyTool><PerformancePage /></LazyTool>} />
           <Route path="/ask" element={<RequireAuth><AskAiPage /></RequireAuth>} />
           <Route path="/team-hub" element={<RequireAuth><HubListPage /></RequireAuth>} />
           <Route path="/team-hub/:id" element={<RequireAuth><HubDetailLayout /></RequireAuth>}>
