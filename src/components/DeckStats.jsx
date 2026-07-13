@@ -364,3 +364,5 @@ function pct(n, d) {
 function cap(s) {
   return String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1);
 }
+
+export { averageCost, buildCostCurve, buildInkSplit };
