@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { parseDeckText } from '../../../api/_lib/deckTextParse.js'
+import { parseDeckText } from '../../lib/deckTextParse.js'
 import { fetchAllCards } from '../../lib/cardsApi.js'
 import { toPayload } from '../../lib/deckPayload.js'
 import { LS_KEYS, loadLS } from '../../lib/storage.js'
@@ -38,12 +38,16 @@ export default function DeckPasteImport({ cards: suppliedCards, onImport, title 
       setLoading(false)
       return undefined
     }
+    let alive = true
     const controller = new AbortController()
     fetchAllCards({ signal: controller.signal }).then((loaded) => {
-      setCards(loaded)
+      // Ignore results after unmount/abort (StrictMode double-mount) so an
+      // aborted fetch's empty array can't clobber a good catalog.
+      if (!alive) return
+      if (loaded?.length) setCards(loaded)
       setLoading(false)
     })
-    return () => controller.abort()
+    return () => { alive = false; controller.abort() }
   }, [suppliedCards])
 
   const nameIndex = useMemo(() => {
