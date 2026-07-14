@@ -61,3 +61,26 @@ describe('buildReviewContext — card oracle resolution', () => {
     expect(ctx).toContain('99-999 — (not found in oracle — do not infer card text)')
   })
 })
+
+describe('buildReviewContext — strategy frameworks injection', () => {
+  it('injects the reasoning frameworks the coach prompt tells the model to use', async () => {
+    const replay = makeReplay([
+      { cardId: '1-1', type: 'quest', action: 'quested with Mickey Mouse', turn: 2, player: 'me' },
+    ])
+    const ctx = await buildReviewContext({ replay, primer: null, gameNumber: 1 })
+
+    expect(ctx).toContain('STRATEGY FRAMEWORKS')
+    // Role theory is the highest-priority framework and must be present.
+    expect(ctx).toContain('# Role Theory')
+  })
+
+  it('keeps the game log even when frameworks are injected (log tail preserved)', async () => {
+    const replay = makeReplay([
+      { cardId: '1-1', type: 'quest', action: 'quested with Mickey Mouse', turn: 9, player: 'me' },
+    ])
+    const ctx = await buildReviewContext({ replay, primer: null, gameNumber: 1, maxChars: 60000 })
+
+    expect(ctx).toContain('--- GAME LOG ---')
+    expect(ctx).toContain('quested with Mickey Mouse')
+  })
+})

@@ -3,7 +3,7 @@
 // anything outside the whitelist (including path-traversal attempts). Also
 // checks the two knowledge tools are wired into the Ask AI dispatcher.
 import { describe, it, expect } from 'vitest'
-import { listKnowledge, readKnowledge, KNOWLEDGE_INDEX } from '../../api/_lib/agentKnowledge.js'
+import { listKnowledge, readKnowledge, KNOWLEDGE_INDEX, buildKnowledgeBundle } from '../../api/_lib/agentKnowledge.js'
 import { TOOL_SPECS, runTool } from '../../api/_lib/agentTools.js'
 
 describe('agentKnowledge — listKnowledge', () => {
@@ -55,6 +55,30 @@ describe('agentKnowledge — readKnowledge', () => {
       expect(res.error, `${entry.file} should be readable`).toBeUndefined()
       expect(res.content.length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('agentKnowledge — buildKnowledgeBundle', () => {
+  it('concatenates the requested files with labeled headers', () => {
+    const bundle = buildKnowledgeBundle(['role-theory.md', 'gameplay-heuristics.md'])
+    expect(bundle).toContain('=== role-theory.md ===')
+    expect(bundle).toContain('# Role Theory')
+    expect(bundle).toContain('=== gameplay-heuristics.md ===')
+  })
+
+  it('respects the total cap across files', () => {
+    const bundle = buildKnowledgeBundle(
+      ['role-theory.md', 'gameplay-heuristics.md', 'game-state-evaluation.md'],
+      { totalCap: 500 }
+    )
+    // A little header overhead is allowed, but nowhere near a full file.
+    expect(bundle.length).toBeLessThan(800)
+  })
+
+  it('skips files that are not whitelisted instead of throwing', () => {
+    const bundle = buildKnowledgeBundle(['role-theory.md', 'nope.md'])
+    expect(bundle).toContain('# Role Theory')
+    expect(bundle).not.toContain('nope.md')
   })
 })
 

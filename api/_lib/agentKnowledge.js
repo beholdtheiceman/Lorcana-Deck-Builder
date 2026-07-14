@@ -83,6 +83,27 @@ export function listKnowledge() {
 }
 
 /**
+ * Concatenate several whitelisted knowledge files into one labeled block,
+ * bounded by a combined character cap. Unknown/missing files are skipped (not
+ * thrown). Used by the tool-less review path to inject strategy frameworks and
+ * the auto-primer to ground its output — the single loader both share.
+ * @param {string[]} files   ordered filenames from KNOWLEDGE_INDEX
+ * @param {{ totalCap?: number }} [opts]
+ * @returns {string}  e.g. "\n\n=== role-theory.md ===\n<content>…"
+ */
+export function buildKnowledgeBundle(files, { totalCap = 40000 } = {}) {
+  let out = "";
+  for (const file of files ?? []) {
+    if (out.length >= totalCap) break;
+    const res = readKnowledge(file);
+    if (res.error) continue; // absent / not whitelisted in this environment — skip it
+    const remaining = totalCap - out.length;
+    out += `\n\n=== ${file} ===\n${res.content.slice(0, remaining)}`;
+  }
+  return out;
+}
+
+/**
  * Read one whitelisted knowledge file. Never throws: unknown files, traversal
  * attempts, and missing files all come back as `{ error }` so the caller can
  * relay it instead of crashing the request.

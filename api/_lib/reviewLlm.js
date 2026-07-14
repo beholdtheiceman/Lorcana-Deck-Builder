@@ -1,13 +1,16 @@
 import { z } from "zod";
 import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
-import { readKnowledge } from "./agentKnowledge.js";
+import { buildKnowledgeBundle } from "./agentKnowledge.js";
 import {
   COACH_MAX_TOKENS,
   PRIMER_MAX_TOKENS as SHARED_PRIMER_MAX_TOKENS,
 } from "./anthropic.js";
 
 export const MODEL = COACH_MODEL;
-export const MAX_CONTEXT_CHARS = 60000;
+// ~60k for the case material (primer, deck, oracle, game log) plus headroom for
+// the injected STRATEGY FRAMEWORKS (capped at 22k in reviewContext.js) so the
+// frameworks don't push the game log out of the budget.
+export const MAX_CONTEXT_CHARS = 82000;
 // The review JSON (recap + up to 4 decision points + leak tags) plus adaptive
 // thinking needs real room; 2000 truncated the JSON and failed the parse.
 export const MAX_TOKENS = COACH_MAX_TOKENS;
@@ -110,9 +113,26 @@ export async function callModel(client, userInstruction, { think = true } = {}) 
 /** Build the exact user-instruction string for a review generation. */
 export function buildUserInstruction(context) {
   return (
-    "Using only the context below, write the review as JSON with exactly this shape:\n" +
+    "Review this game from the perspective player's side. Reason privately through these steps " +
+    "BEFORE writing anything — do not skip to a verdict:\n" +
+    "1. RECONSTRUCT the game from the GAME LOG turn by turn: track the lore race (running totals are " +
+    "in the log), each side's board (what was played, what quested so is exerted, what challenged, what " +
+    "was banished), and ink developed. Use the CARD ORACLE for what each card actually does.\n" +
+    "2. Assign the perspective player's ROLE in this matchup — beatdown or control — using the role-theory " +
+    "and matchup material in the STRATEGY FRAMEWORKS / MATCHUP PRIMER sections. Whoever has the worse late " +
+    "game must be the beatdown. Every decision below is judged against this role, never in a vacuum.\n" +
+    "3. For each decision you flag, ask what the ROLE + current BOARD STATE + LORE RACE actually demanded. " +
+    "'Quest vs challenge' is never generic: questing can be correct as the beatdown and wrong as control " +
+    "(and vice-versa) on the very same board. Cite the specific turn and board state, not a rule of thumb.\n" +
+    "4. You CANNOT see the player's hand or their draws — the log does not contain them. Do NOT claim they " +
+    "'should have played X' unless X is visibly available (already in play, or the log shows it in hand). " +
+    "When a better line depends on an unknown card being in hand, say so and mark it uncertain rather than " +
+    "asserting it. Prefer critiques of lines you can prove from the visible board.\n\n" +
+    "Then write the review as JSON with exactly this shape:\n" +
     '{ "recap": string, "decisionPoints": [{ "turn": number|string, "whatHappened": string, ' +
     '"betterLine": string, "why": string }], "leakTags": string[] }\n' +
+    "The recap should open with the player's role and the shape of the game (the flow, not a play-by-play). " +
+    "Ground every decisionPoint in the reconstructed board state and the player's role.\n" +
     "Return ONLY the JSON object, no prose, no markdown fences.\n\n" +
     "=== CONTEXT ===\n" +
     context
@@ -133,6 +153,10 @@ export const AutoPrimerSchema = z.object({
   vsArchetype: z.string().optional(),
   verdict: z.string(),
   confidence: z.string().optional(),
+  // Who the FIRST-named deck must be in this matchup (beatdown vs control).
+  // Committing this up front gives the review a role lens instead of judging
+  // quest-vs-challenge in a vacuum.
+  role: z.string().optional(),
   gameplan: z.string(),
   mustKill: z.string().optional(),
   mistakes: z.string().optional(),
@@ -171,14 +195,9 @@ const KNOWLEDGE_SNIPPET_CAP = 40000;
  * @returns {Promise<{data: object|null, usage: object|null}>}
  */
 export async function autoGeneratePrimer({ deckArchetype, vsArchetype, deckList, oppRevealed, client }) {
-  let knowledgeSnippet = "";
-  for (const file of PRIMER_KNOWLEDGE_FILES) {
-    if (knowledgeSnippet.length >= KNOWLEDGE_SNIPPET_CAP) break;
-    const res = readKnowledge(file);
-    if (res.error) continue; // File absent / not whitelisted in this environment — skip it.
-    const remaining = KNOWLEDGE_SNIPPET_CAP - knowledgeSnippet.length;
-    knowledgeSnippet += `\n\n=== ${file} ===\n${res.content.slice(0, remaining)}`;
-  }
+  const knowledgeSnippet = buildKnowledgeBundle(PRIMER_KNOWLEDGE_FILES, {
+    totalCap: KNOWLEDGE_SNIPPET_CAP,
+  });
 
   const prompt =
     `Matchup (by ink colors): ${deckArchetype} vs ${vsArchetype}\n` +
@@ -194,9 +213,12 @@ export async function autoGeneratePrimer({ deckArchetype, vsArchetype, deckList,
     "If the deck list matches a known archetype from the knowledge, use that archetype's " +
     "established name in deckArchetype (same for the opponent from their revealed cards); " +
     "otherwise use the ink colors plus a style word (e.g. \"Ruby/Sapphire ramp\").\n" +
+    "Set role to who the FIRST-named deck must be in this matchup — \"beatdown\" or \"control\" " +
+    "(whoever has the worse late game is the beatdown). This drives every quest-vs-challenge call.\n" +
     "Return ONLY a JSON object with this exact shape (no prose, no fences):\n" +
     '{ "deckArchetype": "string", "vsArchetype": "string", ' +
     '"verdict": "Favored|Even|Unfavored", "confidence": "High|Medium|Low", ' +
+    '"role": "beatdown|control", ' +
     '"gameplan": "string", "mustKill": "string", "mistakes": "string", ' +
     '"keyCards": [{ "name": "string", "note": "string" }] }';
 

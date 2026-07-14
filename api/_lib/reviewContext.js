@@ -1,4 +1,5 @@
 import { getById, getByName } from "./cards.js";
+import { buildKnowledgeBundle } from "./agentKnowledge.js";
 import {
   summarizeDecklist,
   renderDeckSection,
@@ -6,6 +7,17 @@ import {
   renderOpponentSection,
   resolveWithEvidence,
 } from "./deckContext.js";
+
+// The tool-less review model can't fetch knowledge, so we inject the reasoning
+// frameworks the coach prompt tells it to use (role assignment, board reading,
+// in-game heuristics). role-theory is first (highest priority, smallest); the
+// bundle is capped so it can't crowd the game log out of the context budget.
+const REVIEW_FRAMEWORK_FILES = [
+  "role-theory.md",
+  "game-state-evaluation.md",
+  "gameplay-heuristics.md",
+];
+const FRAMEWORK_CAP = 22000;
 
 /**
  * Builds the grounding context string handed to the LLM (or stored alongside an
@@ -103,6 +115,7 @@ export async function buildReviewContext({ replay, primer, gameNumber, maxChars 
   if (primer) {
     if (primer.verdict) out.push(`Verdict: ${primer.verdict}`);
     if (primer.confidence) out.push(`Confidence: ${primer.confidence}`);
+    if (primer.role) out.push(`Role (perspective player): ${primer.role}`);
     if (primer.gameplan) out.push(`Game plan: ${primer.gameplan}`);
     if (primer.mustKill) out.push(`Must-kill: ${primer.mustKill}`);
     if (primer.mistakes) out.push(`Common mistakes: ${primer.mistakes}`);
@@ -118,6 +131,14 @@ export async function buildReviewContext({ replay, primer, gameNumber, maxChars 
     out.push("(no primer supplied)");
   }
   out.push("");
+
+  // Reasoning frameworks the review model must apply (it can't fetch them).
+  const frameworks = buildKnowledgeBundle(REVIEW_FRAMEWORK_FILES, { totalCap: FRAMEWORK_CAP });
+  if (frameworks.trim()) {
+    out.push("--- STRATEGY FRAMEWORKS (apply these; do not judge decisions in a vacuum) ---");
+    out.push(frameworks.trim());
+    out.push("");
+  }
 
   const deckSection = renderDeckSection(deckSummary);
   if (deckSection) {
