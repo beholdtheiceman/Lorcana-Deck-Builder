@@ -1,0 +1,169 @@
+[
+  {
+    "id": "deck-build-ruby-sapphire",
+    "mode": "deck_build",
+    "question": "Build me a competitive Ruby/Sapphire deck for the current meta. Give me the full 60.",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "mustMatch": ["budget", "\\b60\\b", "characters", "strategy"]
+    }
+  },
+  {
+    "id": "deck-build-theme-moana",
+    "mode": "deck_build",
+    "question": "Make me a Moana-themed deck. What inks and what's the game plan?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge", "search_cards", "get_card"],
+      "mustMatch": ["\\b60\\b"]
+    }
+  },
+  {
+    "id": "meta-tier1",
+    "mode": "meta",
+    "question": "What's Tier 1 right now and what makes the top deck so consistent?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "knowledgeFiles": ["meta-archetypes.md"],
+      "mustMatch": ["tier"]
+    }
+  },
+  {
+    "id": "meta-fastest-grindiest",
+    "mode": "meta",
+    "question": "If I'm going to a tournament this weekend, what should I expect to face — the fastest deck and the grindiest deck?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"]
+    }
+  },
+  {
+    "id": "matchup-beat-control",
+    "mode": "matchup",
+    "question": "How do I play the Amethyst/Steel control matchup from the aggro side? Am I favored?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "knowledgeFiles": ["matchup-guide.md"],
+      "mustMatch": ["favored|even|unfavored"]
+    }
+  },
+  {
+    "id": "matchup-mulligan",
+    "mode": "matchup",
+    "question": "What do I mulligan for in games 2 and 3 against Ruby/Sapphire?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "mustMatch": ["mulligan"]
+    }
+  },
+  {
+    "id": "matchup-favored-read",
+    "mode": "matchup",
+    "question": "Is Emerald/Ruby aggro favored or unfavored into the grindiest control deck in the format?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "mustMatch": ["favored|even|unfavored"]
+    }
+  },
+  {
+    "id": "gameplay-role-first",
+    "mode": "gameplay",
+    "question": "I'm playing control against an aggro deck and I have a 2-lore quester and a challenge available into their 3-drop. Quest or challenge?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "knowledgeFiles": ["role-theory.md"],
+      "mustMatch": ["role|beatdown|control"]
+    }
+  },
+  {
+    "id": "gameplay-sequencing",
+    "mode": "gameplay",
+    "question": "Walk me through how to decide quest vs challenge when I'm the beatdown and behind on board.",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "mustMatch": ["beatdown"]
+    }
+  },
+  {
+    "id": "rules-ward-challenge",
+    "mode": "rules",
+    "question": "Does Ward stop my opponent from challenging my character?",
+    "expect": {
+      "mustMatch": ["ward", "challeng"],
+      "mustNotMatch": ["i (am|'m) not able", "i can(no|')t help"]
+    }
+  },
+  {
+    "id": "rules-evasive",
+    "mode": "rules",
+    "question": "Can a non-Evasive character challenge an Evasive one?",
+    "expect": {
+      "mustMatch": ["evasive"]
+    }
+  },
+  {
+    "id": "rules-bodyguard-timing",
+    "mode": "rules",
+    "question": "My opponent has a Bodyguard and a regular character both exerted. Can I challenge the non-Bodyguard first?",
+    "expect": {
+      "mustMatch": ["bodyguard"]
+    }
+  },
+  {
+    "id": "deck-review-generic",
+    "mode": "deck_review",
+    "question": "I'm running 40 characters, 4 songs, no card draw, and a 5-drop-heavy curve in Sapphire/Steel. What would you change?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "mustMatch": ["curve|draw|cut|add"]
+    }
+  },
+  {
+    "id": "tech-against-toys",
+    "mode": "tech",
+    "question": "What tech cards should I add to beat the Amber/Ruby Toys deck if I'm on Sapphire?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"],
+      "knowledgeFiles": ["tech-cards.md"]
+    }
+  },
+  {
+    "id": "tech-anti-aggro",
+    "mode": "tech",
+    "question": "I keep losing to fast aggro. What are the best anti-aggro tech includes in Amber?",
+    "expect": {
+      "anyToolsUsed": ["read_knowledge", "list_knowledge"]
+    }
+  },
+  {
+    "id": "sim-four-of",
+    "mode": "simulation",
+    "question": "What are my odds of drawing at least one copy of a 4-of in my opening 7 in a 60-card deck?",
+    "expect": {
+      "mustMatch": ["40|0\\.4|~40"]
+    }
+  },
+  {
+    "id": "sim-turn-two-play",
+    "mode": "simulation",
+    "question": "If I run 14 cards that cost 1 or 2, roughly how often do I have a turn-2 play in a 60-card deck?",
+    "expect": {
+      "mustMatch": ["%|percent|odds|chance|probab"]
+    }
+  },
+  {
+    "id": "grounding-card-text",
+    "mode": "rules",
+    "question": "What does Headless Horseman do exactly, and what's its cost?",
+    "expect": {
+      "anyToolsUsed": ["get_card", "search_cards"],
+      "mustNotMatch": ["i (am|'m) not able"]
+    }
+  },
+  {
+    "id": "grounding-no-hallucinate",
+    "mode": "rules",
+    "question": "Is there a card called 'Mickey Mouse - Galaxy Defender' and if so what does it do?",
+    "expect": {
+      "anyToolsUsed": ["get_card", "search_cards"]
+    }
+  }
+]
