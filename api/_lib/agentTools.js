@@ -9,6 +9,7 @@
 
 import { prisma } from "./db.js";
 import { getByName, searchCards as oracleSearchCards } from "./cards.js";
+import { listKnowledge, readKnowledge } from "./agentKnowledge.js";
 import {
   namedPairsFromDeckData,
   summarizeNamedCards,
@@ -79,6 +80,15 @@ function winPct(wins, losses) {
 // ---------------------------------------------------------------------------
 // Tool implementations
 // ---------------------------------------------------------------------------
+
+async function toolListKnowledge() {
+  return listKnowledge();
+}
+
+async function toolReadKnowledge({ file } = {}) {
+  if (!file) return { error: "file is required" };
+  return readKnowledge(file);
+}
 
 async function toolSearchCards(input = {}) {
   const matches = oracleSearchCards({ ...input, limit: input.limit ?? 12 });
@@ -303,6 +313,30 @@ async function toolSearchTournamentResults({ hubId, player, deckArchetype, event
 
 export const TOOL_SPECS = [
   {
+    name: "list_knowledge",
+    description:
+      "List the Lorcana strategy knowledge files (the lorcana-knowledge base: meta archetypes, matchup " +
+      "guide, role theory, synergy theory, archetype playbooks, game-state evaluation, gameplay heuristics, " +
+      "tech cards, set changelog) with a note on when to read each. Call this to decide which file(s) to open " +
+      "for a strategic question (deck building, meta, matchups, gameplay, tech).",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "read_knowledge",
+    description:
+      "Read one strategy knowledge file by name (from list_knowledge) and get its full text. Consult the " +
+      "relevant file(s) BEFORE answering any strategic question — e.g. read role-theory.md first for gameplay/" +
+      "sequencing, matchup-guide.md for matchup reads and primers, meta-archetypes.md for meta questions, " +
+      "tech-cards.md for tech includes. Ground strategic claims in this content, not from memory.",
+    input_schema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: 'Exact filename from list_knowledge, e.g. "matchup-guide.md"' },
+      },
+      required: ["file"],
+    },
+  },
+  {
     name: "search_cards",
     description:
       "Search the Lorcana card oracle by name/color/type/keyword ability/cost/text. Use this to find cards " +
@@ -435,6 +469,8 @@ export const TOOL_SPECS = [
 ];
 
 const HANDLERS = {
+  list_knowledge: toolListKnowledge,
+  read_knowledge: toolReadKnowledge,
   search_cards: toolSearchCards,
   get_card: toolGetCard,
   list_my_hubs: toolListMyHubs,

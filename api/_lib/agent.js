@@ -20,7 +20,10 @@ const MAX_TOKENS = COACH_MAX_TOKENS;
 // Deck building often needs several card lookups before it can write the list;
 // 6 iterations ran out mid-research and returned the "out of budget" fallback.
 const MAX_ITERATIONS = 10;
-const MAX_TOOL_RESULT_CHARS = 8000;
+// Big enough that a single read_knowledge file (capped at 14000 chars in
+// agentKnowledge.js) isn't truncated mid-file. DB tools slice their own text
+// fields well under this, so this only ever matters for knowledge reads.
+const MAX_TOOL_RESULT_CHARS = 16000;
 
 // The canonical Lorcana Coach persona (mirrored from the Console agent) plus an
 // app-runtime addendum. The Console agent grounds card lookups with web tools,
@@ -35,7 +38,12 @@ const BASE_SYSTEM_PROMPT =
   "oracle text with get_card/search_cards, and use the tools for the user's own saved decks, a " +
   "teammate's deck (in a shared hub's practice games), hub-scoped team stats (win rates by " +
   "matchup and by archetype), replay reviews, matchup primers, meta reports, and synced " +
-  "tournament results. The lorcana-knowledge Skill's files are available to these tools.\n" +
+  "tournament results. The lorcana-knowledge base (meta archetypes, matchup guide, role theory, " +
+  "synergy theory, archetype playbooks, game-state evaluation, gameplay heuristics, tech cards, set " +
+  "changelog) is readable through the list_knowledge and read_knowledge tools — for ANY strategic " +
+  "question (deck building, meta, matchups, gameplay/sequencing, tech), call list_knowledge to pick the " +
+  "right file(s), then read_knowledge to open them, and ground your answer in that content BEFORE " +
+  "replying. The web_fetch/lorcanajson references above do not apply here; use these tools instead.\n" +
   "Ground every claim in a tool result — never invent card text, stats, or review content. If a " +
   "hub-scoped question doesn't specify which hub and there's more than one candidate, call " +
   "list_my_hubs and, if it's still ambiguous, ask the user to clarify rather than guessing. If the " +

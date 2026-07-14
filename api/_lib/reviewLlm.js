@@ -1,15 +1,10 @@
 import { z } from "zod";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { COACH_MODEL, COACH_SYSTEM_PROMPT } from "./coachPrompt.js";
+import { readKnowledge } from "./agentKnowledge.js";
 import {
   COACH_MAX_TOKENS,
   PRIMER_MAX_TOKENS as SHARED_PRIMER_MAX_TOKENS,
 } from "./anthropic.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const KNOWLEDGE_DIR = join(__dirname, "../../src/data/agent-knowledge");
 
 export const MODEL = COACH_MODEL;
 export const MAX_CONTEXT_CHARS = 60000;
@@ -144,8 +139,21 @@ export const AutoPrimerSchema = z.object({
   keyCards: z.array(z.object({ name: z.string(), note: z.string().optional() })).default([]),
 });
 
-// Per-file cap so a runaway knowledge file can't blow up the primer call.
-const KNOWLEDGE_FILE_CAP = 15000;
+// Strategy files the primer/review grounds in. The authored guidance
+// (coachPrompt.js "GENERATE PRIMER" + SKILL-UPDATE.md) points primers at the
+// matchup guide, meta archetypes, role theory (beatdown assignment drives the
+// gameplan), and gameplay heuristics — a focused set rather than the whole base,
+// since the auto-primer is a thinking-off step on the review's critical path and
+// dumping all nine files would balloon input tokens on every review.
+const PRIMER_KNOWLEDGE_FILES = [
+  "matchup-guide.md",
+  "meta-archetypes.md",
+  "role-theory.md",
+  "gameplay-heuristics.md",
+];
+// Combined cap across all loaded files so the primer prompt stays bounded even
+// as the knowledge base grows.
+const KNOWLEDGE_SNIPPET_CAP = 40000;
 
 /**
  * Auto-generate a matchup primer using knowledge files + a fast LLM call.
@@ -164,13 +172,12 @@ const KNOWLEDGE_FILE_CAP = 15000;
  */
 export async function autoGeneratePrimer({ deckArchetype, vsArchetype, deckList, oppRevealed, client }) {
   let knowledgeSnippet = "";
-  for (const file of ["meta-archetypes.md", "matchup-guide.md"]) {
-    try {
-      const text = readFileSync(join(KNOWLEDGE_DIR, file), "utf8");
-      knowledgeSnippet += `\n\n=== ${file} ===\n${text.slice(0, KNOWLEDGE_FILE_CAP)}`;
-    } catch {
-      // File absent in this environment — skip it.
-    }
+  for (const file of PRIMER_KNOWLEDGE_FILES) {
+    if (knowledgeSnippet.length >= KNOWLEDGE_SNIPPET_CAP) break;
+    const res = readKnowledge(file);
+    if (res.error) continue; // File absent / not whitelisted in this environment — skip it.
+    const remaining = KNOWLEDGE_SNIPPET_CAP - knowledgeSnippet.length;
+    knowledgeSnippet += `\n\n=== ${file} ===\n${res.content.slice(0, remaining)}`;
   }
 
   const prompt =
