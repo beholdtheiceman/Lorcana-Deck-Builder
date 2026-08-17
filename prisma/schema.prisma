@@ -526,3 +526,65 @@ model Card {
   @@index([setCode])
   @@index([name])
 }
+
+// ---------------------------------------------------------------------------
+// Meta snapshots — weekly aggregate meta data from external sources.
+// Never deleted: if a source revokes access we keep everything already pulled.
+// See docs/superpowers/specs/2026-08-17-meta-data-pipeline-design.md
+// ---------------------------------------------------------------------------
+
+model MetaSnapshot {
+  id            String   @id @default(uuid())
+  source        String                        // "duels.ink" | "first-party"
+  queue         String                        // "core-bo1" | "core-bo3" | ...
+  era           String                        // "set-13"
+  periodStart   DateTime
+  periodEnd     DateTime
+  totalGames    Int
+  uniquePlayers Int?
+  status        String   @default("pending")  // "pending" | "approved" | "rejected"
+  payload       Json                          // raw response, verbatim
+  capturedAt    DateTime @default(now())
+
+  archetypes MetaArchetype[]
+  matchups   MetaMatchup[]
+
+  @@unique([source, queue, era, periodStart])
+  @@index([status, periodStart])
+}
+
+model MetaArchetype {
+  id                 String   @id @default(uuid())
+  snapshotId         String
+  externalId         String                   // profiles[].id, or "pair:amber/emerald"
+  archetypeId        String?                  // profiles[].archetypeId — often null
+  name               String                   // archetypeName, else colors label
+  colors             String[]
+  games              Int
+  winRate            Float
+  playRate           Float?
+  firstPlayerWinRate Float?
+  centroidCards      Json?
+  cardLift           Json?
+
+  snapshot MetaSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, externalId])
+  @@index([snapshotId])
+}
+
+model MetaMatchup {
+  id                 String   @id @default(uuid())
+  snapshotId         String
+  grain              String                   // "color-pair" | "archetype"
+  keyA               String                   // "amber/emerald" or an archetypeId
+  keyB               String
+  games              Int
+  winRate            Float                    // A's win rate vs B
+  firstPlayerWinRate Float?
+
+  snapshot MetaSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, grain, keyA, keyB])
+  @@index([snapshotId, grain])
+}
