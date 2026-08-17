@@ -132,18 +132,47 @@ model MetaMatchup {
 }
 ```
 
-- [ ] **Step 2: Generate the client and push the schema**
+- [ ] **Step 2: Generate the migration SQL WITHOUT applying it**
+
+⚠️ **`DATABASE_URL` in `.env` points at the live Neon database** (`ep-still-cake-adv00rds-pooler...`).
+**Do NOT run `prisma db push`** — it diffs the whole schema and will drop drifted columns or
+tables without asking. Owner instruction (2026-08-17): generate the SQL, review it, then apply.
 
 ```bash
-npx prisma generate && npx prisma db push
+npx prisma generate
+npx prisma migrate dev --create-only --name add_meta_snapshot_models
 ```
 
-Expected: `Your database is now in sync with your Prisma schema.`
+Expected: a new folder `prisma/migrations/<timestamp>_add_meta_snapshot_models/migration.sql`,
+and **no schema change applied yet**.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Review the SQL and STOP if it is not purely additive**
 
 ```bash
-git add prisma/schema.prisma
+cat prisma/migrations/*_add_meta_snapshot_models/migration.sql
+```
+
+Expected: exactly three `CREATE TABLE` statements (`MetaSnapshot`, `MetaArchetype`,
+`MetaMatchup`), their indexes, and two `ADD CONSTRAINT ... FOREIGN KEY` statements.
+
+**If the file contains any `DROP TABLE`, `DROP COLUMN`, or `ALTER TABLE ... DROP`, STOP and
+report to the human.** That means the live schema has drifted from `schema.prisma` and applying
+it would destroy data. Do not proceed on your own judgement.
+
+- [ ] **Step 4: Apply the reviewed migration**
+
+Only after Step 3 confirms the SQL is purely additive:
+
+```bash
+npx prisma migrate deploy
+```
+
+Expected: `1 migration found` / `applied successfully`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add prisma/schema.prisma prisma/migrations
 git commit -m "feat(meta): add MetaSnapshot/MetaArchetype/MetaMatchup models"
 ```
 
