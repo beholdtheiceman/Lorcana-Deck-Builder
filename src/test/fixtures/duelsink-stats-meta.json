@@ -1,0 +1,87 @@
+{
+  "_comment": "Trimmed real response from GET duels.ink/api/stats/meta?queue=core-bo1&period=all_time&era=current, captured 2026-08-17. Arrays truncated (colorPairs 21->3, matchups 150->3, profiles 88->2, archetypeMatchups 3120->3, cardLift ->2) to keep the fixture readable; shapes are verbatim. See docs/superpowers/specs/2026-08-17-meta-data-pipeline-design.md.",
+  "meta": {
+    "queueId": "core-bo1",
+    "period": "season:019f6cf4-8883-7e7e-87c2-9ceed1bcbb32",
+    "currentWeek": { "startDate": "2026-08-16", "endDate": "2026-08-22", "label": "Aug 16 - 22, 2026" },
+    "availableWeeks": [
+      { "startDate": "2026-07-12", "endDate": "2026-07-18", "label": "Jul 12 - 18, 2026", "totalGames": 24849, "totalMatches": null },
+      { "startDate": "2026-07-19", "endDate": "2026-07-25", "label": "Jul 19 - 25, 2026", "totalGames": 161841, "totalMatches": null },
+      { "startDate": "2026-07-26", "endDate": "2026-08-01", "label": "Jul 26 - Aug 1, 2026", "totalGames": 177115, "totalMatches": null },
+      { "startDate": "2026-08-02", "endDate": "2026-08-08", "label": "Aug 2 - 8, 2026", "totalGames": 145869, "totalMatches": null },
+      { "startDate": "2026-08-09", "endDate": "2026-08-15", "label": "Aug 9 - 15, 2026", "totalGames": 142196, "totalMatches": null },
+      { "startDate": "2026-08-16", "endDate": "2026-08-22", "label": "Aug 16 - 22, 2026", "totalGames": 28419, "totalMatches": null }
+    ],
+    "eras": {
+      "currentEra": { "id": "019f6ce2-3ab3-72bf-b648-5f947d61d3f4", "key": "set-13", "name": "Set 13", "startedAt": "2026-07-16T01:42:00.000Z", "endedAt": null },
+      "pastEras": [
+        { "id": "019ea12f-159d-7506-aa8b-c97d6e1cff49", "key": "set-12", "name": "Set 12", "startedAt": "2026-05-07T23:18:07.574Z", "endedAt": "2026-07-16T23:41:00.000Z" },
+        { "id": "019e0e81-6540-7bb6-ad36-3d38d5cc17e3", "key": "set-11", "name": "Set 11", "startedAt": "2026-02-12T00:00:00.000Z", "endedAt": "2026-05-08T00:00:00.000Z" }
+      ]
+    },
+    "scopeTotalGames": 680300
+  },
+  "activity": { "totalGames": 680300, "uniquePlayers": 14995, "avgTurns": 10, "avgDurationMs": 460691 },
+  "colorPairs": [
+    { "wins": 168269, "games": 322638, "colors": ["amber", "emerald"], "winRate": 52.15, "playRate": 23.71, "matchWins": null, "matchGames": null, "matchWinRate": null, "firstPlayerWinRate": 59.5 },
+    { "wins": 77272, "games": 155421, "colors": ["amber", "ruby"], "winRate": 49.72, "playRate": 11.42, "matchWins": null, "matchGames": null, "matchWinRate": null, "firstPlayerWinRate": 53.92 },
+    { "wins": 79248, "games": 150591, "colors": ["amber", "amethyst"], "winRate": 52.62, "playRate": 11.07, "matchWins": null, "matchGames": null, "matchWinRate": null, "firstPlayerWinRate": 60.35 }
+  ],
+  "matchups": [
+    { "games": 40745, "winsA": 20136, "colorsA": ["amber", "emerald"], "colorsB": ["amber", "emerald"], "winRate": 49.42, "firstPlayerGames": 20316, "firstPlayerWinRate": 57.54 },
+    { "games": 37787, "winsA": 18115, "colorsA": ["amber", "amethyst"], "colorsB": ["amber", "emerald"], "winRate": 47.94, "firstPlayerGames": 18800, "firstPlayerWinRate": 57.41 },
+    { "games": 34588, "winsA": 20146, "colorsA": ["amber", "emerald"], "colorsB": ["amber", "ruby"], "winRate": 58.25, "firstPlayerGames": 17400, "firstPlayerWinRate": 63.02 }
+  ],
+  "profiles": [
+    {
+      "id": "019fb352-efd5-79ee-a400-f8a85d87781f",
+      "colors": ["emerald"],
+      "secondaryColors": [],
+      "name": "Emerald",
+      "isMixed": false,
+      "signatureCards": ["3-92", "4-84", "9-76"],
+      "centroidCounts": { "2-80": 1, "3-70": 3, "3-92": 4, "4-84": 4, "9-76": 4, "10-81": 4, "11-89": 4, "11-98": 4 },
+      "sampleCount": 15,
+      "gamesPlayed": 85,
+      "wins": 40,
+      "winRate": 47.06,
+      "cardLift": [
+        { "lift": 2.94, "cardId": "11-86", "presence": 0.7333, "winsWith": 28, "gamesWith": 56, "shapesWith": 11, "pairWinRate": 47.06, "winRateWith": 50 },
+        { "lift": 0, "cardId": "3-70", "presence": 1, "winsWith": 40, "gamesWith": 85, "shapesWith": 15, "pairWinRate": 47.06, "winRateWith": 47.06 }
+      ],
+      "archetypeName": null,
+      "nameAka": null,
+      "flagshipCards": null,
+      "archetypeId": null,
+      "archetypeSlug": null
+    },
+    {
+      "id": "019fa58f-e88a-741e-ac6d-f363121e2d76",
+      "colors": ["amber", "amethyst"],
+      "secondaryColors": [],
+      "name": "Amber/Amethyst",
+      "isMixed": false,
+      "signatureCards": ["10-55", "10-56", "10-60"],
+      "centroidCounts": { "10-7": 4, "12-6": 4, "2-31": 2, "9-45": 3, "10-55": 4, "10-56": 4, "10-60": 4, "10-66": 4, "11-13": 4, "12-11": 4, "12-62": 4, "13-15": 4 },
+      "sampleCount": 5524,
+      "gamesPlayed": 49184,
+      "wins": 26900,
+      "winRate": 54.69,
+      "cardLift": [
+        { "lift": 1.94, "cardId": "10-40", "presence": 0.0654, "winsWith": 1686, "gamesWith": 2977, "shapesWith": 361, "pairWinRate": 54.69, "winRateWith": 56.63 },
+        { "lift": 1.57, "cardId": "1-21", "presence": 0.2049, "winsWith": 6410, "gamesWith": 11394, "shapesWith": 1132, "pairWinRate": 54.69, "winRateWith": 56.26 }
+      ],
+      "archetypeName": "Midrange",
+      "nameAka": null,
+      "flagshipCards": null,
+      "archetypeId": "01a00f2a-d70a-75a2-bd15-60ccda218ae9",
+      "archetypeSlug": "amber-amethyst-horseman"
+    }
+  ],
+  "archetypeMatchups": [
+    { "archetypeIdA": "019fc019-e6de-7e00-83aa-01fc2b16a367", "archetypeIdB": "019fc541-78dc-7fe5-903b-3ef383c898ac", "games": 121, "winsA": 47, "winRate": 38.84, "firstPlayerGames": 61, "firstPlayerWins": 30, "firstPlayerWinRate": 49.18 },
+    { "archetypeIdA": "019fd6ec-9042-7354-8b2d-c0071bc7e3de", "archetypeIdB": "019ff39c-1f2c-7c8a-9241-a72bedeb754e", "games": 24, "winsA": 17, "winRate": 70.83, "firstPlayerGames": 12, "firstPlayerWins": 8, "firstPlayerWinRate": 66.67 },
+    { "archetypeIdA": "019f6db2-55bf-7ba0-854a-7bff77600f0d", "archetypeIdB": "019fd9dc-0244-70f2-a919-90504c2d5810", "games": 225, "winsA": 152, "winRate": 67.56, "firstPlayerGames": 113, "firstPlayerWins": 87, "firstPlayerWinRate": 76.99 }
+  ],
+  "updatedAt": "2026-08-17T09:47:38.012Z"
+}
