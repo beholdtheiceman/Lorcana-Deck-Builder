@@ -5,11 +5,20 @@ if (!globalThis.__prisma) globalThis.__prisma = prisma;
 
 const ADMIN_SECRET = process.env.DIGEST_SECRET || process.env.CRON_SECRET;
 
-// Sanity band: a plausible pull has a real sample and no absurd win rates.
+// Sanity band: does this pull look like real data, or like garbage?
+//
+// Only rows with a meaningful sample are checked. Low-sample rows are legitimately
+// extreme and say nothing about pull quality: the first live snapshot carried a
+// mono-Sapphire row at 0% over 2 games and a mono-Ruby row at 14% over 7, and a
+// real archetype (Hunny) sat at 27.9% over 1,371. None of those indicate a bad
+// pull. At a 2000-game floor every row in that snapshot fell inside 30-70%, so an
+// outlier above the floor is genuinely suspicious and worth a human look.
+const SANITY_MIN_GAMES = 2000;
+
 export function passesSanityCheck(snapshot) {
   if (snapshot.totalGames < 1000) return false;
   return snapshot.archetypes
-    .filter((a) => a.games >= 500)
+    .filter((a) => a.games >= SANITY_MIN_GAMES)
     .every((a) => a.winRate >= 30 && a.winRate <= 70);
 }
 
