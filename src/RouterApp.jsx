@@ -22,6 +22,7 @@ import MyDecksPage from './pages/MyDecksPage'
 import AskAiPage from './pages/AskAiPage'
 import LandingPage from './pages/LandingPage'
 import ToolsHubPage from './pages/tools/ToolsHubPage'
+import MetaPage from './pages/MetaPage'
 import { useAuth } from './contexts/AuthContext'
 
 const HypergeometricPage = lazy(() => import('./pages/tools/HypergeometricPage'))
@@ -51,6 +52,7 @@ function TopNav() {
     { to: '/builder', label: 'Deck Lab' },
     { to: '/my-decks', label: 'My Decks' },
     { to: '/tools', label: 'Tools' },
+    { to: '/meta', label: 'Meta' },
     { to: '/ask', label: 'Ask AI' },
   ]
 
@@ -178,6 +180,7 @@ export default function RouterApp() {
           <Route path="/join" element={<JoinPage />} />
           <Route path="/my-decks" element={<MyDecksPage />} />
           <Route path="/tools" element={<ToolsHubPage />} />
+          <Route path="/meta" element={<MetaPage />} />
           <Route path="/tools/hypergeometric" element={<LazyTool><HypergeometricPage /></LazyTool>} />
           <Route path="/tools/swiss" element={<LazyTool><SwissPage /></LazyTool>} />
           <Route path="/tools/deck-change" element={<LazyTool><DeckChangePage /></LazyTool>} />
