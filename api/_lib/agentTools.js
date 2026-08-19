@@ -308,7 +308,23 @@ async function toolSearchTournamentResults({ hubId, player, deckArchetype, event
   };
 }
 
-async function toolGetCurrentMeta(input = {}) {
+// The archetypes table holds two different KINDS of row at different resolutions:
+// color-pair aggregates (externalId "pair:...") and individual deck shapes within
+// them. Sorting both on one games axis interleaves them, and a deck shape is a
+// SUBSET of its pair's games — so presenting them in one list invites the model to
+// answer "strongest color pair" with a deck name. Split them explicitly.
+const isColorPair = (a) => a.externalId.startsWith("pair:");
+
+const metaRow = (a) => ({
+  name: a.name,
+  colors: a.colors,
+  games: a.games,
+  winRate: a.winRate,
+  playRate: a.playRate,
+  firstPlayerWinRate: a.firstPlayerWinRate,
+});
+
+async function toolGetCurrentMeta(input) {
   const data = await getCurrentMeta({ queue: input.queue || "core-bo1" });
   if (!data) return { error: "No approved meta snapshot is available yet." };
   return {
@@ -319,14 +335,8 @@ async function toolGetCurrentMeta(input = {}) {
     totalGames: data.totalGames,
     uniquePlayers: data.uniquePlayers,
     stale: data.stale,
-    archetypes: data.archetypes.slice(0, 20).map((a) => ({
-      name: a.name,
-      colors: a.colors,
-      games: a.games,
-      winRate: a.winRate,
-      playRate: a.playRate,
-      firstPlayerWinRate: a.firstPlayerWinRate,
-    })),
+    colorPairs: data.archetypes.filter(isColorPair).slice(0, 15).map(metaRow),
+    decks: data.archetypes.filter((a) => !isColorPair(a)).slice(0, 15).map(metaRow),
     matchups: data.matchups.slice(0, 30).map((m) => ({
       a: m.keyA,
       b: m.keyB,
@@ -335,6 +345,7 @@ async function toolGetCurrentMeta(input = {}) {
     })),
   };
 }
+
 
 // ---------------------------------------------------------------------------
 // Tool specs (Anthropic tool-use schema) + dispatcher
@@ -484,8 +495,11 @@ export const TOOL_SPECS = [
   {
     name: "get_current_meta",
     description:
-      "Get the current competitive meta snapshot: top color pairs and archetypes by play rate with win " +
-      "rates, first-player win rates, sample sizes, the period covered, the set era, and the data source. " +
+      "Get the current competitive meta snapshot. Returns TWO SEPARATE lists: `colorPairs` (ink-pair " +
+      "aggregates like Amber/Emerald — use these for 'best color pair' questions) and `decks` (individual " +
+      "deck shapes WITHIN those pairs, like Princess Aggro — a deck's games are a subset of its pair's, so " +
+      "never compare the two lists as peers or sum them). Both carry win rate, play rate, first-player win " +
+      "rate and sample size, alongside the period covered, the set era, and the data source. " +
       "This is LIVE data and it OVERRIDES the static knowledge files — meta-archetypes.md, matchup-guide.md " +
       "and tech-cards.md are pinned to an older set and may contradict it. Call this before answering any " +
       "question about what is strong, popular, or winning right now. When you cite a figure from it, state " +
