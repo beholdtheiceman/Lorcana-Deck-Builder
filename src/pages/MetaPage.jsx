@@ -13,7 +13,17 @@ const QUEUES = [
 const MIN_GAMES_THRESHOLD = 200
 
 const numberFormatter = new Intl.NumberFormat('en-US')
-const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+// timeZone: 'UTC' is load-bearing. Period boundaries are stored as UTC midnight
+// (2026-08-16T00:00:00.000Z), so formatting them in the viewer's local zone shifts
+// the label a day back anywhere west of UTC — Aug 16 renders as "Aug 15" in US
+// Eastern. This page's whole job is citing the week the data covers, so an
+// off-by-one there is a correctness bug, not a cosmetic one.
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
 
 function formatNumber(value) {
   return value === null || value === undefined ? '—' : numberFormatter.format(value)
