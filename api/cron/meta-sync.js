@@ -16,6 +16,16 @@ export default async function handler(req, res) {
 
   try {
     const summary = await syncAllQueues();
+    // A cron nobody watches is a cron that fails silently. Vercel surfaces a run
+    // as failed only on a non-2xx response, so any failed queue must be non-2xx —
+    // otherwise the first signal is the /meta staleness banner two weeks later.
+    // Successful queues have already been written; the status is purely the alarm.
+    if (!summary.ok) {
+      console.error(
+        `[meta-sync] FAILED for ${summary.failedQueues.join(", ")} (${summary.syncedCount} of ${summary.results.length} synced)`,
+      );
+      return res.status(502).json(summary);
+    }
     return res.status(200).json(summary);
   } catch (err) {
     console.error("[meta-sync] failed:", err?.message ?? err);

@@ -49,6 +49,22 @@ export async function persistSnapshot({ snapshot, archetypes, matchups }) {
 }
 
 /** Pull every configured queue. One request per queue. */
+/**
+ * Reduce per-queue results to a pass/fail verdict.
+ *
+ * Pure and exported so the failure path is unit-testable without hitting the
+ * network or the DB — the whole point of this helper is that a broken sync is
+ * noticed, so it must not itself be the untested part.
+ */
+export function summarizeSync(results) {
+  const failedQueues = results.filter((r) => !r.ok).map((r) => r.queue);
+  return {
+    ok: failedQueues.length === 0,
+    failedQueues,
+    syncedCount: results.filter((r) => r.ok).length,
+  };
+}
+
 export async function syncAllQueues() {
   const results = [];
   for (const queue of QUEUES) {
@@ -64,5 +80,5 @@ export async function syncAllQueues() {
       results.push({ queue, ok: false, error: String(err?.message ?? err) });
     }
   }
-  return { syncedAt: new Date().toISOString(), results };
+  return { syncedAt: new Date().toISOString(), ...summarizeSync(results), results };
 }
