@@ -10,6 +10,7 @@
 import { prisma } from "./db.js";
 import { getByName, searchCards as oracleSearchCards } from "./cards.js";
 import { listKnowledge, readKnowledge } from "./agentKnowledge.js";
+import { getCurrentMeta } from "../meta/current.js";
 import {
   namedPairsFromDeckData,
   summarizeNamedCards,
@@ -307,6 +308,34 @@ async function toolSearchTournamentResults({ hubId, player, deckArchetype, event
   };
 }
 
+async function toolGetCurrentMeta(input = {}) {
+  const data = await getCurrentMeta({ queue: input.queue || "core-bo1" });
+  if (!data) return { error: "No approved meta snapshot is available yet." };
+  return {
+    source: data.source,
+    queue: data.queue,
+    era: data.era,
+    period: `${data.periodStart.toISOString().slice(0, 10)} to ${data.periodEnd.toISOString().slice(0, 10)}`,
+    totalGames: data.totalGames,
+    uniquePlayers: data.uniquePlayers,
+    stale: data.stale,
+    archetypes: data.archetypes.slice(0, 20).map((a) => ({
+      name: a.name,
+      colors: a.colors,
+      games: a.games,
+      winRate: a.winRate,
+      playRate: a.playRate,
+      firstPlayerWinRate: a.firstPlayerWinRate,
+    })),
+    matchups: data.matchups.slice(0, 30).map((m) => ({
+      a: m.keyA,
+      b: m.keyB,
+      games: m.games,
+      winRate: m.winRate,
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tool specs (Anthropic tool-use schema) + dispatcher
 // ---------------------------------------------------------------------------
@@ -453,6 +482,26 @@ export const TOOL_SPECS = [
     },
   },
   {
+    name: "get_current_meta",
+    description:
+      "Get the current competitive meta snapshot: top color pairs and archetypes by play rate with win " +
+      "rates, first-player win rates, sample sizes, the period covered, the set era, and the data source. " +
+      "This is LIVE data and it OVERRIDES the static knowledge files — meta-archetypes.md, matchup-guide.md " +
+      "and tech-cards.md are pinned to an older set and may contradict it. Call this before answering any " +
+      "question about what is strong, popular, or winning right now. When you cite a figure from it, state " +
+      "the date range and sample size so the user knows how current and how well-supported it is. Not " +
+      "hub-scoped — this is global data, no hub id needed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        queue: {
+          type: "string",
+          description: 'Which queue to read: "core-bo1" (default) or "core-bo3".',
+        },
+      },
+    },
+  },
+  {
     name: "search_tournament_results",
     description: "Search a hub's synced tournament results (event, player, archetype, placement, record).",
     input_schema: {
@@ -480,6 +529,7 @@ const HANDLERS = {
   search_team_reviews: toolSearchTeamReviews,
   search_primers: toolSearchPrimers,
   search_meta_reports: toolSearchMetaReports,
+  get_current_meta: toolGetCurrentMeta,
   search_tournament_results: toolSearchTournamentResults,
 };
 

@@ -165,5 +165,14 @@
     "expect": {
       "anyToolsUsed": ["get_card", "search_cards"]
     }
+  },
+  {
+    "id": "meta-live-strongest-pair",
+    "mode": "meta",
+    "question": "What's the strongest color pair in Core BO1 right now, and how confident should I be?",
+    "expect": {
+      "anyToolsUsed": ["get_current_meta"],
+      "mustMatch": ["period|date range", "games|sample size|players"]
+    }
   }
 ]

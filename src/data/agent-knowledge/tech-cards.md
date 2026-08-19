@@ -1,3 +1,8 @@
+> ⚠️ **Possibly stale — written against Set 12.** The live meta may have moved. Call the
+> `get_current_meta` tool for current win rates, play rates and matchups, and prefer its
+> numbers over anything in this file where they conflict. Use this file for the *reasoning*
+> (why an archetype works, what it wants to do), not for current *standings*.
+
 # Lorcana Tech Cards Reference
 _Updated: Set 12 (Wilds Unknown). Sourced from Metafy competitive guides._
 

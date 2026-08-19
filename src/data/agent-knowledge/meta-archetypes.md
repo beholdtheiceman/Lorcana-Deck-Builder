@@ -1,3 +1,8 @@
+> ⚠️ **Possibly stale — written against Set 12.** The live meta may have moved. Call the
+> `get_current_meta` tool for current win rates, play rates and matchups, and prefer its
+> numbers over anything in this file where they conflict. Use this file for the *reasoning*
+> (why an archetype works, what it wants to do), not for current *standings*.
+
 # Meta Archetypes — Set 12 (Wilds Unknown) Competitive Landscape
 _Last updated from Metafy competitive guides — Set 12 (Wilds Unknown). This represents the current Core Constructed meta._
 

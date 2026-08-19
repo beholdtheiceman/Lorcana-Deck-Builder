@@ -1,3 +1,8 @@
+> ⚠️ **Possibly stale — written against Set 12.** The live meta may have moved. Call the
+> `get_current_meta` tool for current win rates, play rates and matchups, and prefer its
+> numbers over anything in this file where they conflict. Use this file for the *reasoning*
+> (why an archetype works, what it wants to do), not for current *standings*.
+
 # Lorcana Matchup Guide — Set 12 (Wilds Unknown)
 _Sourced from competitive Metafy guides. Use when a user asks "how do I play against X?", "is my deck favored?", or when reviewing for a specific tournament field._
 
