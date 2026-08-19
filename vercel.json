@@ -12,6 +12,7 @@
   ],
   "crons": [
     { "path": "/api/hubs/digest", "schedule": "0 10 * * 1" },
-    { "path": "/api/cards/ingest", "schedule": "0 8 * * *" }
+    { "path": "/api/cards/ingest", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/meta-sync", "schedule": "0 9 * * 1" }
   ]
 }
