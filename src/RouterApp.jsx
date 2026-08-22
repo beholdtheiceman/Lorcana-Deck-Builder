@@ -188,9 +188,12 @@ export default function RouterApp() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/team-hub" replace />} />
-          <Route path="/builder" element={<BuilderPage />} />
-          {/* Rebuild, URL-only until the swap. Deliberately absent from NAV_ITEMS. */}
-          <Route path="/builder2" element={<NewBuilderRoute />} />
+          {/* Deck Lab now serves the rebuilt builder. The old one stays mounted
+              at /builder-legacy for side-by-side comparison while this is
+              dogfooded; it is removed, along with App.jsx, at final sign-off. */}
+          <Route path="/builder" element={<NewBuilderRoute />} />
+          <Route path="/builder2" element={<Navigate to="/builder" replace />} />
+          <Route path="/builder-legacy" element={<BuilderPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join" element={<JoinPage />} />
