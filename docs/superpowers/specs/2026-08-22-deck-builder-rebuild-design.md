@@ -159,8 +159,10 @@ Three cases that currently fail silently:
    The local write always succeeds first, so no edit is ever lost to a network
    error.
 3. **Unmatched import lines.** `matchCard` currently drops lines it cannot resolve
-   without telling the user. Phase 1 surfaces the count; Phase 3 builds the full
-   preview.
+   without telling the user. Phase 1 extracts the parsers unchanged and pins the
+   behavior with tests, but builds no import surface — there is nowhere to report
+   the count until Phase 3 rebuilds import, which is where the full matched /
+   unmatched preview lands.
 
 ### Testing
 
