@@ -34,10 +34,14 @@ export function describeActiveFilters(filters = {}) {
   if (filters.inkable === 'yes') descriptions.push('inkable only')
   if (filters.inkable === 'no') descriptions.push('uninkable only')
 
+  // Format is always shown, never hidden behind a label. Core silently
+  // excludes sets 1-8, so the count has to say why.
+  const format = String(filters.gamemode || '').trim()
+  if (format) descriptions.push(format === 'Core Constructed' ? 'Core' : format)
+
   for (const [key, label] of [
     ['setNumber', 'set number'],
     ['franchise', 'franchise'],
-    ['gamemode', 'game mode'],
   ]) {
     const value = String(filters[key] || '').trim()
     if (value) descriptions.push(`${label} ${value}`)

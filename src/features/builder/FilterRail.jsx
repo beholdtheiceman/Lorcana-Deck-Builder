@@ -2,6 +2,17 @@ import InkFilter from './filters/InkFilter.jsx'
 import CostFilter from './filters/CostFilter.jsx'
 import TypeFilter from './filters/TypeFilter.jsx'
 import MoreFilters from './filters/MoreFilters.jsx'
+import { FORMATS, CORE_SET_NUMS } from '../../lib/filters/filterModel.js'
+
+const CORE_RANGE = (() => {
+  const nums = [...CORE_SET_NUMS].sort((a, b) => a - b)
+  return `sets ${nums[0]}–${nums[nums.length - 1]}`
+})()
+
+const FORMAT_OPTIONS = [
+  { label: 'Core', value: FORMATS.CORE, hint: CORE_RANGE },
+  { label: 'Infinity', value: FORMATS.INFINITY, hint: 'all sets' },
+]
 
 const INKABLE_OPTIONS = [
   { label: 'Any inkability', value: 'any' },
@@ -17,6 +28,39 @@ function Section({ title, children }) {
       </h3>
       {children}
     </section>
+  )
+}
+
+function FormatFilter({ value, onChange }) {
+  return (
+    <div className="grid grid-cols-2 gap-1" role="group" aria-label="Format">
+      {FORMAT_OPTIONS.map((option) => {
+        const active = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            aria-label={`${option.label} format, ${option.hint}`}
+            onClick={() => onChange({ type: 'SET_GAMEMODE', value: option.value })}
+            className="rounded-md border px-2 py-1.5 text-center"
+            style={{
+              background: active ? 'var(--sapphire)' : 'var(--canvas)',
+              borderColor: active ? 'var(--sapphire)' : 'var(--line)',
+              color: active ? 'var(--canvas)' : 'var(--text)',
+            }}
+          >
+            <span className="block text-xs font-medium">{option.label}</span>
+            <span
+              className="block text-[10px]"
+              style={{ color: active ? 'var(--canvas)' : 'var(--muted)' }}
+            >
+              {option.hint}
+            </span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -66,6 +110,10 @@ export default function FilterRail({ filters, onChange, activeCount, onClear }) 
           </button>
         )}
       </header>
+
+      <Section title="Format">
+        <FormatFilter value={filters?.gamemode} onChange={onChange} />
+      </Section>
 
       <Section title="Ink">
         <InkFilter inks={filters.inks} onChange={onChange} />

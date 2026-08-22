@@ -78,7 +78,21 @@ function matchesInkFilter(card, selectedInks) {
   return false;
 }
 
-function defaultFilterState() {
+/**
+ * Play formats. Infinity permits every card ever printed; Core Constructed is
+ * the rotating competitive format, currently sets 9-13. Keep CORE_SET_NUMS as
+ * the single source of truth — it rotates, and the UI reads it too.
+ */
+export const FORMATS = {
+  CORE: "Core Constructed",
+  INFINITY: "Infinity",
+};
+
+export const CORE_SET_NUMS = new Set([9, 10, 11, 12, 13]);
+
+export const DEFAULT_FORMAT = FORMATS.CORE;
+
+export function defaultFilterState() {
   return {
     text: "",
     inks: new Set(),
@@ -93,7 +107,7 @@ function defaultFilterState() {
     sortDir: "asc",
     setNumber: "",
     franchise: "",
-    gamemode: "",
+    gamemode: DEFAULT_FORMAT,
     loreMin: "",
     loreMax: "",
     willpowerMin: "",
@@ -146,7 +160,7 @@ export function hydrateFilterState(raw) {
     inkable,
     setNumber: raw.setNumber || "",
     franchise: raw.franchise || "",
-    gamemode: raw.gamemode || "",
+    gamemode: raw.gamemode || FORMATS.INFINITY,
     loreMin: raw.loreMin || "",
     loreMax: raw.loreMax || "",
     willpowerMin: raw.willpowerMin || "",
@@ -240,7 +254,7 @@ export function countActiveFilters(state) {
     state.inkable !== undefined && state.inkable !== "any",
     hasText(state.setNumber),
     hasText(state.franchise),
-    hasText(state.gamemode),
+    state.gamemode !== undefined && state.gamemode !== DEFAULT_FORMAT,
     hasText(state.loreMin) || hasText(state.loreMax),
     hasText(state.willpowerMin) || hasText(state.willpowerMax),
     hasText(state.strengthMin) || hasText(state.strengthMax),
@@ -561,9 +575,9 @@ export function applyFilters(cards, filters) {
   // Apply legality filter using set-based logic (same approach as sets filter)
   if (filters.gamemode && filters.gamemode.trim()) {
     
-    if (filters.gamemode === "Core Constructed") {
+    if (filters.gamemode === FORMATS.CORE) {
       // Core Constructed: only allow sets 9+ (exclude sets 1-8)
-      const allowedSetNums = new Set([9, 10, 11, 12, 13]); // Core Constructed: sets 9+
+      const allowedSetNums = CORE_SET_NUMS;
       
       list = list.filter((c) => {
         // Try multiple sources for set number information (same as sets filter)
@@ -585,7 +599,7 @@ export function applyFilters(cards, filters) {
       
     }
     // Infinity mode: no filtering needed, show all cards
-    else if (filters.gamemode === "Infinity") {
+    else if (filters.gamemode === FORMATS.INFINITY) {
     }
   }
 

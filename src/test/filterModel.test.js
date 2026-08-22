@@ -9,7 +9,9 @@ const cards = [
   { id: '3', name: 'Be Prepared', cost: 7, inks: ['Ruby'], type: 'Action', rarity: 'Rare', inkable: true, setNum: 9 },
 ]
 
-const base = () => ({ ...initialFilterState(), inks: new Set(), selectedCosts: new Set(), types: new Set(), rarities: new Set(), sets: new Set(), classifications: new Set(), abilities: new Set() })
+// Pin Infinity so these ink/cost/type assertions are not affected by the
+// Core format default, which excludes sets 1-8.
+const base = () => ({ ...initialFilterState(), gamemode: 'Infinity', inks: new Set(), selectedCosts: new Set(), types: new Set(), rarities: new Set(), sets: new Set(), classifications: new Set(), abilities: new Set() })
 
 describe('applyFilters', () => {
   it('returns everything with a default filter state', () => {
@@ -76,18 +78,22 @@ describe('filterReducer', () => {
   })
 })
 
+// These assert the active-dimension count, so they use the true default
+// state (Core) rather than the Infinity-pinned base above.
+const countBase = () => ({ ...base(), gamemode: 'Core Constructed' })
+
 describe('countActiveFilters', () => {
   it('is zero for a default state', () => {
-    expect(countActiveFilters(base())).toBe(0)
+    expect(countActiveFilters(countBase())).toBe(0)
   })
 
   it('counts each active dimension once', () => {
-    const s = { ...base(), inks: new Set(['Ruby', 'Amber']), selectedCosts: new Set([2]), inkable: 'yes' }
+    const s = { ...countBase(), inks: new Set(['Ruby', 'Amber']), selectedCosts: new Set([2]), inkable: 'yes' }
     expect(countActiveFilters(s)).toBe(3)
   })
 
   it('counts each min/max stat pair as one dimension', () => {
-    const s = { ...base(), loreMin: '1', loreMax: '3', willpowerMax: '5', strengthMin: '2' }
+    const s = { ...countBase(), loreMin: '1', loreMax: '3', willpowerMax: '5', strengthMin: '2' }
     expect(countActiveFilters(s)).toBe(3)
   })
 })
