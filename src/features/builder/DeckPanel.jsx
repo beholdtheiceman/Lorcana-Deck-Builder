@@ -3,7 +3,7 @@ import SaveStatus from './deck/SaveStatus.jsx'
 import DeckList from './deck/DeckList.jsx'
 import DeckStatsPanel from './deck/DeckStatsPanel.jsx'
 
-export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCount, onRemove }) {
+export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCount, onRemove, onSave }) {
   const total = Number(deck?.total) || 0
 
   return (
@@ -15,7 +15,7 @@ export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCoun
       <header className="border-b pb-4" style={{ borderColor: 'var(--line)' }}>
         <DeckTitle name={deck?.name} onRename={onRename} />
         <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-          <SaveStatus saveStatus={saveStatus} />
+          <SaveStatus saveStatus={saveStatus} onSave={onSave} />
           <span aria-label={`${total} of 60 cards`} className="font-semibold tabular-nums">
             {total} / 60
           </span>

@@ -5,7 +5,7 @@ import InspectCardModal from './results/InspectCardModal.jsx'
 import DeckPanel from './DeckPanel.jsx'
 import { FilterSheet, DeckSheet } from './MobileSheets.jsx'
 import useCardPool from './hooks/useCardPool.js'
-import useAutosave from './hooks/useAutosave.js'
+import useDeckSave from './hooks/useDeckSave.js'
 import { deckReducer, initialDeckState } from '../../lib/deck/deckReducer.js'
 import { computeDeckStats } from '../../lib/deck/stats.js'
 import {
@@ -28,7 +28,11 @@ export default function BuilderPage({ isAuthenticated = false }) {
   const [inspectedCard, setInspectedCard] = useState(null)
 
   const { cards, loading, error, retry } = useCardPool()
-  const saveStatus = useAutosave(deck, { isAuthenticated })
+  const handleDeckSaved = useCallback((dbId) => {
+    deckDispatch({ type: 'UPDATE_METADATA', updates: { _dbId: dbId } })
+  }, [])
+
+  const saveStatus = useDeckSave(deck, { isAuthenticated, onSaved: handleDeckSaved })
 
   const filteredCards = useMemo(() => applyFilters(cards, filters), [cards, filters])
   const stats = useMemo(() => computeDeckStats(deck), [deck])
@@ -75,6 +79,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
       onRename={handleRename}
       onSetCount={handleSetCount}
       onRemove={handleRemove}
+      onSave={saveStatus.save}
     />
   )
 

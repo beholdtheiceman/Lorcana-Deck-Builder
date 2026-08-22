@@ -82,9 +82,27 @@ describe('SaveStatus', () => {
     expect(screen.getByText(/saved/i)).toBeInTheDocument()
   })
 
-  it('reports a failed sync', () => {
-    setup({ saveStatus: { status: 'sync-failed', lastSavedAt: Date.now(), retry: () => {} } })
-    expect(screen.getByText(/sync failed/i)).toBeInTheDocument()
+  it('offers a Save deck button', () => {
+    setup()
+    expect(screen.getByRole('button', { name: /save deck/i })).toBeInTheDocument()
+  })
+
+  it('calls onSave when Save deck is pressed', async () => {
+    const onSave = vi.fn()
+    setup({ onSave })
+    await userEvent.click(screen.getByRole('button', { name: /save deck/i }))
+    expect(onSave).toHaveBeenCalled()
+  })
+
+  it('surfaces a save failure with its message', () => {
+    setup({ saveStatus: { status: 'error', error: new Error('Save failed (500)') } })
+    expect(screen.getByText(/couldn't save/i)).toBeInTheDocument()
+    expect(screen.getByText(/Save failed \(500\)/)).toBeInTheDocument()
+  })
+
+  it('flags unsaved changes after an edit', () => {
+    setup({ saveStatus: { status: 'unsaved' } })
+    expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument()
   })
 })
 
