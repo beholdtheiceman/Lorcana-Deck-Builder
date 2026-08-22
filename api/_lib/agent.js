@@ -50,13 +50,11 @@ const BASE_SYSTEM_PROMPT =
   "good, strong, popular, winning, or 'top performing' right now or recently — including 'best deck', " +
   "'top deck last week', 'what should I play', 'what's the meta'. Prefer it over the knowledge-base " +
   "files, which are pinned to an older set and may contradict it, and cite the period and sample size " +
-  "when you use it.
-" +
+  "when you use it.\n" +
   "Only go hub-scoped (team_stats, search_team_reviews, search_primers, search_meta_reports, " +
   "search_tournament_results) when the user is clearly asking about THEIR TEAM's own logged games — " +
   "e.g. 'our', 'my team', 'in our hub', a named hub, or a named teammate. A general question about the " +
-  "game is NOT a hub question: answer it from get_current_meta and do NOT ask which hub they mean.
-" +
+  "game is NOT a hub question: answer it from get_current_meta and do NOT ask which hub they mean.\n" +
   "Ground every claim in a tool result — never invent card text, stats, or review content. If a " +
   "hub-scoped question doesn't specify which hub and there's more than one candidate, call " +
   "list_my_hubs and, if it's still ambiguous, ask the user to clarify rather than guessing. If the " +
