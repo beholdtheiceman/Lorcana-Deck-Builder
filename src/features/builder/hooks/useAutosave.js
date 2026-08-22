@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { loadAllDecks, saveAllDecks } from '../../../lib/deck/storage.js'
+import { loadAllDecks, saveAllDecks, saveCurrentDeckId } from '../../../lib/deck/storage.js'
 
 const CLOUD_SAVE_DELAY = 2000
 
@@ -55,6 +55,10 @@ export default function useAutosave(deck, { isAuthenticated } = {}) {
     if (deck?.id) {
       const { decks } = loadAllDecks()
       saveAllDecks({ ...decks, [deck.id]: deck })
+      // Also pin the current deck id. Without this the deck is written but
+      // orphaned: initialDeckState looks up decks[currentDeckId] on the next
+      // mount, misses, and hands back a fresh Untitled Deck.
+      saveCurrentDeckId(deck.id)
       setLastSavedAt(Date.now())
     }
     setStatus(isAuthenticated ? 'saving' : 'local-only')
