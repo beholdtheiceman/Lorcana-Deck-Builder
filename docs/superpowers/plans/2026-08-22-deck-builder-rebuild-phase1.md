@@ -1207,7 +1207,9 @@ git commit -m "feat(builder): add DeckPanel with inline deck naming and always-v
 
 Status transitions: local write done and signed out → `local-only`. Signed in, debounce pending or request in flight → `saving`. Cloud write succeeded → `saved`. Cloud write rejected → `sync-failed`, with `retry()` re-attempting the cloud write only.
 
-`useCardPool()` wraps `fetchAllCards` from `src/lib/cardsApi.js`, maps results through `toAppCard`, and returns `{ cards, loading, error, retry }`.
+`useCardPool()` wraps `fetchAllCards` from `src/lib/cardsApi.js` and returns `{ cards, loading, error, retry }`.
+
+**Do not map the pool through `toAppCard`.** `fetchAllCards` already emits the shape the rest of the builder expects, including `inks` as an array. `toAppCard` is a different transformer used only on the import path (`src/App.jsx:1115`, `:1163`); it emits `colors` rather than `inks` and would silently break ink filtering, the ink split, and the per-row ink markers. `useCardPool` passes `fetchAllCards` output through unchanged.
 
 - [ ] **Step 1: Write the failing test**
 
