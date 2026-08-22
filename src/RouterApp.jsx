@@ -25,6 +25,11 @@ import ToolsHubPage from './pages/tools/ToolsHubPage'
 import MetaPage from './pages/MetaPage'
 import { useAuth } from './contexts/AuthContext'
 
+// Rebuilt deck builder, reachable at /builder2 while it is dogfooded next to
+// the existing /builder. Named to avoid shadowing the local BuilderPage
+// wrapper below, which still mounts the old DeckBuilderApp.
+const NewBuilderPage = lazy(() => import('./features/builder/BuilderPage.jsx'))
+
 const HypergeometricPage = lazy(() => import('./pages/tools/HypergeometricPage'))
 const SwissPage = lazy(() => import('./pages/tools/SwissPage'))
 const DeckChangePage = lazy(() => import('./pages/tools/DeckChangePage'))
@@ -150,6 +155,15 @@ function BuilderPage() {
   return <DeckBuilderApp />
 }
 
+function NewBuilderRoute() {
+  const { user } = useAuth()
+  return (
+    <LazyTool>
+      <NewBuilderPage isAuthenticated={Boolean(user)} />
+    </LazyTool>
+  )
+}
+
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
 
@@ -175,6 +189,8 @@ export default function RouterApp() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/team-hub" replace />} />
           <Route path="/builder" element={<BuilderPage />} />
+          {/* Rebuild, URL-only until the swap. Deliberately absent from NAV_ITEMS. */}
+          <Route path="/builder2" element={<NewBuilderRoute />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join" element={<JoinPage />} />
