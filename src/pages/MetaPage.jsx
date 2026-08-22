@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import PairExplorer from '../components/meta/PairExplorer'
 import { Badge, Skeleton } from '../components/ui'
 import { inkVar } from '../components/ui/inks'
 
@@ -336,6 +337,7 @@ export default function MetaPage() {
 
           <ColorPairTable archetypes={data.archetypes || []} />
           <MatchupTable matchups={data.matchups || []} />
+          <PairExplorer queue={queue} />
         </div>
       ) : null}
 
