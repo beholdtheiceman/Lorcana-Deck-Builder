@@ -46,7 +46,6 @@ function loadAllDecks() {
 function saveAllDecks(decks) {
   try {
     saveLS(LS_KEYS.DECKS, decks);
-    console.log('[saveAllDecks] Saved decks to localStorage');
   } catch (error) {
     console.error('[saveAllDecks] Error saving decks:', error);
   }

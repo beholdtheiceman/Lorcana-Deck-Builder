@@ -13,11 +13,8 @@ export const LS_KEYS = {
 
 export function loadLS(key, fallback) {
   try {
-    console.log('[loadLS] Loading key:', key);
     const v = localStorage.getItem(key);
-    console.log('[loadLS] Raw value from localStorage:', v);
     const result = v ? JSON.parse(v) : fallback;
-    console.log('[loadLS] Parsed result:', result);
     return result;
   } catch (error) {
     console.error('[loadLS] Error loading from localStorage:', error);
@@ -27,9 +24,7 @@ export function loadLS(key, fallback) {
 
 export function saveLS(key, value) {
   try {
-    console.log('[saveLS] Saving key:', key, 'with value:', value);
     localStorage.setItem(key, JSON.stringify(value));
-    console.log('[saveLS] Successfully saved to localStorage');
   } catch (error) {
     console.error('[saveLS] Error saving to localStorage:', error);
   }
