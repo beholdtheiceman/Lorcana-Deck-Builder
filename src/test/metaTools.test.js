@@ -17,3 +17,28 @@ describe("get_current_meta tool spec", () => {
     expect(spec.description).toMatch(/date|as of/i);
   });
 });
+
+// Regression: the agent answered "top performing deck last week" by asking which
+// HUB the user meant, because team_stats' description claimed the phrase "top
+// performing decks" and nothing routed general questions to the live meta.
+describe("meta vs hub-scoped routing", () => {
+  const spec = (n) => TOOL_SPECS.find((t) => t.name === n);
+
+  it("team_stats does not claim general 'top performing' questions", () => {
+    expect(spec("team_stats").description).not.toMatch(/top performing decks'/i);
+  });
+
+  it("team_stats points general meta questions at get_current_meta", () => {
+    expect(spec("team_stats").description).toMatch(/get_current_meta/);
+  });
+
+  it("list_my_hubs tells the agent not to ask which hub for general questions", () => {
+    expect(spec("list_my_hubs").description).toMatch(/get_current_meta/);
+  });
+
+  it("get_current_meta claims the phrasings users actually type", () => {
+    const d = spec("get_current_meta").description;
+    expect(d).toMatch(/top performing/i);
+    expect(d).toMatch(/last week/i);
+  });
+});

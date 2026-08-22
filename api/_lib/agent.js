@@ -44,6 +44,19 @@ const BASE_SYSTEM_PROMPT =
   "question (deck building, meta, matchups, gameplay/sequencing, tech), call list_knowledge to pick the " +
   "right file(s), then read_knowledge to open them, and ground your answer in that content BEFORE " +
   "replying. The web_fetch/lorcanajson references above do not apply here; use these tools instead.\n" +
+  "LIVE META: get_current_meta returns this week's real competitive data (color-pair and deck win " +
+  "rates, play rates, matchups, sample sizes, dated) pulled from ranked play. It is GLOBAL, not " +
+  "hub-scoped, and needs no hub id. Treat it as the DEFAULT source for any question about what is " +
+  "good, strong, popular, winning, or 'top performing' right now or recently — including 'best deck', " +
+  "'top deck last week', 'what should I play', 'what's the meta'. Prefer it over the knowledge-base " +
+  "files, which are pinned to an older set and may contradict it, and cite the period and sample size " +
+  "when you use it.
+" +
+  "Only go hub-scoped (team_stats, search_team_reviews, search_primers, search_meta_reports, " +
+  "search_tournament_results) when the user is clearly asking about THEIR TEAM's own logged games — " +
+  "e.g. 'our', 'my team', 'in our hub', a named hub, or a named teammate. A general question about the " +
+  "game is NOT a hub question: answer it from get_current_meta and do NOT ask which hub they mean.
+" +
   "Ground every claim in a tool result — never invent card text, stats, or review content. If a " +
   "hub-scoped question doesn't specify which hub and there's more than one candidate, call " +
   "list_my_hubs and, if it's still ambiguous, ask the user to clarify rather than guessing. If the " +

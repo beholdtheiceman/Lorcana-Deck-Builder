@@ -410,7 +410,8 @@ export const TOOL_SPECS = [
       "List the Team Hubs the current user belongs to (id, name, role). Call this before a hub-scoped tool " +
       "(team_stats, search_team_reviews, search_primers, search_meta_reports, search_tournament_results) when " +
       "no hub id has been given in context and the question implies a specific team, or when it's ambiguous " +
-      "which hub the user means.",
+      "which hub the user means. Do NOT call this for general questions about the game or the meta — those " +
+      "are answered globally by get_current_meta, and asking the user to pick a hub for them is wrong.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -435,9 +436,12 @@ export const TOOL_SPECS = [
   {
     name: "team_stats",
     description:
-      "Aggregate a hub's logged practice games (PlaytestGame) into win rates — either by specific matchup " +
-      "(deckArchetype vs vsArchetype) or overall by archetype (useful for 'top performing decks'). Optionally " +
-      "filter to one player's games by name.",
+      "Aggregate ONE HUB'S OWN logged practice games (PlaytestGame) into win rates — either by specific " +
+      "matchup (deckArchetype vs vsArchetype) or overall by archetype. This is the team's private practice " +
+      "record, a handful of games logged by hub members — NOT the competitive meta. For how decks are " +
+      "performing in the game at large ('best deck', 'top performing deck', 'what's winning'), use " +
+      "get_current_meta instead. Only use this when the user is asking about their own team's results. " +
+      "Optionally filter to one player's games by name.",
     input_schema: {
       type: "object",
       properties: {
@@ -504,7 +508,10 @@ export const TOOL_SPECS = [
       "and tech-cards.md are pinned to an older set and may contradict it. Call this before answering any " +
       "question about what is strong, popular, or winning right now. When you cite a figure from it, state " +
       "the date range and sample size so the user knows how current and how well-supported it is. Not " +
-      "hub-scoped — this is global data, no hub id needed.",
+      "hub-scoped — this is global data, no hub id needed, and it is the right tool even when the user " +
+      "belongs to several hubs. Covers 'best/top performing deck', 'what's winning', 'what should I play', " +
+      "'the meta', and recent-timeframe phrasings like 'this week' or 'last week' — the snapshot is weekly, " +
+      "so say which week it covers rather than refusing.",
     input_schema: {
       type: "object",
       properties: {
