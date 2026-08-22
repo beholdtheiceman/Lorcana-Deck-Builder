@@ -63,6 +63,37 @@ function ColorDots({ colorKey }) {
     </span>
   )
 }
+// Ink-pair badges live in public/ink-pairs/ as <inkA>-<inkB>.png with the ink
+// names sorted alphabetically — the same shape the adapter builds pairKey with,
+// so "amber/emerald" maps straight to amber-emerald.png with no lookup table.
+// Only the 15 two-ink combinations have art; mono-ink rows (all of them tiny —
+// Sapphire has 2 games) fall back to the colored dots.
+function inkPairArt(colorKey) {
+  const parts = String(colorKey || '')
+    .split('/')
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean)
+  if (parts.length !== 2) return null
+  return `/ink-pairs/${[...parts].sort().join('-')}.png`
+}
+
+function InkPair({ colorKey, size = 22 }) {
+  const src = inkPairArt(colorKey)
+  const label = colorPairLabel(colorKey)
+  if (!src) return <ColorDots colorKey={colorKey} />
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={Math.round((size * 380) / 330)}
+      loading="lazy"
+      className="shrink-0"
+      title={label}
+    />
+  )
+}
+
 
 function StaleBanner({ periodEnd }) {
   return (
@@ -89,8 +120,8 @@ function ColorPairTable({ archetypes }) {
       <tr key={row.id}>
         <td className="px-5 py-3" style={{ color: 'var(--text)' }}>
           <span className="inline-flex items-center gap-2">
-            <ColorDots colorKey={row.archetypeId || row.name} />
-            {colorPairLabel(row.name || row.archetypeId)}
+            <InkPair colorKey={(row.colors || []).join('/')} />
+            {colorPairLabel((row.colors || []).join('/') || row.name)}
           </span>
         </td>
         <td className="px-5 py-3 text-right tabular-nums" style={{ color: 'var(--muted)' }}>{formatPercent(row.playRate)}</td>
@@ -164,8 +195,18 @@ function MatchupTable({ matchups }) {
             <tbody className="divide-y" style={{ borderColor: 'var(--line)' }}>
               {sorted.map((row) => (
                 <tr key={`${row.keyA}-${row.keyB}`}>
-                  <td className="px-5 py-3" style={{ color: 'var(--text)' }}>{colorPairLabel(row.keyA)}</td>
-                  <td className="px-5 py-3" style={{ color: 'var(--text)' }}>{colorPairLabel(row.keyB)}</td>
+                  <td className="px-5 py-3" style={{ color: 'var(--text)' }}>
+                    <span className="inline-flex items-center gap-2">
+                      <InkPair colorKey={row.keyA} size={20} />
+                      {colorPairLabel(row.keyA)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3" style={{ color: 'var(--text)' }}>
+                    <span className="inline-flex items-center gap-2">
+                      <InkPair colorKey={row.keyB} size={20} />
+                      {colorPairLabel(row.keyB)}
+                    </span>
+                  </td>
                   <td className="px-5 py-3 text-right font-semibold tabular-nums" style={{ color: 'var(--sapphire)' }}>{formatPercent(row.winRate)}</td>
                   <td className="px-5 py-3 text-right tabular-nums" style={{ color: 'var(--muted)' }}>{formatPercent(row.firstPlayerWinRate)}</td>
                   <td className="px-5 py-3 text-right tabular-nums" style={{ color: 'var(--muted)' }}>{formatNumber(row.games)}</td>
