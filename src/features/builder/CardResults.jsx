@@ -2,7 +2,7 @@ import SearchBar from './results/SearchBar.jsx'
 import ResultSummary, { describeActiveFilters } from './results/ResultSummary.jsx'
 import CardTile from './results/CardTile.jsx'
 
-function deckCountFor(card, deck) {
+export function deckCountFor(card, deck) {
   return Object.values(deck?.entries || {}).reduce((count, entry) => {
     return entry?.card?.id === card.id ? count + (Number(entry.count) || 0) : count
   }, 0)

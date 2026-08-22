@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useReducer, useState } from 'react'
 import FilterRail from './FilterRail.jsx'
-import CardResults from './CardResults.jsx'
+import CardResults, { deckCountFor } from './CardResults.jsx'
+import InspectCardModal from './results/InspectCardModal.jsx'
 import DeckPanel from './DeckPanel.jsx'
 import { FilterSheet, DeckSheet } from './MobileSheets.jsx'
 import useCardPool from './hooks/useCardPool.js'
@@ -24,6 +25,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
   const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState)
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [deckSheetOpen, setDeckSheetOpen] = useState(false)
+  const [inspectedCard, setInspectedCard] = useState(null)
 
   const { cards, loading, error, retry } = useCardPool()
   const saveStatus = useAutosave(deck, { isAuthenticated })
@@ -104,7 +106,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
             error={error}
             onSearch={handleSearch}
             onAdd={handleAdd}
-            onInspect={handleAdd}
+            onInspect={setInspectedCard}
             onRetry={retry}
           />
         </main>
@@ -120,6 +122,13 @@ export default function BuilderPage({ isAuthenticated = false }) {
       >
         {deck?.name || 'Deck'} · {Number(deck?.total) || 0}/60
       </button>
+
+      <InspectCardModal
+        card={inspectedCard}
+        deckCount={inspectedCard ? deckCountFor(inspectedCard, deck) : 0}
+        onClose={() => setInspectedCard(null)}
+        onSetCount={handleSetCount}
+      />
 
       <FilterSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)}>
         {rail}

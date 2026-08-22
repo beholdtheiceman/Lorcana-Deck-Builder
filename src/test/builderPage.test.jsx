@@ -68,3 +68,15 @@ describe('BuilderPage', () => {
     expect(screen.getByText('Mulan')).toBeInTheDocument()
   })
 })
+
+describe('BuilderPage inspect', () => {
+  const deckPanel2 = () => within(screen.getByRole('complementary', { name: /deck/i }))
+
+  it('Inspect opens the card details rather than adding the card', async () => {
+    render(<BuilderPage />)
+    await userEvent.click(screen.getByRole('button', { name: /inspect Cinderella/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveAccessibleName(/Cinderella/)
+    expect(deckPanel2().getByText(/0\s*\/\s*60/)).toBeInTheDocument()
+  })
+})
