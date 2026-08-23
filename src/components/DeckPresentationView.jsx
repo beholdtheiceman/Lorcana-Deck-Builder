@@ -25,6 +25,7 @@
 // duplicating ~1700 lines of chart/analysis logic into a second file.
 
 import React, { useState, useEffect } from "react";
+import DeckActionBar from './deck/DeckActionBar.jsx'
 import {
   ResponsiveContainer,
   BarChart,
@@ -1926,115 +1927,36 @@ export default function DeckPresentationView({ deck, allCards, onSave, onGenerat
           />
         </div>
         
-        {/* Action Buttons - Improved Layout */}
-        <div className="bg-[color:var(--panel)] backdrop-blur-sm border-t border-[color:var(--line)] mt-6 pt-6 pb-4">
-          {/* Primary Actions Row */}
-          <div className="flex flex-wrap justify-center gap-3 mb-4 px-3">
-            {/* Download Image Button */}
-            <button
-              onClick={handleDownloadImage}
-              disabled={isGeneratingImage}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-[color:var(--panel-2)] disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Download deck as image (PNG)"
-            >
-              {isGeneratingImage ? '🔄 Generating…' : '🖼️ Download Image'}
-            </button>
+        <DeckActionBar
+          canSave={Boolean(deckName.trim())}
+          onSave={() => { if (onSave && deckName.trim()) onSave(deckName.trim()) }}
+          onDownloadImage={handleDownloadImage}
+          isGeneratingImage={isGeneratingImage}
+          onPrint={() => window.print()}
+          onCopyDeckList={() => onCopyDreamborn(deck)}
+          onCopyLorcanito={() => onExportLorcanito(deck)}
+          onCopyStats={() => {
+            const summary = [
+              `Deck: ${deck.name}`,
+              `Total Cards: ${totalCards}`,
+              `Inkable: ${totalInkable} (${(inkableRatio * 100).toFixed(1)}%)`,
+              `Uninkable: ${totalUninkable} (${(uninkableRatio * 100).toFixed(1)}%)`,
+              `Average Cost: ${averageCost.toFixed(1)}`,
+              `Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)})`,
+              `Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`,
+            ].join('\n')
+            navigator.clipboard.writeText(summary)
+          }}
+          teamHub={{
+            hubs,
+            selectedId: selectedHubId,
+            onSelect: setSelectedHubId,
+            onSave: handleSaveToHub,
+            saving: savingToHub,
+            loading: loadingHubs,
+          }}
+        />
 
-            {/* Print Button */}
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-[color:var(--sapphire)] hover:brightness-110 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Print deck presentation"
-            >
-              🖨️ Print
-            </button>
-
-            {/* Save Button */}
-            <button
-              onClick={() => {
-                if (onSave && deckName.trim()) {
-                  onSave(deckName.trim());
-                }
-              }}
-              disabled={!deckName.trim()}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-[color:var(--panel-2)] disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Save deck to storage"
-            >
-              💾 Save Deck
-            </button>
-          </div>
-
-          {/* Copy Actions Row */}
-          <div className="flex flex-wrap justify-center gap-3 mb-4 px-3">
-            {/* Copy Dreamborn Format Button */}
-            <button
-              onClick={() => onCopyDreamborn(deck)}
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Copy decklist in Dreamborn format (e.g., '4 Nick Wilde - Soggy Fox')"
-            >
-              📋 Copy to Clipboard
-            </button>
-
-            {/* Copy for Lorcanito Button */}
-            <button
-              onClick={() => onExportLorcanito(deck)}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Copy decklist in Lorcanito format"
-            >
-              📋 Copy for Lorcanito
-            </button>
-
-            {/* Copy Stats Button */}
-            <button
-              onClick={() => {
-                // Copy deck stats to clipboard
-                const stats = `Deck: ${deck.name}
-Total Cards: ${totalCards}
-Inkable: ${totalInkable} (${(inkableRatio * 100).toFixed(1)}%)
-Uninkable: ${totalUninkable} (${(uninkableRatio * 100).toFixed(1)}%)
-Average Cost: ${averageCost.toFixed(1)}
-Most Expensive: ${mostExpensive?.card.name} (Cost ${getCost(mostExpensive?.card)})
-Cheapest: ${cheapest?.card.name} (Cost ${getCost(cheapest?.card)})`;
-                navigator.clipboard.writeText(stats);
-              }}
-              className="px-4 py-2 bg-[color:var(--sapphire)] hover:brightness-110 rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2"
-              title="Copy deck statistics to clipboard"
-            >
-              📊 Copy Stats
-            </button>
-          </div>
-
-          {/* Team Hub Section */}
-          <div className="flex justify-center px-3">
-            <div className="flex flex-wrap items-center gap-3 bg-[color:var(--panel-2)] border border-[color:var(--line)] p-4 rounded-lg max-w-md w-full">
-              <label className="text-[color:var(--muted)] font-medium text-sm">
-                Add to Team Hub:
-              </label>
-              <select
-                value={selectedHubId}
-                onChange={(e) => setSelectedHubId(e.target.value)}
-                className="flex-1 min-w-[160px] px-3 py-2 bg-[color:var(--panel-2)] border border-[color:var(--line-2)] rounded-lg text-[color:var(--text)] focus:border-emerald-400 focus:outline-none text-sm"
-                disabled={loadingHubs}
-              >
-                <option value="">Select a team hub...</option>
-                {hubs.map(hub => (
-                  <option key={hub.id} value={hub.id}>
-                    {hub.name} ({hub.members.length + 1} members)
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleSaveToHub}
-                disabled={!selectedHubId || !deckName.trim() || savingToHub}
-                className="px-3 py-2 bg-[color:var(--sapphire)] hover:brightness-110 disabled:bg-[color:var(--panel-2)] disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg text-sm flex items-center gap-1"
-                title="Save deck to selected team hub"
-              >
-                {savingToHub ? '🔄' : '👥'} {savingToHub ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-          
           {/* Print Header */}
           <div className="hidden print:block text-center border-t pt-4 mt-4">
             <p className="text-sm text-[color:var(--muted)]">
