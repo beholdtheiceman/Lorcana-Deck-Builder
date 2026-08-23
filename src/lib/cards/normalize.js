@@ -264,8 +264,14 @@ export function toAppCard(raw) {
   const baseName = name.split(" - ")[0];
   const subtitle = name.includes(" - ") ? name.split(" - ")[1] : null;
 
-  const splitList = (s) =>
-    s ? s.split(",").map(x => x.trim()).filter(Boolean) : [];
+  // Real pool cards carry classifications and abilities as ARRAYS; only the
+  // legacy CSV-ish shapes are comma-separated strings. Assuming a string threw
+  // "s.split is not a function" on every live card.
+  const splitList = (s) => {
+    if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
+    if (typeof s === "string") return s.split(",").map(x => x.trim()).filter(Boolean);
+    return [];
+  };
 
   const abilities = raw.abilities || splitList(raw.Abilities || '');
 

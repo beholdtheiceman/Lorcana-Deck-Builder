@@ -36,8 +36,16 @@ function toAppCard(raw) {
   const baseName = name.split(" - ")[0];
   const subtitle = name.includes(" - ") ? name.split(" - ")[1] : null;
 
-  const splitList = (s) =>
-    s ? s.split(",").map(x => x.trim()).filter(Boolean) : [];
+  // NOTE: this file carries its own copy of toAppCard, duplicated from
+  // lib/cards/normalize.js during extraction. Both copies need this fix.
+  // Real pool cards carry classifications and abilities as ARRAYS; assuming a
+  // comma-separated string threw "s.split is not a function" on every live
+  // card, and the catch below then dropped the card art.
+  const splitList = (s) => {
+    if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
+    if (typeof s === "string") return s.split(",").map(x => x.trim()).filter(Boolean);
+    return [];
+  };
 
   const abilities = raw.abilities || splitList(raw.Abilities || '');
 
@@ -281,9 +289,10 @@ export function parseTextImport(text, suppliedCards) {
         
       } catch (error) {
         console.warn(`[parseTextImport] Error processing card ${foundCard.name}:`, error);
-        // Store the card without image on error
+        // Keep whatever art the source card already had. Nulling it here
+        // turned any processing error into a silently missing image.
         deck.entries[key] = { 
-          card: { ...foundCard, image_url: null }, 
+          card: { ...foundCard }, 
           count: countNum 
         };
         validCards++;
