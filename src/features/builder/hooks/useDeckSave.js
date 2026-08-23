@@ -12,17 +12,38 @@ import { loadAllDecks, saveAllDecks, saveCurrentDeckId } from '../../../lib/deck
  * `id` is the DATABASE id, not the local `deck_<ts>_<rand>` one. Posting the
  * raw deck object fails validation with a 400.
  */
+/**
+ * What actually distinguishes one saved deck from another: its identity, its
+ * name and its cards. Deliberately excludes updatedAt and _dbId - storing the
+ * database id after a save stamps a fresh updatedAt, and treating that as an
+ * edit made a successful first save report "unsaved changes".
+ */
+function deckSignature(deck) {
+  if (!deck) return null
+  const entries = Object.entries(deck.entries || {})
+    .map(([key, entry]) => `${key}:${Number(entry?.count) || 0}`)
+    .sort()
+    .join('|')
+  return `${deck.id}::${deck.name || ""}::${entries}`
+}
 export default function useDeckSave(deck, { isAuthenticated, onSaved } = {}) {
   const [phase, setPhase] = useState('idle') // idle | saving | saved | error
   const [error, setError] = useState(null)
   const [lastSavedAt, setLastSavedAt] = useState(null)
 
   const deckRef = useRef(deck)
-  const savedDeckRef = useRef(null)
+  const savedSignatureRef = useRef(null)
   const mountedRef = useRef(true)
   deckRef.current = deck
 
-  useEffect(() => () => { mountedRef.current = false }, [])
+  // Must re-arm on mount, not just tear down. StrictMode runs effects
+  // mount -> cleanup -> mount, so a teardown-only effect leaves this false
+  // forever and every save silently skips its success and error branches,
+  // leaving the status stuck on "Saving...".
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // Local draft. useLayoutEffect so the write lands before paint and a fast
   // reload cannot race it.
@@ -82,7 +103,7 @@ export default function useDeckSave(deck, { isAuthenticated, onSaved } = {}) {
       const dbId = body?.deck?.id
 
       if (!mountedRef.current) return
-      savedDeckRef.current = deckToSave
+      savedSignatureRef.current = deckSignature(deckToSave)
       setLastSavedAt(Date.now())
       setPhase('saved')
       if (dbId && dbId !== deckToSave._dbId) onSaved?.(dbId)
@@ -93,17 +114,8 @@ export default function useDeckSave(deck, { isAuthenticated, onSaved } = {}) {
     }
   }, [postDeck, onSaved])
 
-  // Compare content, not object identity. deckReducer stamps updatedAt on
-  // every action, and comparing values means a caller that rebuilds the deck
-  // object each render does not read as permanently unsaved.
-  const savedDeck = savedDeckRef.current
-  const dirty = Boolean(
-    savedDeck &&
-    (deck?.id !== savedDeck.id ||
-      deck?.updatedAt !== savedDeck.updatedAt ||
-      deck?.total !== savedDeck.total ||
-      deck?.name !== savedDeck.name)
-  )
+  const savedSignature = savedSignatureRef.current
+  const dirty = Boolean(savedSignature && deckSignature(deck) !== savedSignature)
 
   let status = phase
   if (phase === 'saved' && dirty) status = 'unsaved'
