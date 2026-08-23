@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import BuilderPage from '../features/builder/BuilderPage.jsx'
 
 vi.mock('../features/builder/hooks/useCardPool.js', () => ({
@@ -19,7 +20,7 @@ beforeEach(() => {
 
 describe('BuilderPage', () => {
   it('renders all three panes', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     expect(screen.getByRole('complementary', { name: /filters/i })).toBeInTheDocument()
     expect(screen.getByRole('searchbox')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: /rename deck/i })).toBeInTheDocument())
@@ -31,13 +32,13 @@ describe('BuilderPage', () => {
   const deckPanel = () => within(screen.getByRole('complementary', { name: /deck/i }))
 
   it('adding a card updates the deck panel total', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     await userEvent.click(screen.getByRole('button', { name: /add Cinderella/i }))
     await waitFor(() => expect(deckPanel().getByLabelText(/1 of 60 cards/)).toBeInTheDocument())
   })
 
   it('filtering by ink narrows the results', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     expect(screen.getByText('Mulan')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Amethyst' }))
     await waitFor(() => expect(screen.queryByText('Mulan')).not.toBeInTheDocument())
@@ -45,7 +46,7 @@ describe('BuilderPage', () => {
   })
 
   it('clearing filters restores every card', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     await userEvent.click(screen.getByRole('button', { name: 'Amethyst' }))
     await waitFor(() => expect(screen.queryByText('Mulan')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /clear 1/i }))
@@ -53,7 +54,7 @@ describe('BuilderPage', () => {
   })
 
   it('renaming the deck updates the visible title', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     await userEvent.click(deckPanel().getByRole('button', { name: /rename deck/i }))
     const input = deckPanel().getByRole('textbox')
     await userEvent.clear(input)
@@ -62,7 +63,7 @@ describe('BuilderPage', () => {
   })
 
   it('searching narrows the results', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     await userEvent.type(screen.getByRole('searchbox'), 'mulan')
     await waitFor(() => expect(screen.queryByText('Cinderella')).not.toBeInTheDocument())
     expect(screen.getByText('Mulan')).toBeInTheDocument()
@@ -73,7 +74,7 @@ describe('BuilderPage inspect', () => {
   const deckPanel2 = () => within(screen.getByRole('complementary', { name: /deck/i }))
 
   it('Inspect opens the card details rather than adding the card', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     await userEvent.click(screen.getByRole('button', { name: /inspect Cinderella/i }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAccessibleName(/Cinderella/)

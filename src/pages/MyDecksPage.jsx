@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { LS_KEYS, loadLS, saveLS } from '../lib/storage.js'
 import { fetchAllCards } from '../lib/cardsApi.js'
@@ -58,7 +58,17 @@ export default function MyDecksPage() {
   const { user } = useAuth()
   const { addToast } = useToasts()
   const [decks, setDecks] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedId, setSelectedId] = useState(() => searchParams.get('deck'))
+
+  // Keep the id in the URL so a deck page can be linked to, refreshed and
+  // reached with the browser back button.
+  const selectDeck = (id) => {
+    setSelectedId(id)
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('deck', id); else next.delete('deck')
+    setSearchParams(next, { replace: true })
+  }
 
   // The full card catalog is only needed once a deck's rich presentation is
   // shown, so fetch it lazily the first time a deck is opened rather than
@@ -155,7 +165,7 @@ export default function MyDecksPage() {
             return (
               <button
                 key={deck.id}
-                onClick={() => setSelectedId(isSelected ? null : deck.id)}
+                onClick={() => selectDeck(isSelected ? null : deck.id)}
                 className={`text-left rounded-xl border p-4 transition-colors ${
                   selectedDeck ? 'w-48 shrink-0 lg:w-full' : ''
                 }`}
@@ -187,7 +197,7 @@ export default function MyDecksPage() {
           <div className="rounded-xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--panel)' }}>
             <div className="flex justify-end mb-3">
               <button
-                onClick={() => setSelectedId(null)}
+                onClick={() => selectDeck(null)}
                 className="px-3 py-2 border rounded-md text-sm transition-colors"
                 style={{ borderColor: 'var(--line-2)', color: 'var(--muted)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--faint)' }}

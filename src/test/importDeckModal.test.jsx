@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import ImportDeckModal from '../features/builder/ImportDeckModal.jsx'
 import BuilderPage from '../features/builder/BuilderPage.jsx'
 
@@ -117,7 +118,7 @@ describe('ImportDeckModal', () => {
 
 describe('reaching import from the builder', () => {
   it('opens the import dialog from the deck panel', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
     const panel = screen.getByRole('complementary', { name: /deck/i })
     await userEvent.click(within(panel).getByRole('button', { name: /^import$/i }))
     await waitFor(() =>

@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import BuilderPage from '../features/builder/BuilderPage.jsx'
 
 vi.mock('../features/builder/hooks/useCardPool.js', () => ({
@@ -18,7 +19,7 @@ const deckPanel = () => within(screen.getByRole('complementary', { name: /deck/i
 
 describe('builder persistence', () => {
   it('survives a full unmount and remount', async () => {
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
 
     await userEvent.click(screen.getByRole('button', { name: /add Cinderella/i }))
     await waitFor(() => expect(deckPanel().getByLabelText(/1 of 60 cards/)).toBeInTheDocument())
@@ -30,7 +31,7 @@ describe('builder persistence', () => {
     await waitFor(() => expect(deckPanel().getByText('Persisted Deck')).toBeInTheDocument())
 
     cleanup()
-    render(<BuilderPage />)
+    render(<MemoryRouter><BuilderPage /></MemoryRouter>)
 
     await waitFor(() => expect(deckPanel().getByText('Persisted Deck')).toBeInTheDocument())
     expect(deckPanel().getByLabelText(/1 of 60 cards/)).toBeInTheDocument()

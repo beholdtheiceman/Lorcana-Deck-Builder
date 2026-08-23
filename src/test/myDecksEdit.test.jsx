@@ -12,6 +12,9 @@ import MyDecksPage from '../pages/MyDecksPage.jsx'
 const navigateMock = vi.fn()
 vi.mock('react-router-dom', () => ({
   useNavigate: () => navigateMock,
+  // MyDecksPage keeps the open deck in ?deck=<id> so other surfaces can
+  // link to it; these tests do not exercise the URL.
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }))
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: null }),

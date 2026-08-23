@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import FilterRail from './FilterRail.jsx'
 import CardResults, { deckCountFor } from './CardResults.jsx'
 import InspectCardModal from './results/InspectCardModal.jsx'
 import DeckPanel from './DeckPanel.jsx'
 import { FilterSheet, DeckSheet } from './MobileSheets.jsx'
-import DeckStatsModal from './DeckStatsModal.jsx'
 import ImportDeckModal from './ImportDeckModal.jsx'
 import useCardPool from './hooks/useCardPool.js'
 import useDeckSave from './hooks/useDeckSave.js'
@@ -23,12 +23,12 @@ import {
  * everything below it as props.
  */
 export default function BuilderPage({ isAuthenticated = false }) {
+  const navigate = useNavigate()
   const [deck, deckDispatch] = useReducer(deckReducer, undefined, initialDeckState)
   const [filters, filterDispatch] = useReducer(filterReducer, undefined, initialFilterState)
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [deckSheetOpen, setDeckSheetOpen] = useState(false)
   const [inspectedCard, setInspectedCard] = useState(null)
-  const [statsOpen, setStatsOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
   const { cards, loading, error, retry } = useCardPool()
@@ -121,7 +121,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
       onSetCount={handleSetCount}
       onRemove={handleRemove}
       onSave={saveStatus.save}
-      onShowStats={() => setStatsOpen(true)}
+      onShowStats={() => navigate(`/my-decks?deck=${encodeURIComponent(deck?.id || '')}`)}
       onImport={() => setImportOpen(true)}
     />
   )
@@ -180,8 +180,6 @@ export default function BuilderPage({ isAuthenticated = false }) {
         onClose={() => setInspectedCard(null)}
         onSetCount={handleSetCount}
       />
-
-      <DeckStatsModal open={statsOpen} deck={deck} onClose={() => setStatsOpen(false)} />
 
       <ImportDeckModal
         open={importOpen}
