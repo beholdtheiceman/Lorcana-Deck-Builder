@@ -134,6 +134,7 @@ export function serializeFilterState(state) {
     inkable: state.inkable === "yes" || state.inkable === "no" ? state.inkable : "any",
     setNumber: state.setNumber || "",
     franchise: state.franchise || "",
+    text: "",
     gamemode: state.gamemode || "",
     loreMin: state.loreMin || "",
     loreMax: state.loreMax || "",
@@ -171,7 +172,10 @@ export function hydrateFilterState(raw) {
 }
 export function filterReducer(state, action) {
   switch (action.type) {
-    case "SET_TEXT": return persist({ ...state, text: action.text || "" });
+    // Deliberately not persisted: writing the whole filter state to
+    // localStorage on every keystroke was a synchronous JSON.stringify per
+    // character, and restoring a stale search on reload is unhelpful anyway.
+    case "SET_TEXT": return { ...state, text: action.text || "" };
     case "TOGGLE_INK": {
       const inks = new Set(state.inks instanceof Set ? state.inks : new Set());
       if (inks.has(action.ink)) inks.delete(action.ink); else inks.add(action.ink);

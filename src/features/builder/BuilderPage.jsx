@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FilterRail from './FilterRail.jsx'
 import CardResults, { deckCountFor } from './CardResults.jsx'
@@ -38,7 +38,14 @@ export default function BuilderPage({ isAuthenticated = false }) {
 
   const saveStatus = useDeckSave(deck, { isAuthenticated, onSaved: handleDeckSaved })
 
-  const filteredCards = useMemo(() => applyFilters(cards, filters), [cards, filters])
+  // Filtering 2,500 cards runs a ~490-line predicate chain. Deferring it lets
+  // keystrokes paint immediately and the grid catch up, instead of every
+  // character waiting on the full pass.
+  const deferredFilters = useDeferredValue(filters)
+  const filteredCards = useMemo(
+    () => applyFilters(cards, deferredFilters),
+    [cards, deferredFilters]
+  )
   const stats = useMemo(() => computeDeckStats(deck), [deck])
   const activeCount = useMemo(() => countActiveFilters(filters), [filters])
 

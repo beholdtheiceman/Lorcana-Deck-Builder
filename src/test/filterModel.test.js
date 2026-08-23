@@ -105,7 +105,9 @@ describe('state persistence round trip', () => {
     expect(back.inks instanceof Set).toBe(true)
     expect(back.inks.has('Ruby')).toBe(true)
     expect(back.inkable).toBe('no')
-    expect(back.text).toBe('x')
+    // Search text is deliberately not persisted: restoring a stale search on
+    // reload is unhelpful, and writing it cost a JSON.stringify per keystroke.
+    expect(back.text).toBe('')
   })
 
   it('migrates legacy showUninkablesOnly to inkable no', () => {
