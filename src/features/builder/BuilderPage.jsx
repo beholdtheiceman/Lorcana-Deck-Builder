@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import FilterRail from './FilterRail.jsx'
 import CardResults, { deckCountFor } from './CardResults.jsx'
 import InspectCardModal from './results/InspectCardModal.jsx'
 import DeckPanel from './DeckPanel.jsx'
 import { FilterSheet, DeckSheet } from './MobileSheets.jsx'
+import DeckStatsModal from './DeckStatsModal.jsx'
 import useCardPool from './hooks/useCardPool.js'
 import useDeckSave from './hooks/useDeckSave.js'
 import { deckReducer, initialDeckState } from '../../lib/deck/deckReducer.js'
@@ -26,6 +27,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [deckSheetOpen, setDeckSheetOpen] = useState(false)
   const [inspectedCard, setInspectedCard] = useState(null)
+  const [statsOpen, setStatsOpen] = useState(false)
 
   const { cards, loading, error, retry } = useCardPool()
   const handleDeckSaved = useCallback((dbId) => {
@@ -38,6 +40,39 @@ export default function BuilderPage({ isAuthenticated = false }) {
   const stats = useMemo(() => computeDeckStats(deck), [deck])
   const activeCount = useMemo(() => countActiveFilters(filters), [filters])
 
+
+  // Each pane scrolls independently, which means the builder has to claim a
+  // fixed height. Measure our own top rather than hard-coding a nav offset,
+  // so this survives changes to the shell.
+  const shellRef = useRef(null)
+  const [shellHeight, setShellHeight] = useState(null)
+
+  useEffect(() => {
+    const measure = () => {
+      const node = shellRef.current
+      if (!node) return
+      const top = node.getBoundingClientRect().top
+      // Ancestors add their own bottom padding below us (the app shell uses
+      // py-6), so claiming the full remaining viewport would push the page
+      // into a scrollbar. Subtract whatever sits underneath.
+      let inset = 0
+      for (let el = node.parentElement; el && el !== document.body; el = el.parentElement) {
+        const cs = getComputedStyle(el)
+        inset += parseFloat(cs.paddingBottom) || 0
+        inset += parseFloat(cs.borderBottomWidth) || 0
+        inset += parseFloat(cs.marginBottom) || 0
+      }
+      setShellHeight(Math.max(320, window.innerHeight - top - inset))
+    }
+    measure()
+    // Re-measure once layout settles; fonts and late chrome shift our top.
+    const raf = requestAnimationFrame(measure)
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
   const handleSearch = useCallback((text) => {
     filterDispatch({ type: 'SET_TEXT', text })
   }, [])
@@ -80,18 +115,20 @@ export default function BuilderPage({ isAuthenticated = false }) {
       onSetCount={handleSetCount}
       onRemove={handleRemove}
       onSave={saveStatus.save}
+      onShowStats={() => setStatsOpen(true)}
     />
   )
 
   return (
     <div
-      className="mx-auto w-full max-w-[1600px] px-3 py-4"
-      style={{ color: 'var(--text)' }}
+      ref={shellRef}
+      className="mx-auto flex w-full max-w-[1600px] flex-col px-3 py-4"
+      style={{ color: 'var(--text)', height: shellHeight ? `${shellHeight}px` : undefined }}
     >
-      <div className="grid gap-4 lg:grid-cols-[188px_minmax(0,1fr)_264px]">
-        <div className="hidden lg:block">{rail}</div>
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[188px_minmax(0,1fr)_264px]">
+        <div className="hidden min-h-0 overflow-y-auto pr-1 lg:block">{rail}</div>
 
-        <main className="min-w-0">
+        <main className="flex min-h-0 min-w-0 flex-col">
           <div className="mb-3 flex gap-2 lg:hidden">
             <button
               type="button"
@@ -103,6 +140,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
             </button>
           </div>
 
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <CardResults
             cards={filteredCards}
             deck={deck}
@@ -114,9 +152,10 @@ export default function BuilderPage({ isAuthenticated = false }) {
             onInspect={setInspectedCard}
             onRetry={retry}
           />
+          </div>
         </main>
 
-        <div className="hidden lg:block">{panel}</div>
+        <div className="hidden min-h-0 lg:block">{panel}</div>
       </div>
 
       <button
@@ -134,6 +173,8 @@ export default function BuilderPage({ isAuthenticated = false }) {
         onClose={() => setInspectedCard(null)}
         onSetCount={handleSetCount}
       />
+
+      <DeckStatsModal open={statsOpen} deck={deck} onClose={() => setStatsOpen(false)} />
 
       <FilterSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)}>
         {rail}

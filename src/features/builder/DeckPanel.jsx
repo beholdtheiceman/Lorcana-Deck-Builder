@@ -3,13 +3,13 @@ import SaveStatus from './deck/SaveStatus.jsx'
 import DeckList from './deck/DeckList.jsx'
 import DeckStatsPanel from './deck/DeckStatsPanel.jsx'
 
-export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCount, onRemove, onSave }) {
+export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCount, onRemove, onSave, onShowStats }) {
   const total = Number(deck?.total) || 0
 
   return (
     <aside
       aria-label="Deck"
-      className="flex min-h-0 flex-col border p-4"
+      className="flex h-full min-h-0 flex-col border p-4"
       style={{ background: 'var(--canvas)', borderColor: 'var(--line)', color: 'var(--text)' }}
     >
       <header className="border-b pb-4" style={{ borderColor: 'var(--line)' }}>
@@ -20,9 +20,18 @@ export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCoun
           <span className="text-xs" style={{ color: 'var(--muted)' }}>/ 60 cards</span>
         </p>
 
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
           <SaveStatus saveStatus={saveStatus} onSave={onSave} />
         </div>
+
+        <button
+          type="button"
+          onClick={onShowStats}
+          className="mt-3 w-full rounded-md border px-3 py-1.5 text-xs"
+          style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
+        >
+          Deck stats
+        </button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto py-4">
