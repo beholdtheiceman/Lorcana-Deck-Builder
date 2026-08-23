@@ -50,7 +50,13 @@ export default function useDeckSave(deck, { isAuthenticated, onSaved } = {}) {
 
   const save = useCallback(async () => {
     const deckToSave = deckRef.current
-    if (!deckToSave?.id) return
+    if (!deckToSave?.id) {
+      // A silent return here is what let an id-less imported deck look
+      // like a dead Save button.
+      setError(new Error("This deck has no identifier and cannot be saved."))
+      setPhase("error")
+      return
+    }
 
     setPhase('saving')
     setError(null)

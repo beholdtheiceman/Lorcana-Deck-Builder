@@ -21,8 +21,24 @@ function deckReducer(state, action) {
       return next;
     }
     case "IMPORT_STATE": {
-      const next = action.deck || createNewDeck("Imported Deck");
-      return next;
+      // Importers return a bare { entries, total } with no identity. Merge it
+      // into the current deck rather than replacing it: an id-less deck is
+      // never written to local storage and can never be saved, so it silently
+      // disappears.
+      const incoming = action.deck || {};
+      const base = state && state.id ? state : createNewDeck("Imported Deck");
+      const entries = incoming.entries && typeof incoming.entries === "object"
+        ? incoming.entries
+        : {};
+      const total = Object.values(entries)
+        .reduce((sum, entry) => sum + (Number(entry?.count) || 0), 0);
+      return {
+        ...base,
+        name: incoming.name || base.name || "Imported Deck",
+        entries,
+        total,
+        updatedAt: Date.now(),
+      };
     }
     case "ADD": {
       const { card, count = 1 } = action;
