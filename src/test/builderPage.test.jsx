@@ -33,7 +33,7 @@ describe('BuilderPage', () => {
   it('adding a card updates the deck panel total', async () => {
     render(<BuilderPage />)
     await userEvent.click(screen.getByRole('button', { name: /add Cinderella/i }))
-    await waitFor(() => expect(deckPanel().getByText(/1\s*\/\s*60/)).toBeInTheDocument())
+    await waitFor(() => expect(deckPanel().getByLabelText(/1 of 60 cards/)).toBeInTheDocument())
   })
 
   it('filtering by ink narrows the results', async () => {
@@ -77,6 +77,6 @@ describe('BuilderPage inspect', () => {
     await userEvent.click(screen.getByRole('button', { name: /inspect Cinderella/i }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAccessibleName(/Cinderella/)
-    expect(deckPanel2().getByText(/0\s*\/\s*60/)).toBeInTheDocument()
+    expect(deckPanel2().getByLabelText(/0 of 60 cards/)).toBeInTheDocument()
   })
 })

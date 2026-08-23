@@ -1,10 +1,17 @@
 const LABELS = {
-  idle: 'Draft saved on this device',
-  'local-only': 'Draft saved on this device',
+  idle: 'Draft only',
+  'local-only': 'Draft only',
   saving: 'Saving…',
-  saved: 'Saved to your account',
+  saved: 'Saved',
   unsaved: 'Unsaved changes',
   error: "Couldn't save",
+}
+
+const HINTS = {
+  idle: 'Saved on this device. Press Save to store it on your account.',
+  'local-only': 'Saved on this device. Press Save to store it on your account.',
+  saved: 'Stored on your account',
+  unsaved: 'Edited since the last save',
 }
 
 function relative(timestamp) {
@@ -22,27 +29,32 @@ export default function SaveStatus({ saveStatus, onSave }) {
   const when = status === 'saved' ? relative(saveStatus?.lastSavedAt) : ''
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <button
           type="button"
           onClick={onSave}
           disabled={busy}
-          className="rounded-md px-3 py-1.5 text-xs font-medium"
+          className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium"
           style={{
             background: busy ? 'var(--line)' : 'var(--sapphire)',
             color: busy ? 'var(--muted)' : 'var(--canvas)',
           }}
         >
-          {busy ? 'Saving…' : 'Save deck'}
+          {busy ? 'Saving…' : 'Save'}
         </button>
-        <span role="status" style={{ color: status === 'error' ? 'var(--ruby)' : 'var(--muted)' }}>
+        <span
+          role="status"
+          title={HINTS[status] || ''}
+          className="text-xs"
+          style={{ color: status === 'error' ? 'var(--ruby)' : 'var(--muted)' }}
+        >
           {LABELS[status] || LABELS.idle}{when && ` · ${when}`}
         </span>
       </div>
 
       {status === 'error' && saveStatus?.error?.message && (
-        <p className="text-[11px]" style={{ color: 'var(--ruby)' }}>
+        <p className="text-[11px] leading-snug" style={{ color: 'var(--ruby)' }}>
           {saveStatus.error.message}
         </p>
       )}

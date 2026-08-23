@@ -82,15 +82,15 @@ describe('SaveStatus', () => {
     expect(screen.getByText(/saved/i)).toBeInTheDocument()
   })
 
-  it('offers a Save deck button', () => {
+  it('offers a Save button', () => {
     setup()
-    expect(screen.getByRole('button', { name: /save deck/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument()
   })
 
-  it('calls onSave when Save deck is pressed', async () => {
+  it('calls onSave when Save is pressed', async () => {
     const onSave = vi.fn()
     setup({ onSave })
-    await userEvent.click(screen.getByRole('button', { name: /save deck/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
     expect(onSave).toHaveBeenCalled()
   })
 
@@ -109,13 +109,13 @@ describe('SaveStatus', () => {
 describe('DeckPanel body', () => {
   it('shows the card total against the deck size', () => {
     setup()
-    expect(screen.getByText(/4\s*\/\s*60/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/4 of 60 cards/)).toBeInTheDocument()
   })
 
   it('lists deck entries with counts', () => {
     setup()
     expect(screen.getByText('Cinderella')).toBeInTheDocument()
-    expect(screen.getByText('4')).toBeInTheDocument()
+    expect(screen.getAllByText('4').length).toBeGreaterThan(0)
   })
 
   it('shows stats without any interaction', () => {

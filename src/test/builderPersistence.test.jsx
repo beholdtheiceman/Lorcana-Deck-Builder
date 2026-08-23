@@ -21,7 +21,7 @@ describe('builder persistence', () => {
     render(<BuilderPage />)
 
     await userEvent.click(screen.getByRole('button', { name: /add Cinderella/i }))
-    await waitFor(() => expect(deckPanel().getByText(/1\s*\/\s*60/)).toBeInTheDocument())
+    await waitFor(() => expect(deckPanel().getByLabelText(/1 of 60 cards/)).toBeInTheDocument())
 
     await userEvent.click(deckPanel().getByRole('button', { name: /rename deck/i }))
     const input = deckPanel().getByRole('textbox')
@@ -33,6 +33,6 @@ describe('builder persistence', () => {
     render(<BuilderPage />)
 
     await waitFor(() => expect(deckPanel().getByText('Persisted Deck')).toBeInTheDocument())
-    expect(deckPanel().getByText(/1\s*\/\s*60/)).toBeInTheDocument()
+    expect(deckPanel().getByLabelText(/1 of 60 cards/)).toBeInTheDocument()
   })
 })

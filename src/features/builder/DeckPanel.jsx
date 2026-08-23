@@ -14,11 +14,14 @@ export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCoun
     >
       <header className="border-b pb-4" style={{ borderColor: 'var(--line)' }}>
         <DeckTitle name={deck?.name} onRename={onRename} />
-        <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+
+        <p className="mt-1 flex items-baseline gap-1.5" aria-label={`${total} of 60 cards`}>
+          <span className="text-xl font-semibold leading-none tabular-nums">{total}</span>
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>/ 60 cards</span>
+        </p>
+
+        <div className="mt-3">
           <SaveStatus saveStatus={saveStatus} onSave={onSave} />
-          <span aria-label={`${total} of 60 cards`} className="font-semibold tabular-nums">
-            {total} / 60
-          </span>
         </div>
       </header>
 

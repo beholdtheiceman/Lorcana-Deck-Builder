@@ -41,22 +41,17 @@ function FormatFilter({ value, onChange }) {
             key={option.value}
             type="button"
             aria-pressed={active}
-            aria-label={`${option.label} format, ${option.hint}`}
+            aria-label={`${option.label} format`}
+            title={option.hint}
             onClick={() => onChange({ type: 'SET_GAMEMODE', value: option.value })}
-            className="rounded-md border px-2 py-1.5 text-center"
+            className="rounded-md border px-2 py-1.5 text-center text-xs font-medium"
             style={{
               background: active ? 'var(--sapphire)' : 'var(--canvas)',
               borderColor: active ? 'var(--sapphire)' : 'var(--line)',
               color: active ? 'var(--canvas)' : 'var(--text)',
             }}
           >
-            <span className="block text-xs font-medium">{option.label}</span>
-            <span
-              className="block text-[10px]"
-              style={{ color: active ? 'var(--canvas)' : 'var(--muted)' }}
-            >
-              {option.hint}
-            </span>
+            {option.label}
           </button>
         )
       })}
