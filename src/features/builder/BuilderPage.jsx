@@ -5,6 +5,7 @@ import InspectCardModal from './results/InspectCardModal.jsx'
 import DeckPanel from './DeckPanel.jsx'
 import { FilterSheet, DeckSheet } from './MobileSheets.jsx'
 import DeckStatsModal from './DeckStatsModal.jsx'
+import ImportDeckModal from './ImportDeckModal.jsx'
 import useCardPool from './hooks/useCardPool.js'
 import useDeckSave from './hooks/useDeckSave.js'
 import { deckReducer, initialDeckState } from '../../lib/deck/deckReducer.js'
@@ -28,6 +29,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
   const [deckSheetOpen, setDeckSheetOpen] = useState(false)
   const [inspectedCard, setInspectedCard] = useState(null)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const { cards, loading, error, retry } = useCardPool()
   const handleDeckSaved = useCallback((dbId) => {
@@ -93,6 +95,10 @@ export default function BuilderPage({ isAuthenticated = false }) {
     deckDispatch({ type: 'REMOVE', card })
   }, [])
 
+  const handleImport = useCallback((importedDeck) => {
+    deckDispatch({ type: 'IMPORT_STATE', deck: importedDeck })
+  }, [])
+
   const handleRename = useCallback((name) => {
     deckDispatch({ type: 'SET_NAME', name })
   }, [])
@@ -116,6 +122,7 @@ export default function BuilderPage({ isAuthenticated = false }) {
       onRemove={handleRemove}
       onSave={saveStatus.save}
       onShowStats={() => setStatsOpen(true)}
+      onImport={() => setImportOpen(true)}
     />
   )
 
@@ -175,6 +182,14 @@ export default function BuilderPage({ isAuthenticated = false }) {
       />
 
       <DeckStatsModal open={statsOpen} deck={deck} onClose={() => setStatsOpen(false)} />
+
+      <ImportDeckModal
+        open={importOpen}
+        cards={cards}
+        currentDeckTotal={Number(deck?.total) || 0}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+      />
 
       <FilterSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)}>
         {rail}

@@ -3,7 +3,7 @@ import SaveStatus from './deck/SaveStatus.jsx'
 import DeckList from './deck/DeckList.jsx'
 import DeckStatsPanel from './deck/DeckStatsPanel.jsx'
 
-export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCount, onRemove, onSave, onShowStats }) {
+export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCount, onRemove, onSave, onShowStats, onImport }) {
   const total = Number(deck?.total) || 0
 
   return (
@@ -24,14 +24,24 @@ export default function DeckPanel({ deck, stats, saveStatus, onRename, onSetCoun
           <SaveStatus saveStatus={saveStatus} onSave={onSave} />
         </div>
 
-        <button
-          type="button"
-          onClick={onShowStats}
-          className="mt-3 w-full rounded-md border px-3 py-1.5 text-xs"
-          style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
-        >
-          Deck stats
-        </button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onShowStats}
+            className="rounded-md border px-3 py-1.5 text-xs"
+            style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
+          >
+            Deck stats
+          </button>
+          <button
+            type="button"
+            onClick={onImport}
+            className="rounded-md border px-3 py-1.5 text-xs"
+            style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
+          >
+            Import
+          </button>
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto py-4">

@@ -175,7 +175,7 @@ export function findCardByLorcanitoFormat(cardName, subtitle, setId, setNumber) 
     return null;
   }
 }
-export function parseTextImport(text) {
+export function parseTextImport(text, suppliedCards) {
   if (!text || typeof text !== 'string') {
     throw new Error('Invalid text input');
   }
@@ -237,9 +237,13 @@ export function parseTextImport(text) {
 
     // Resolve against the FULL catalog, not the currently filtered view — an
     // active search/filter must not make deck-list cards unresolvable on import.
-    const cards = window.getAllCards
-      ? window.getAllCards()
-      : (window.getCurrentCards ? window.getCurrentCards() : []);
+    // Prefer an explicitly supplied pool. The window globals are set by the
+    // legacy builder; new callers pass their own cards instead.
+    const cards = Array.isArray(suppliedCards) && suppliedCards.length
+      ? suppliedCards
+      : (window.getAllCards
+        ? window.getAllCards()
+        : (window.getCurrentCards ? window.getCurrentCards() : []));
     const foundCard = findCardByName(cardName, cards);
     
     if (foundCard && !foundCard.reason) {
@@ -412,27 +416,10 @@ export function parseTextImport(text) {
       const card = entry.card;
       if (!card) return null;
       
-      // DEBUG: Log what we're working with
-      console.log(`[parseTextImport] Prefetch processing card:`, {
-        name: card.name,
-        type: typeof card,
-        keys: Object.keys(card),
-        hasImageUrl: !!card.image_url,
-        imageUrlType: typeof card.image_url
-      });
       
       // Use getCardImageUrl to get the best possible URL
       const rawUrl = getCardImageUrl(card);
       
-      // DEBUG: Log the exact value and type
-      console.log(`[parseTextImport] Prefetch rawUrl details:`, {
-        rawUrl,
-        type: typeof rawUrl,
-        isString: typeof rawUrl === 'string',
-        isObject: typeof rawUrl === 'object',
-        length: rawUrl?.length,
-        keys: typeof rawUrl === 'object' ? Object.keys(rawUrl) : 'N/A'
-      });
       
       // GUARD: Ensure rawUrl is a string before calling proxyImageUrl
       if (typeof rawUrl !== 'string') {
@@ -458,6 +445,13 @@ export function parseTextImport(text) {
     console.log('[parseTextImport] Not found cards:', notFoundCards);
   }
   
+  deck._report = {
+    matched: foundCards,
+    unmatched: notFoundCards,
+    skippedLines,
+    totalCards,
+  };
+
   return deck;
 }
 export function matchCard(line, db) {
